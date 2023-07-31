@@ -1,0 +1,1015 @@
+########################################
+## G2 connection to Octonians via Spin(7)
+## File: spin7_g2.ca - G.P.Wilmot
+########################################
+## This file for calcCA defines the Triads7[30] 3-forms for Spin7, triads7*
+## functions to process allSign() elements and makeG2(i,j) to generate globals
+## A, B,...,N for octonian representations.
+
+#--------------------------------------------------------------------------
+# Find all 21 2-forms, 35 3/4-forms, 7 6-forms  # Triads7[0].swap(each term)
+# Same as list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(2/3/4/5/6)
+TT71 = list(CA.Basis(7))[:7] 
+TT72 = list(CA.Basis(7))[7:28] 
+TT73 = list(CA.Basis(7))[28:63]
+TT74 = list(CA.Basis(7))[63:98]
+TT75 = list(CA.Basis(7))[98:119]
+TT76 = list(CA.Basis(7))[119:126]
+
+# From CA(7)+ find 30 tetrahedron faces selected to define sub-algebras of CA(7).
+Triads7gen = (CA.Eval(x) for x in Common.triads(7))
+# Triads7 = list(Triads7gen) [takes 2.3 minutes]
+Triads7 = (e123 +e145 +e167 +e246 +e257 +e347 +e356, e123 +e145 +e167 +e247 +e256 +e346 +e357,
+           e123 +e146 +e157 +e245 +e267 +e347 +e356, e123 +e146 +e157 +e247 +e256 +e345 +e367,
+           e123 +e147 +e156 +e245 +e267 +e346 +e357, e123 +e147 +e156 +e246 +e257 +e345 +e367,
+           e124 +e135 +e167 +e236 +e257 +e347 +e456, e124 +e135 +e167 +e237 +e256 +e346 +e457,
+           e124 +e136 +e157 +e235 +e267 +e347 +e456, e124 +e136 +e157 +e237 +e256 +e345 +e467,
+           e124 +e137 +e156 +e235 +e267 +e346 +e457, e124 +e137 +e156 +e236 +e257 +e345 +e467,
+           e125 +e134 +e167 +e236 +e247 +e357 +e456, e125 +e134 +e167 +e237 +e246 +e356 +e457,
+           e125 +e136 +e147 +e234 +e267 +e357 +e456, e125 +e136 +e147 +e237 +e246 +e345 +e567,
+           e125 +e137 +e146 +e234 +e267 +e356 +e457, e125 +e137 +e146 +e236 +e247 +e345 +e567,
+           e126 +e134 +e157 +e235 +e247 +e367 +e456, e126 +e134 +e157 +e237 +e245 +e356 +e467,
+           e126 +e135 +e147 +e234 +e257 +e367 +e456, e126 +e135 +e147 +e237 +e245 +e346 +e567,
+           e126 +e137 +e145 +e234 +e257 +e356 +e467, e126 +e137 +e145 +e235 +e247 +e346 +e567,
+           e127 +e134 +e156 +e235 +e246 +e367 +e457, e127 +e134 +e156 +e236 +e245 +e357 +e467,
+           e127 +e135 +e146 +e234 +e256 +e367 +e457, e127 +e135 +e146 +e236 +e245 +e347 +e567,
+           e127 +e136 +e145 +e234 +e256 +e357 +e467, e127 +e136 +e145 +e235 +e246 +e347 +e567)
+
+# G2 paper has Fp = negTriO(Triads7[0])[4] and FFp=-e1247 +e1256 +e1346 +e1357 -e2345 +e2367 +e4567
+# ie Fp^FFp=7e1234567. But Fp*e1234567 negates terms 2,3,5 so that (Fp*Fp +7) = 6*Fp *e1234567.
+P1 = Tensor(e123, e145, e167, e246, e257, e347, e356)  # = (CA(**dict([x])) for x in Triads7[0].copyTerms())
+PP1 = (e1247, e1256, e1346, e1357, e2345, e2367, e4567) # = sum(PP1) = -e1234567 *sum(P1)
+PPP1 = list(Common.chain(*([CA.Eval([x[0],x[1]])+CA.Eval([x[2],x[3]]), CA.Eval([x[0],x[2]])+CA.Eval([x[1],x[3]]),
+        CA.Eval([x[0],x[3]])+CA.Eval([x[1],x[2]])] for x in (y.basisTerms()[0][0] for y in PP1))))
+
+# Pick one P1o = next(negTriO(P1)) & define PP1o = -e1234567 *P1o  # This P1o negates e246 from P1.
+# Find PP1o = (P1o*P1o+7)/6 & P1o*(PP1o+6) = 7e1234567
+P1o = e123 +e145 +e167 -e246 +e257 +e347 +e356
+PP1o = e1247 +e1256 +e1346 -e1357 +e2345 +e2367 +e4567
+
+# Define S1 so that P1 +S1 = all 3-forms in CA(7) and SS1 = abs(e1234567 *S1), PP1 +SS1 = all 4-forms
+# Find PP1 = abs(e1234567 *P1) and SS1 = abs(e1234567 *S1)
+S1 = list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(3) -sum(P1)).copyTerms())
+SS1 = list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(4) -sum(PP1)).copyTerms())
+
+# Select S1o s.t. PP1o *S1o = S1o and SS1o = e1234567 *S1o = P1o *S1o
+# Takes ages but can get ?=181382, S1o, in 1.5 hours which is first min. with 19 terms in S1o*S1o
+TriadsG2 = (x for x in sum(S1).allSigns() if PP1o *x == x)
+
+S1o = -e124 +e125 +e126 +e127 +e134 +e135 -e136 +e137 +e146 +e147 +e156 +e157 -e234 +e235 \
+     +e236 +e237 +e245 +e247 +e256 -e267 +e345 -e346 +e357 +e367 +e456 +e457 +e467 -e567
+SS1o = e1234 +e1235 -e1236 +e1237 -e1245 +e1246 -e1257 -e1267 -e1345 +e1347 +e1356 +e1367 -e1456 +e1457 \
+    -e1467 -e1567 +e2346 -e2347 -e2356 +e2357 +e2456 +e2457 +e2467 -e2567 -e3456 +e3457 -e3467 -e3567
+# Find P1o *SS1o = -S1o, PP1o *S1o = S1o, PP1o *SS1o = SS1o, S1o *S1o = -SS1o *SS1o, S1o *SS1o = ...
+# (P1o+PP1o)**2 = 12*P1o +14e1234567 & no product of P1o, S1o, PP1o, SS1o contains a 6-form which is part of CA(7)+
+# (P1o+S1o)**2  (S1o+SS1o)**2  (PP1o+SS1o)**2 (P1o+SS1o)**2 
+
+# Generate Octonians using CA (need to guess P1 or use next(Triads7gen) [22 secs].
+# Check isomorphism to Octonians (A7) including -F cases which give other 8 signed F's.
+# Also checked all P not in 480 +/-TriadsOhalf[*]) are not isomorphic to Octonians.
+# Hence 30 * 16 = 480 3-forms generating tables isomorphic to Octonians.
+# TriadsOhalf = list(Common.chain(*(triadsOhalf(x) for x in range(30)))) # len=240
+# Octonians = TriadsOhalf +(-1*Tensor(TriadsOhalf))                      # len=480
+
+# Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Tensor.Table/Cycles(basis)
+f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))    # morph(PP1, f7Basis)
+#       f1  f2  f3  f4  f5  f6  f7
+#   ------------------------------
+# f1|    1 -f7 -f6  f5  f4 -f3 -f2
+# f2|  -f7   1 -f5  f6 -f3  f4 -f1
+# f3|  -f6 -f5   1  f7 -f2 -f1  f4
+# f4|   f5  f6  f7   1  f1  f2  f3
+# f5|   f4 -f3 -f2  f1   1 -f7 -f6
+# f6|  -f3  f4 -f1  f2 -f7   1 -f5
+# f7|  -f2 -f1  f4  f3 -f6 -f5   1
+# So PP1 *PP1 = 7 -2*PP1 +8*f4
+#          e1247  e1256  e1346  e1357  e2345  e2367  e4567
+#      ------1------2------3------4------5------6------7--
+# e1247|     1.0 -e4567 -e2367  e2345  e1357 -e1346 -e1256
+# e1256|  -e4567    1.0 -e2345  e2367 -e1346  e1357 -e1247
+# e1346|  -e2367 -e2345    1.0  e4567 -e1256 -e1247  e1357
+# e1357|   e2345  e2367  e4567    1.0  e1247  e1256  e1346
+# e2345|   e1357 -e1346 -e1256  e1247    1.0 -e4567 -e2367
+# e2367|  -e1346  e1357 -e1247  e1256 -e4567    1.0 -e2345
+# e4567|  -e1256 -e1247  e1357  e1346 -e2367 -e2345    1.0
+
+# triads7all(0,4) = O- = -O+
+Spin7O = Tensor( \
+ ("-1",  "f3",  "-f2", "f5", "-f4",  "f7",  "-f6"),
+ ("-f3", "-1",  "f1",  "-f6", "f7",  "f4",  "-f5"),
+ ("f2",  "-f1", "-1",  "f7",  "f6",  "-f5", "-f4"),
+ ("-f5", "f6",  "-f7", "-1",  "f1",  "-f2", "f3"),
+ ("f4",  "-f7", "-f6", "-f1", "-1",  "f3",  "f2"),
+ ("-f7", "-f4", "f5",  "f2",  "-f3", "-1",  "f1"),
+ ("f6",  "f5",  "f4",  "-f3", "-f2", "-f1", "-1"))
+if CA.IsCalc("O"):  # Need default.oct
+  Tensor(A7).search(m8,Spin7O,f7Basis)
+  Tensor.Triads(*(-triads7all(0,22)).spin(f7Basis)) == Tensor(A7).morph(m8,f7Basis)
+  Tensor.Triads(*triads7all(0,22).spin(f7Basis)) == Tensor(C7).morph(m8,f7Basis)
+  Tensor.Triads(*triads7all(10,0).spin(f7Basis)) == Tensor(E7).morph(m8,f7Basis)
+
+# triads7all(0,0) = R+-
+Spin7R = Tensor( \
+ ("-1", "f3","-f2", "f5","-f4", "f7","-f6"),
+ ("-f3", "-1", "f1", "f6", "f7","-f4","-f5"),
+ ("f2","-f1", "-1", "f7", "f6","-f5","-f4"),
+ ("-f5","-f6","-f7", "-1", "f1", "f2", "f3"),
+ ("f4","-f7","-f6","-f1", "-1", "f3", "f2"),
+ ("-f7", "f4", "f5","-f2","-f3", "-1", "f1"),
+ ("f6", "f5", "f4","-f3","-f2","-f1", "-1"))
+
+# Correlation between the class index and non-assoc cnt is multi-cover so invert
+NacName = {4:"R", 8:"S", 10:"T", 12:"U", 14:"V", 16:"W", 28:"O"}
+NacMap = ( \
+  (4, 12, 12, 14, 14, 14, 14),  (4, 12, 12, 14, 14, 14, 14),  #0  R:8, U:16, V:32;       same 
+  (4, 14, 14, 12, 12, 14, 14),  (4, 14, 14, 14, 14, 12, 12),  #2  R:8, U:16, V:32;       same 
+  (4, 14, 14, 12, 12, 14, 14),  (4, 14, 14, 14, 14, 12, 12),  #4  R:8, U:16, V:32;       same 
+  (8, 12, 12, 14, 14, 14, 10),  (8, 12, 12, 14, 14, 14, 10),  #6  S:8, T:8, U:16, V:24;  same 
+  (8, 14, 14, 12, 12, 14, 10),  (8, 14, 14, 14, 14, 12, 8),   #8  S:8, T:8, U:16, V:24;  S:16, U:8, V:32
+  (8, 14, 14, 12, 12, 14, 10),  (8, 14, 14, 14, 14, 12, 8),   #10 S:8, T:8, U:16, V:24;  S:16, U:8, V:32
+  (10, 10, 12, 14, 16, 12, 10), (10, 10, 12, 14, 16, 12, 10), #12 T:24, U:16, V:8; W:8;  T:24, U:16, V:8, W:8
+  (10, 14, 16, 10, 12, 12, 10), (12, 14, 14, 14, 14, 12, 4),  #14 T:24, U:16, V:8; W:8;  R:8, U:16, V:32
+  (10, 14, 16, 10, 12, 12, 10), (12, 14, 14, 14, 14, 12, 4),  #16 T:24, U:16, V:8; W:8;  R:8, U:16, V:32
+  (12, 10, 14, 12, 16, 10, 10), (12, 10, 14, 14, 14, 12, 8),  #18 T:24, U:16, V:8; W:8;  S:8, T:8, U:16, V:8
+  (12, 12, 16, 10, 14, 10, 10), (12, 14, 14, 14, 14, 12, 4),  #20 T:24, U:16, V:8; W:8;  R:8, U:16, V:32
+  (12, 14, 14, 10, 14, 12, 8),  (12, 14, 14, 14, 14, 12, 4),  #22 S:8, T:8, U:16, V:24;  R:8, U:16, V:32
+  (12, 10, 14, 12, 16, 10, 10), (12, 10, 14, 14, 14, 12, 8),  #24 T:24, U:16, V:8; W:8;  S:8, T:8, U:16, V:24
+  (12, 12, 16, 10, 14, 10, 10), (12, 14, 14, 14, 14, 12, 4),  #26 T:24, U:16, V:8; W:8;  R:8, U:16, V:32
+  (12, 14, 14, 10, 14, 12, 8),  (12, 14, 14, 14, 14, 12, 4))  #28 S:8, T:8, U:16, V:24;  R:8, U:16, V:32
+
+#NacName = {4:"R", 8:"S", 10:"T", 12:"U", 14:"V", 16:"W", 28:"O"}
+### +-      +  1          2        - 3          4          5          6
+### 0123456789 0123456789 0123456789 0123456789 0123456789 0123456789 0123
+#0: VVVVORUUVV ROUUVUUORU UROVVVVVVV UUROUUORVV VVVVROUUVV VVVVVVVVVV UURO
+#1: VVVVUUROVV UUORVROUUO RUUVVVVVVV ORUUROUUVV VVVVUUORVV VVVVVVVVVV ORUU
+#2: VVROVVUUOR VVUUVUUVVU UVVVROORVV UUVVUUVVVO RROVVVUUOV VVVORVVVVR UUVV
+#3: VVORUUVVRO UUVVVVVUUV VUUVORROVV VVUUVVUUVR OORVUUVVRV VVVROVVVVO VVUU
+#4: VVUUVVORUU VVROVORVVR OVVVUUUUVV ROVVORVVVU UUUVVVROUV VVVUUVVVVU ROVV
+#5: VVUUROVVUU ORVVVVVROV VORVUUUUVV VVORVVROVU UUUVORVVUV VVVUUVVVVU VVOR
+#6: UUOSVTVVSO TVVVUVVVTV VTVUOSSOUU VVTVVVVTUS OOSUTVVVSU UUUSOUUUUO VVTV
+#7: SOUUVVTVUU VVVTOTVVVV TVVOUUUUOS VTVVTVVVSU UUUSVVVTUS OOSUUOSSOU VTVV
+#8: UUTVSOVVVT OSVVUVVSOV VOSUTVVTUU VVOSVVSOUV TTVUOSVVVU UUUVTUUUUT VVOS
+#9: VVUSOSVVSU SOVVVVVOSV VSOVUSSUVV VVSOVVOSVS UUSVSOVVSV VVVSUVVVVU VVSO
+#10:OSVVUUVTVV UUTVSVTUUT VUUSVVVVSO TVUUVTUUOV VVVOUUTVVO SSOVVSOOSV TVUU
+#11:VVSOSUVVOS USVVVVVSUV VUSVSOOSVV VVUSVVSUVO SSOVUSVVOV VVVOSVVVVS VVUS
+#12:WVTUTOUTUT OTTUVUTTOT UOTVTUUTVW TUOTUTTOWU TTUWOTTUUW VVWUTVWWVT TUOT
+#13:UTVWTUOTWV UTTOTOTTUT OUTTVWWVTU TOUTOTTUUW VVWUUTTOWU TTUWVTUUTV TOUT
+#14:VWOTUTTUTO TUUTWTUUTU TTUWOTTOWV UTTUTUUTVT OOTVTUUTTV WWVTOWVVWO UTTU
+#15:VVOUURVVUO RUVVVVVURV VRUVOUUOVV VVRUVVURVU OOUVRUVVUV VVVUOVVVVO VVRU
+#16:TUUTWVTOTU VWOTUTOWVO TVWUUTTUUT OTVWTOWVTT UUTTVWOTTT UUTTUUTTUU OTVW
+#17:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
+#18:TVOUTTUWUO TTWUVUWTTW UTTVOUUOVT WUTTUWTTTU OOUTTTWUUT VVTUOVTTVO WUTT
+#19:OUTVVVUSVT VVSUUUSVVS UVVUTVVTUO SUVVUSVVOV TTVOVVSUVO UUOVTUOOUT SUVV
+#20:VTTTUOWUTT OUUWTWUUOU WOUTTTTTTV UWOUWUUOVT TTTVOUUWTV TTVTTTVVTT UWOU
+#21:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
+#22:UOVVVTSUVV TVUSOSUVTU STVOVVVVOU USTVSUVTUV VVVUTVUSVU OOUVVOUUOV USTV
+#23:VVOUURVVUO RUVVVVVURV VRUVOUUOVV VVRUVVURVU OOUVRUVVUV VVVUOVVVVO VVRU
+#24:UWTTOUTVTT UOVTWTVOUV TUOWTTTTWU VTUOTVOUUT TTTUUOVTTU WWUTTWUUWT VTUO
+#25:SUVVVTUOVV TVOUUUOVTO UTVUVVVVUS OUTVUOVTSV VVVSTVOUVS UUSVVUSSUV OUTV
+#26:WUUOTTVTOU TTTVUVTTTT VTTUUOOUUW TVTTVTTTWO UUOWTTTVOW UUWOUUWWUU TVTT
+#27:VVOUURVVUO RUVVVVVURV VRUVOUUOVV VVRUVVURVU OOUVRUVVUV VVVUOVVVVO VVRU
+#28:USTVVVOUVT VVUOSOUVVU OVVSTVVTSU UOVVOUVVUV TTVUVVUOVU SSUVTSUUST UOVV
+#29:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
+
+# Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()
+AutoTriads7 = (((), CA(1)),                     (((2,3), (4,5), (6,7)), e246),
+  (((1,2), (4,5), (6,7)), e256),                  (((1,2), (5,7)), e345),
+  (((2,3), (5,7)), e157),                 (((4,5), (4, 6), (4,7)), e123),
+  (((1,2), (3,4), (5,6)), e146),   (((3,4), (6,7), (1,3), (1,2), (4,5), (4,7)), CA(1)),
+  (((3,4), (5,6), (3,6), (5,7)), e7),                 (((3,4), (5,6), (5,7)), e367),
+  (((3,4), (5,6), (6,7), (1,2),(2,3),(4,7),(4,5)), e234567), (((3,4), (5,7), (1,2),(3,5)), e3),
+  (((3,5), (6,7)), e257),                                 (((2,3), (2,4), (2,5)), e167),
+  (((3,5), (4,6), (4,7), (1,2),(3,4),(3,7),(3,6)), e7),      (((3,5), (4,6), (1,2),(3,4)), e6),
+  (((3,5), (4,7), (2,4),(2,3),(5,6),(5,7)), e2),    (((3,5), (4,7), (4,6)), e145),
+  (((1,2), (3,6), (3,4)), e146),   (((3,6), (4,7), (1,3),(1,2),(4,7),(4,6)), e57),
+  (((3,6), (5,7), (3,5),(4,7)), e3),                (((3,6), (3,4), (3,5)), e256), 
+  (((3,6), (1,3),(1,2),(4,6),(4,7)), e7),       (((3,6), (4,5), (1,2),(5,7)), e4),
+  (((3,7), (4,6), (3,4),(5,6)), e5),   (((2,3), (2,5), (2,7), (3,4),(3,6),(3,7),(3,5)), CA(1)),
+  (((1,2),(3,7),(3,5)), e356),           (((3,7), (5,6), (1,2),(3,4)), e3),
+  (((3,7), (4,5), (2,3),(6,7)), e1),                 (((3,7)), e123))
+
+# G21 & G22 are are automorphisms of triads7all(0,63). Map to all other O-.
+# Map triads7all(x,63) to all triadsOhalf(x). AutoTriads7 maps 0.63 to O-: 63, 60, 53, 59, 61, 62,
+#  59, 58, 62, 63, 78, 53, 62, 61, 59, 59, 60, 62, 59, 78, 62, 62, 58, 59, 63, 60, 53, 59, 61, 62
+
+AutoTriadsO = ((e14567, e124567, e123467, e123456, e23456, e23467, e24567, CA(1)),
+  (e14567, e134567, e123567, e123457, e23457, e23567, e34567, CA(1)),
+  (e24567, e124567, e123567, e123457, e23467, e23456, e14567, CA(1)),
+  (e24567, e124567, e123456, e123467, e23567, e23457, e14567, CA(1)),
+  (e14567, e134567, e123456, e123467, e23467, e23456, e34567, CA(1)),
+  (e14567, e124567, e123567, e123457, e23457, e23567, e24567, CA(1)),
+  (e23567, e123567, e123457, e123456, e24567, e23467, e13567, CA(1)),
+  (e23467, e123467, e123456, e123457, e34567, e23567, e13567, CA(1)),
+  (e13567, e123567, e124567, e123467, e23467, e24567, e23567, CA(1)),
+  (e13567, e123567, e123457, e123467, e23467, e23457, e23567, CA(1)),
+  (e23456, e123456, e123467, e123457, e3567, e234567, e134567, e123567),
+  (e23567, e123567, e124567, e123456, e23457, e23467, e13567, CA(1)),
+  (e13467, e123467, e124567, e123457, e23457, e24567, e23467, CA(1)),
+  (e13467, e134567, e123567, e123456, e23456, e23567, e34567, CA(1)),
+  (e23467, e123467, e123567, e123456, e24567, e23457, e13467, CA(1)),
+  (e23467, e123467, e123456, e123567, e24567, e23457, e13467, CA(1)),
+  (e13467, e134567, e124567, e123457, e23457, e24567, e34567, CA(1)),
+  (e13467, e123467, e124567, e123457, e23457, e24567, e23467, CA(1)),
+  (e23457, e123457, e123467, e123456, e24567, e23567, e13457, CA(1)),
+  (e23567, e123567, e123456, e123467, e3457, e234567, e134567, e123457),
+  (e13457, e123457, e124567, e123567, e23567, e24567, e23457, CA(1)),
+  (e13457, e123457, e124567, e123456, e23456, e24567, e23457, CA(1)),
+  (e23456, e123456, e123567, e123467, e34567, e23457, e13457, CA(1)),
+  (e23457, e123457, e123467, e123567, e24567, e23456, e13457, CA(1)),
+  (e13456, e123456, e123567, e123457, e23457, e23567, e23456, CA(1)),
+  (e13456, e134567, e124567, e123467, e23467, e24567, e34567, CA(1)),
+  (e23456, e123456, e124567, e123467, e23567, e23457, e13456, CA(1)),
+  (e23456, e123456, e123457, e123567, e24567, e23467, e13456, CA(1)),
+  (e13456, e134567, e123457, e123567, e23567, e23457, e34567, CA(1)),
+  (e13456, e123456, e124567, e123467, e23467, e24567, e23456, CA(1)))
+
+# Octonians have f*f+7==+-6e1234567*f. Spin7R is a Spin(7) subset.
+# with f*f+7 == +-2*f' +<one term>
+def triadsOhalf(idx):
+  """triadsOhalf(idx)
+     Yield Octonian Triads7[idx].allSigns(<64), 64..127 are minus these."""
+  for phi in Triads7[idx].allSigns(True):
+    if abs(phi *phi +7) == abs(6e1234567 *phi):
+      yield phi
+
+def triads7all(idx, pos=0):
+  """triads7all(idx, [pos])
+     Enumerate all signed terms of Triads7[idx] and return pos index."""
+  Common._checkType(idx, int, "triads7all")
+  Common._checkType(pos, int, "triads7all")
+  if idx <0 or idx > 29 or pos < 0 or pos > 127:
+    raise Exception("Invalid input range in triads7all: %d,%d" %(idx,pos))
+  return list(Triads7[idx].allSigns())[pos]
+
+def triads7terms(idx, pos=0):
+  """triads7terms(idx, [pos])
+     Return triads7all(idx,pos) as a Tensor of Eval(copyTerms)."""
+  Common._checkType(idx, int, "triads7terms")
+  Common._checkType(pos, int, "triads7terms")
+  if idx <0 or idx > 29 or pos < 0 or pos > 127:
+    raise Exception("Invalid input range in triads7terms: %d,%d" %(idx,pos))
+  return Tensor(list(CA(**dict([x])) for x in triads7all(idx,pos).copyTerms()))
+
+def triads7remain(phi):
+  """triad7remain(phi)
+     Return remainder of phi assuming correct parity."""
+  Common._checkType(phi, CA, "triads7remain")
+  val = (3e1234567 -phi)/2
+  remain = val *val +4
+  if remain == 0:
+    return 0
+  return remain *e1234567 /2 -phi
+
+def triads7class(phi, id=False):
+  """triad7class(phi, [id])
+     Classify phi as <class=R/S/T/U/V/W/O> with parity & index in 30:128."""
+  Common._checkType(phi, CA, "triads7class")
+  Common._checkType(id, bool, "triads7class")
+  aPhi = abs(phi)
+  if aPhi not in Triads7:
+    raise Exception("Abs. input phi to triads7class not found in Triads7")
+  idx30 = Triads7.index(aPhi)
+  idx128,parity = phi.allSignsIndicies()
+  remain = triads7remain(phi *(-1 if parity %2 else 1))
+  if remain == 0:
+    clsName = NacName[28]
+  else:
+    terms = list(CA(**{x[0]: 1}) for x in (aPhi).copyTerms())
+    clsName = NacName[NacMap[idx30][terms.index(abs(remain))]]
+  if id:
+    return (clsName, parity %2, idx30, int(idx128))
+  return "%s%s:%0.3f" %(clsName, "-" if parity %2 else "+", idx30 +idx128/1000)
+
+def _triads7combs(g2, comb=0, parity=False):
+  """Return combinations of pairs for 4 or 6 forms (comb=0 is all 3)."""
+  if comb not in (0,1,2,3):
+    raise Exception("Invalid parameter comb")
+  g2Terms = []
+  basisTerms = g2.basisTerms()
+  for idx,term in enumerate(basisTerms[0]):
+    sgn = basisTerms[1][idx] *(-1 if parity else 1)
+    if len(term) == 4:
+      if comb in (0, 1):
+        g2Terms.append((CA.Eval((term[0], term[1])),
+                        sgn *CA.Eval((term[2], term[3]))))
+      if comb in (0, 2):
+        g2Terms.append((CA.Eval((term[0], term[2])),
+                        -sgn *CA.Eval((term[1], term[3]))))
+      if comb in (0, 3):
+        g2Terms.append((CA.Eval((term[0], term[3])),
+                        sgn *CA.Eval((term[1], term[2]))))
+    elif (comb != 1 and len(term) > 2) or len(term) %2:
+      raise Exception("Can't swap > 4-form with comb != 1 or odd form")
+    else:
+      g2Terms.append((sgn *CA.Eval(term),))
+  return g2Terms
+
+def triads7test(g2, row, rng0=0, rng1=0, loop=1, comb=0, mod=None, minus=False,
+                dump=False):
+  """triads7test(g2, row, [rng0,rng1,loop,comb,mod,minus,dump])
+     Swap phi=Triads7[row].allSigned()[rng0[:rng1]] & accum. to & return mod by
+     g2 terms. minus negates phi and comb=(1,2,3:swap pairs, 0:all)."""
+  Common._checkType(g2, CA, "triads7test")
+  Common._checkType(row, int, "triads7test")
+  Common._checkType(rng0, int, "triads7test")
+  Common._checkType(rng1, int, "triads7test")
+  Common._checkType(loop, int, "triads7test")
+  if not mod:
+    mod = list([] for x in range(30))
+  if rng1 <= rng0: rng1 = rng0 +1
+  if row < 0:
+    newLoopAccum = []
+    for idx in range(30):
+      for pos,phi in Triads7[idx].allSigns(True):
+        if abs(phi *phi +7) == abs(6e1234567 *phi):
+          newLoopAccum.append(phi)
+          if pos not in mod[idx]:
+            mod[idx] = pos
+          break
+  elif rng0 < 0:
+    for pos,phi in Triads7[row].allSigns(True):
+      if abs(phi *phi +7) == abs(6e1234567 *phi):
+        newLoopAccum.append(phi)
+        if pos not in mod[row]:
+          mod[row] = pos
+  else:
+    newLoopAccum = list((Triads7[row]*(-1 if minus else 1)).allSigns())[rng0:rng1]
+    for idx in range(rng0, rng1):
+      if idx not in mod[row]:
+        mod[row].append(idx)
+  sAccum = []
+  accum = []
+  g2Terms = _triads7combs(g2, comb)
+  for cnt in range(loop):
+    loopAccum = newLoopAccum[:]
+    newLoopAccum = []
+    mismatch = {}
+    same = True
+    for gTerm in g2Terms:
+      for sPerm in loopAccum:
+        fromCls = triads7class(sPerm)
+        toPerm = sPerm.swap(sum(gTerm))
+        toCls = triads7class(toPerm)
+        tmp = float(toCls[toCls.index(":")+1:])
+        if int(tmp) not in accum:
+          accum.append(int(tmp))
+        if toCls not in sAccum:
+          sAccum.append(toCls)
+          idx = int((tmp -int(tmp)) *1000 +0.5)
+          if idx not in mod[int(tmp)]:
+            mod[int(tmp)].append(idx)
+          newLoopAccum.append(toPerm)
+        match = " " +(fromCls[0] +toCls[0] if fromCls[0] < toCls[0] \
+                      else toCls[0] +fromCls[0])
+        if match[1] == match[2]:
+          match = ""
+        elif match[1:] in mismatch:
+          mismatch[match[1:]] += 1
+        else:
+          mismatch[match[1:]] = 1
+        if dump:
+          lop = "%s_" %cnt if loop > 1 else ""
+          sys.stdout.write("%s%s: %s -> %s%s\n" %(lop, sum(gTerm), fromCls,toCls,match))
+    mapped = ("%s:%d" %(x, mismatch[x]) for x in sorted(mismatch))
+    sys.stdout.write("Primary: %s=%d & Total=%d, {%s}\n" %(sorted(accum),
+                      len(accum), len(sAccum), ", ".join(mapped)))
+  return mod
+
+def triads7parity(term):
+  """triads7parity(term)
+     Return the relative parity to e1234567."""
+  t = term.basisTerms()
+  a = 0  #if t[1][0] == 1 else 1
+  for y in t[0][0]:
+    a += 7-y
+  return a %2
+
+def triads7autos(idx):
+  """triads7autos(idx)
+     Find & check reflections for first 8 signed combinations."""
+  r = triads7remain(triads7all(idx, 0))
+  x0 = 0 if r else 1
+  while x0 < 8:
+    x1 = x0 +1
+    x2 = x1 %8     # Wrap to start
+    if not triads7remain(triads7all(idx, x2) *(-1 if x2 and x2 < 8 else 1)):
+      x1 = x1 +1
+      x2 = (x2 +1) %8     # Wrap to start
+    phi0 = triads7all(idx, x0)
+    phi1 = triads7all(idx, x2)
+    p0 = Tensor.Triads(*phi0.spin(f7Basis)).search(f7Basis, 
+         Tensor.Triads(*phi1.spin(f7Basis)), num=-1)
+    p1 = []
+    p2 = [1,2,3,4,5,6,7]
+    for x in Tensor(p0).permCycles():
+      if len(x) == 1:
+        if -x[0] in p2:
+          p2.remove(-x[0])
+      elif len(x) == 2:
+        p1.append((abs(x[0]), abs(x[1])))
+        if x[1] > 0 and x[1] in p2:
+          p2.remove(x[1])
+        if x[0] < 0 and -x[0] in p2:
+          p2.remove(-x[0])
+      else:
+        for y in x[1:]:
+          p1.append([abs(x[0]),abs(y)])
+          if y == x[1] and x[0] < 0 and -x[0] in p2:
+            p2.remove(-x[0])
+          if y > 0 and y in p2:
+            p2.remove(y)
+    fnd = CA.Eval(p2).reflect(phi0.swap(p1))
+    print("%sFOUND %d:%d from %d = %s %s %s %s" %("" if fnd==phi1 else "NOT ",
+           idx, x1, x0, fnd, p0, p1, p2))
+    x0 = x1
+
+#--------------------------------------------------------------------------
+# Wiki/G2_(mathematics), set lambdas = 1 to get Cayley Table, TableG2, below.
+# "A"*A0 +"B"*B0 +"C"*C0 +"D"*D0 +"E"*E0 +"F"*F0 +"G"*G0 +"H"*H0 +"I"*I0 \
+#     +"J"*J0 +"K"*K0 +"L"*L0 +"M"*M0 +"N"*N0:
+#  0    C   -B    E   -D   -G     F-M
+# -C    0    A    F   -G+N  D-K  -E-L
+#  B   -A    0   -N    M    L    -K
+# -E   -F    N    0   -A+H -B+I   C-J
+#  D   G-N  -M   A-H   0    J     I
+#  G   K-D  -L   B-I  -J    0    -H
+# -F+M E+L   K  -C+J  -I    H     0
+A0 = Matrix.Diag([0]*7); A0[2][1]=-1; A0[1][2]=+1; A0[4][3]=+1; A0[3][4]=-1
+B0 = Matrix.Diag([0]*7); B0[0][2]=-1; B0[2][0]=+1; B0[5][3]=+1; B0[3][5]=-1
+C0 = Matrix.Diag([0]*7); C0[1][0]=-1; C0[0][1]=+1; C0[3][6]=+1; C0[6][3]=-1
+D0 = Matrix.Diag([0]*7); D0[0][4]=-1; D0[4][0]=+1; D0[1][5]=+1; D0[5][1]=-1
+E0 = Matrix.Diag([0]*7); E0[3][0]=-1; E0[0][3]=+1; E0[6][1]=+1; E0[1][6]=-1
+F0 = Matrix.Diag([0]*7); F0[6][0]=-1; F0[0][6]=+1; F0[1][3]=+1; F0[3][1]=-1
+G0 = Matrix.Diag([0]*7); G0[0][5]=-1; G0[5][0]=+1; G0[4][1]=+1; G0[1][4]=-1
+H0 = Matrix.Diag([0]*7); H0[4][3]=-1; H0[3][4]=+1; H0[6][5]=+1; H0[5][6]=-1
+I0 = Matrix.Diag([0]*7); I0[5][3]=-1; I0[3][5]=+1; I0[4][6]=+1; I0[6][4]=-1
+J0 = Matrix.Diag([0]*7); J0[5][4]=-1; J0[4][5]=+1; J0[6][3]=+1; J0[3][6]=-1
+K0 = Matrix.Diag([0]*7); K0[1][5]=-1; K0[5][1]=+1; K0[6][2]=+1; K0[2][6]=-1
+L0 = Matrix.Diag([0]*7); L0[5][2]=-1; L0[2][5]=+1; L0[6][1]=+1; L0[1][6]=-1
+M0 = Matrix.Diag([0]*7); M0[0][6]=-1; M0[6][0]=+1; M0[2][4]=+1; M0[4][2]=-1
+N0 = Matrix.Diag([0]*7); N0[4][1]=-1; N0[1][4]=+1; N0[3][2]=+1; N0[2][3]=-1
+G20 = (A0, B0, C0, D0, E0, F0, G0, H0, I0, J0, K0, L0, M0, N0)
+G202 = (A0+H0, B0+I0, C0+J0, D0+K0, F0+M0, G0+N0, L0-E0)
+
+A3 = -A0; B3 = B0; C3 = -C0; D3 = D0; E3 = -E0; F3 = -F0; G3 = -G0; H3 = -H0
+I3 = Matrix.Diag([0]*7); I3[5][3]=-1; I3[3][5]=+1; I3[4][6]=-1; I3[6][4]=+1
+J3 = Matrix.Diag([0]*7); J3[5][4]=-1; J3[4][5]=+1; J3[6][3]=-1; J3[3][6]=+1
+K3 = Matrix.Diag([0]*7); K3[1][5]=-1; K3[5][1]=+1; K3[6][2]=-1; K3[2][6]=+1
+L3 = Matrix.Diag([0]*7); L3[5][2]=-1; L3[2][5]=+1; L3[6][1]=-1; L3[1][6]=+1
+M3 = -M0; N3 = -N0
+G23 = (A3, B3, C3, D3, E3, F3, G3, H3, I3, J3, K3, L3, M3, N3)
+G232 = (A3+H3, B3+I3, C3+J3, C3-J3, D3+K3, D3-K3, F3+M3, G3+N3, G3-N3, K3+M3, L3-E3, L3-M3)
+G232 = (A3+H3, B3+I3, C3+J3, D3+K3, F3+M3, G3+N3, L3-E3)
+
+# tableG2().dump() == tableG2(G21,G212,G2n+G2n2).dump() == TableG2
+# The full table is tableG2(G21+G212,(),G2n+G2n2).dump(G2n+G2n2)
+TableG2 = Tensor( \
+ ("0", "-(C+J)", "B+I", "-(L-E)", "-(D+K)", "N", "F+M", "0", "J", "-I", "L", "-K", "N", "-2(F+M)"),
+ ("C+J", "0", "-(A+H)", "-(F+M)", "-(G+N)", "-K", "-(L-E)", "-J", "0", "H", "F", "G+N", "D+K", "-(L-E)"),
+ ( "-(B+I)", "A+H", "0", "-G", "-2F", "2E", "D", "I", "-H", "0", "G+N", "-F", "-E", "-(D+K)"),
+ ("L-E", "F+M", "G", "0", "-H", "I", "-2(C+J)", "E", "-F", "G", "0", "-(A+H)", "-(B+I)", "C+J"),
+ ("D+K", "G+N", "2F", "H", "0", "-2C", "I", "-D", "-G", "-F", "-(A+H)", "0", "C", "-(B+I)"),
+ ( "-N", "K", "-2E", "-I", "2C", "0", "H", "-G", "D", "E", "-B", "C", "0", "A"),
+ ( "-(F+M)", "L-E", "-D", "2(C+J)", "-I", "-H", "0", "F", "E", "-D", "-(C+J)", "-(B+I)", "A+H", "0"),
+ ( "0", "J", "-I", "-E", "D", "G", "-F", "0", "-2J", "2I", "L", "-K", "-(G+N)", "F+M"),
+ ( "-J", "0", "H", "F", "G", "-D", "-Matrix.Diag([0]*7); A0[2][1]=-1; E", "2J", "0", "-2H", "-(F+M)", "-N", "D+K", "L"),
+ ( "I", "-H", "0", "-G", "F", "-E", "D", "-2I", "2H", "0", "-N", "F+M", "-(L-E)", "K"),
+ ( "-L", "-F", "-(G+N)", "0", "A+H", "B", "C+J", "-L", "F+M", "N", "0", "2(A+H)", "-(B+I)", "-J"),
+ ( "K", "-(G+N)", "F", "A+H", "0", "-C", "B+I", "K", "N", "-(F+M)", "-2(A+H)", "0", "C+J", "-I"),
+ ( "-N", "-(D+K)", "E", "B+I", "-C", "0", "-(A+H)", "G+N", "-(D+K)", "L-E", "B+I", "-(C+J)", "0", "A"),
+ ("2(F+M)", "L-E", "D+K", "-(C+J)", "B+I", "-A", "0", "-(F+M)", "-L", "-K", "J", "I", "-A", "0"))
+
+# Note that products with M and resulting products have a pattern
+# M^C=E, M^E=-C, M^F=0       # Zero product
+# M^A=-N, M^N=A
+# M^D=B+I, M^G=-A-H          # B+I repeated
+# M^K=B+I, M^L=-C+J
+# M^B=-D-K                   # -D-K repeated
+# M^I=-D-K, M^H=G+N, M^J=L-E
+# C^E=-2F, C^F=2E, E^F=-2C   # A cycle of C, E, 2F
+# H^I=-2J, H^J=2I, I^J=-2H   # A cycle of I, J, H
+# A^N=-2(F+M), (F+M)^A=-2N, (F+M)^N=2A
+# L^K=-2(A+H); D^G=-2(C+J)
+
+# Check:
+# for y,x in enumerate(AutoTriads7): print(y,x[1].reflect(triads7all(0).swap(x[0]))\
+# ==triads7all(y,1 if y in (10, 19) else 0), x[1].reflect(triads7all(0).swap(x[0])))
+# for x in range(30): print(x, tableG2(*makeG2(x))==TableG2)
+# for x in range(30): print(x, mapG2(x, g2=makeG2(x)[0]))
+# Use C1.asym(E1)=-2F1 or [C2,E2]=-2F2
+A1,A2 = +e23-e45, (+e23-e45)//2   # 4~comb=0-+
+B1,B2 = -e13-e46, (-e13-e46)//2   # 2~comb=0++
+C1,C2 = +e12+e47, (+e12+e47)//2   # 0~comb=0--
+D1,D2 = -e15+e26, (-e15+e26)//2   # 1*comb=1+-
+E1,E2 = +e14-e27, (+e14-e27)//2   # 0~comb=1-+
+F1,F2 = +e17+e24, (+e17+e24)//2   # 0~comb=2--
+G1,G2 = -e16-e25, (-e16-e25)//2   # 1~comb=2++
+H1,H2 = +e45-e67, (+e45-e67)//2   # 6~comb=0-+
+I1,I2 = +e46+e57, (+e46+e57)//2   # 6*comb=1--
+J1,J2 = -e47+e56, (-e47+e56)//2   # 6~comb=2-+
+K1,K2 = -e26-e37, (-e26-e37)//2   # 5*comb=1++
+L1,L2 = -e27+e36, (-e27+e36)//2   # 5~comb=2-+
+M1,M2 = -e17+e35, (-e17+e35)//2   # 3*comb=2-+
+N1,N2 = +e25-e34, (+e25-e34)//2   # 4~comb=2-+
+
+G21 = (A1, B1, C1, D1, E1, F1, G1, H1, I1, J1, K1, L1, M1, N1)
+G212 = (A1+H1, B1+I1, C1+J1, D1+K1, F1+M1, G1+N1, L1-E1)
+G213 = (A1-H1, B1-I1, C1-J1, D1-K1, F1-M1, G1-N1, L1+E1) # TBC
+G22 = (A2, B2, C2, D2, E2, F2, G2, H2, I2, J2, K2, L2, M2, N2)
+G222 = (A2+H2, B2+I2, C2+J2, C2-J2,D2+K2, F2+M2, G2+N2, L2-E2)
+G2n = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N")
+G2n2 = ("A+H", "B+I", "C+J", "D+K", "F+M", "G+N", "L-E")
+G2n3 = ("A-H", "B-I", "C-J", "D-K", "F-M", "G-N", "L+E") # TBC
+G2n4 = ("(A+H)", "(B+I)", "(C+J)", "(D+K)", "(F+M)", "(G+N)", "(L-E)")
+
+def _findG2(elem, basis=G21+G212, names=G2n+G2n2, dump=False): # TBC
+  """_findG2(elem, basis, names, [dump])
+     Internal function to find  and return G2 elements name or -name."""
+  if elem == 0:
+    return "0"
+  Common._checkType(elem, (CA, Tensor), "_findG2")
+  Common._checkType(basis, (list, tuple), "_findG2")
+  Common._checkType(names, (list, tuple), "_findG2")
+  if len(basis) != len(names):
+    raise Exception("_findG2 needs inputs basis and names of same length")
+  for scale in (("", 1), ("-", -1), ("2", 2), ("-2", -2), ("8", 8),("-8", -8)):
+    for ii,x in enumerate(basis):
+      if scale[1] *x == elem:
+        if scale[0] and len(names[ii]) > 1:
+          if names[ii][0] == "(" and names[ii][-1] == ")":
+            return "%s%s" %(scale[0], names[ii])
+          return "%s(%s)" %(scale[0], names[ii])
+        return scale[0] +names[ii]
+  if dump:
+    if isinstance(elem, Tensor):
+      elem.dump(name="NOT FOUND:")
+    else:
+      print(elem, type(elem), "NOT FOUND")
+  return "X"
+
+def tableG2(baseG21=G21, baseG22=G212, names=G2n+G2n2, useAsym=True, fix=0, pp=True):
+  """tableG2([baseG21, baseG22, names, useAsym, pp])
+     Return G2 multiplication table in name form if pp."""
+  out = []
+  bases = baseG21 +baseG22
+  for row in baseG21:
+    accum = []
+    for col in baseG21:
+      if useAsym:
+        # XXX TBC
+        if fix == 1:
+          prod = (row.asym(col)).pure([0,2])
+        else:
+          prod = (row.asym(col))
+      else:
+        prod = row *col -col *row
+      if pp:
+        accum.append(_findG2(prod, bases, names))
+      else:
+        accum.append(prod)
+    out.append(accum)
+  return Tensor(*out)
+      
+def makeG2(idx=0, pos=None):
+  """makeG2([idx]) -> (allG2, allG22)
+     Return lists of G2 and common G2 sums. Also set global G2 elements."""
+  if pos is None:
+    pos = triads7class(next(triadsOhalf(idx)), True)[3]
+  swap,ref1 = AutoTriads7[idx]
+  phi = triads7all(idx, pos)
+  if triads7class(phi, True)[0] != "O":
+    raise Exception("%s is not Octonian for makeG2" %triads7class(phi))
+  listO = list(triads7class(x,True)[3] for x in list(triadsOhalf(idx)))
+  ref2 = AutoTriadsO[idx][listO.index(pos if pos < 64 else 127 -pos)]
+  if pos > 63:
+    ref2 *= e1234567
+  global A, B, C, D, E, F, G, H, I, J, K, L, M, N, allG2, allG22, allG23
+  A = ref2.reflect(ref1.reflect(G21[0].swap(swap)))
+  B = ref2.reflect(ref1.reflect(G21[1].swap(swap)))
+  C = ref2.reflect(ref1.reflect(G21[2].swap(swap)))
+  D = ref2.reflect(ref1.reflect(G21[3].swap(swap)))
+  E = ref2.reflect(ref1.reflect(G21[4].swap(swap)))
+  F = ref2.reflect(ref1.reflect(G21[5].swap(swap)))
+  G = ref2.reflect(ref1.reflect(G21[6].swap(swap)))
+  H = ref2.reflect(ref1.reflect(G21[7].swap(swap)))
+  I = ref2.reflect(ref1.reflect(G21[8].swap(swap)))
+  J = ref2.reflect(ref1.reflect(G21[9].swap(swap)))
+  K = ref2.reflect(ref1.reflect(G21[10].swap(swap)))
+  L = ref2.reflect(ref1.reflect(G21[11].swap(swap)))
+  M = ref2.reflect(ref1.reflect(G21[12].swap(swap)))
+  N = ref2.reflect(ref1.reflect(G21[13].swap(swap)))
+  allG2 = (A, B, C, D, E, F, G, H, I, J, K, L, M, N)
+  allG22 = (A+H, B+I, C+J, D+K, F+M, G+N, L-E)
+  allG23 = (A-H, B-I, C-J, D-K, F-M, G-N, L+E) #TBC
+  return (allG2, allG22)
+
+def mapG2(idx=0, pos=0, g2=G21, dump=False):
+  """mapG2([idx, pos=0, g2=G21, dump=True]) -> G2 class list
+     Print classes for G2 trials. Use g2=makeG2(idx)[0] for correct g2."""
+  if not (isinstance(g2, (list, tuple)) and isinstance(g2[0], CA)):
+    raise Exception("Invalid g2 input to mapG2")
+  phi = triads7all(idx, pos)
+  cls = triads7class(phi)
+  x = (-e1234567 *phi).copyTerms()
+  tags = [0] *14
+  allTerms = _triads7combs(-e1234567 *phi, parity=(cls[1] == "-"))
+  for rc in range(0, len(allTerms), 3):
+    term = allTerms[rc]
+    sys.stdout.write("%6s:" %(CA(**dict([x[rc//3]]))))
+    for offs in range(3):
+      sys.stdout.write(" %s" %triads7class(phi.swap(sum(allTerms[rc +offs]))))
+    parity, check = "",""
+    for offs in range(3):
+      term = allTerms[rc +offs]
+      rotCls = triads7class(phi.swap(sum(term)))
+      l = rotCls.find(".") +1
+      map,order,sgn = "","~",(0,0)
+      if int(rotCls[l:]) != pos:
+        order = "*"
+      map = _findG2(sum(term), allG2 +allG22, dump=dump)
+      order += str(term[0] +term[1])
+      parity += "-" if map[0] == "-" else " "
+      if map[0] != "X":
+        for gotIdx,gotG2 in enumerate(g2):
+          if abs(gotG2) == abs(sum(term)):
+            gTerms = gotG2.copyTerms()
+            sgn = ((term[0]<0)==(term[1]<0), gTerms[0][1]==gTerms[1][1])
+            check += "O" if sgn[0]==sgn[1] else "X"
+      sys.stdout.write("  %-6s%s" %(map, order))
+    sys.stdout.write(" %s %s\n" %(parity, check))
+
+def _constructG2(idx=0, pos=0, dump=False):
+  """Return trials for each phi' rotation and parity with asym products by found
+     M for each element and products of each result. First column is M or 0."""
+  phi = triads7all(idx, pos)
+  cls = triads7class(phi)
+  phiTerms = phi.copyTerms()
+  remainder = triads7remain(phi)
+  if remainder and len(remainder.copyTerms()) > 1:
+    remainder = triads7remain(-phi)
+  if remainder == 0: # Octonians need to find first signed term
+    if idx in [10, 19]:
+      remain = CA(**{phiTerms[0][0]: 1})
+    else:
+      for oTerm in next(triadsOhalf(idx)).copyTerms():
+        if oTerm[1] < 0:
+          remain = CA(**{oTerm[0]: 1})
+          break
+  else:
+    remain = remainder
+  remain = -e1234567 *remain
+  trialM = [] 
+  trialG2 = []
+  allTerms = _triads7combs(-e1234567 *phi, parity=(cls[1] == "-"))
+  for rc in range(0, len(allTerms), 3):
+    for offs in range(3):
+      term = allTerms[rc +offs]
+      trialG2.append(term[0] +term[1])
+      if abs(remain) == abs(term[0] *term[1]):
+        trialM.append(trialG2[-1].copy())
+  trialAll = []
+  for combM,elemM in enumerate(trialM):
+    pos = 0
+    for term in phiTerms:
+      trialG = []
+      trialMG2 = []  # Multiply M and trialG2
+      trialMG22 = [] # Multiple elements in trialMG2
+      for row in range(3):
+        mul = trialG2[pos]
+        pos += 1
+        trialG.append(mul)
+        trialMG2.append((elemM *mul -mul *elemM)/2)
+      for pairs in Common.comb(len(trialMG2), 2, True):
+        mul1,mul2 = trialMG2[pairs[0] -1], trialMG2[pairs[1] -1]
+        trialMG22.append((mul1 *mul2 -mul2 *mul1)/2)
+      newTrial = [0 if not remainder and abs(remain) == \
+                  abs(-e1234567 *CA(**dict([term]))) else elemM]
+      newTrial.extend(trialG)
+      newTrial.extend(trialMG2)
+      newTrial.extend(trialMG22)
+      trialAll.append(newTrial)
+  return trialAll
+
+def constructG2(idx, pos, trial=0, pp=False, dump=False):
+  """constructG2([idx, pos, trial, pp, dump])
+     Return G2 trial and print construction and compare to AutoTriads7 if pp."""
+  # Works for trial (3, 3, 3, 2, 2, 2, 3, 2, 3, 2, 2, 1, 3, 3, 3,
+  #                  3, 2, 3, 3, 3, 1, 3, 1, 2, 1, 1, 2, 1, 1, 1)
+  rows = _constructG2(idx, pos, dump)
+  elemM = 0
+  rowsMCA = [0] *3
+  otherRows,otherIdxs,badMCA = [], [], False
+  for rowIdx,row in enumerate(rows):
+    cnt = rowIdx //7
+    if sum(map(lambda x: x==0, row[4:7])) == 1 and \
+       sum(map(lambda x: x==0, row[7:])) == 2:    # Find 0/0,0 [M,Y]/cross rows
+      tri = sum(row[7:]) /2
+      test = (tri in row[1:4] or -tri in row[1:4])
+      if abs(tri) >= 4 and rowsMCA[0] == 0:
+        rowsMCA[0] = row   # M
+      elif test and rowsMCA[1] == 0:
+        rowsMCA[1] = row   # C_E  - C always first
+      elif test and rowsMCA[2] == 0:
+        rowsMCA[2] = row   # A_N  - Either order
+      else:
+        badMCA = True
+    else:
+      otherRows.append(row)
+      otherIdxs.append(rowIdx %7)
+      if row[0]:
+        elemM = row[0]
+    if rowIdx %7 == 6:
+      if sum(map(lambda x: x!=0, rowsMCA)) != 3:  # Got MCA rows
+        badMCA = True
+      if trial == cnt +1:
+        break
+      elif trial == 0 and not badMCA:
+        print("Found construct at trial: %s" %(cnt +1))
+        break
+      rowsMCA = [0] *3
+      otherRows,otherIdxs,rowsPP,badMCA = [], [], [], False
+  if len(otherRows) != 4:
+    raise Exception("No such trial for constructG2: %s" %trial)
+
+  # For triads7all(0,63) have found these rows:
+  # -B-I -D-K -M; -2D-2K 2B+2I 0; 8M 0 0
+  # C E F; -E C 0; -2F 0 0
+  # A F+M N; N 0 A; 0 -2(F+M) 0
+  M, F, C_E, A_N = elemM, 0, [0,0], [0,0]
+  if badMCA:
+    print("BAD MCA")
+  else:
+    F = sum(rowsMCA[1][7:]) /2
+    C_E = rowsMCA[1][1:4]
+    mulC_E = rowsMCA[1][4:7]
+    mulC_E.remove(0)
+    for f in (F, -F):
+      if f in C_E:
+        C_E.remove(f)
+    A_N = rowsMCA[2][1:4]
+    mulA_N = rowsMCA[2][4:7]
+    mulA_N.remove(0)
+    MF = sum(rowsMCA[2][7:]) /2
+    if MF != M+F:
+      M = -M
+      if MF != M+F:
+        print("BAD M+F", MF, M, F)
+    for f in (MF, -MF):
+      if f in A_N:
+        A_N.remove(f) # Could be AN or NA
+  if len(C_E) != 2 or len(A_N) != 2:
+    print("BAD A,C,E,F,N")
+
+  # Find pairs B+I and D+K and find first C/E terms inside:
+  # C+J -D -G; -L B+I -A-H; G 2K -C-J 
+  # A+H -K -L; -G B+I -C-J; -L -2D A+H
+  # -B E-L -G-N; -(D+K) -J -H; G+N E-L -2I
+  # H I -J;-G-N D+K L-E; -J 2B H 
+  pairs = []
+  pairsCE = [0] *4
+  pairsIdx = [-1] *4
+  pairsFirst = [True] *2
+  if C_E[0] and C_E[1]:
+    for rowIdx,row in enumerate(otherRows):
+      gotPair = None
+      for triIdx,triRow in enumerate(otherRows[rowIdx +1:]):
+        for idxElem,elem in enumerate(row[4:7]):
+          sgn = -1 if -elem in triRow[4:7] else 1
+          if elem in triRow[4:7] or sgn < 0:
+            dualIdx = triRow[4:7].index(sgn *elem)
+            gotPair = (rowIdx, rowIdx +triIdx +1, idxElem, dualIdx)
+            break
+        if gotPair:
+          pairs.append(gotPair)
+          break
+    cnt = 0
+    for pair in pairs:
+      for rowIdx in pair[:2]:
+        row = otherRows[rowIdx]
+        for idxElem,elem in enumerate(row[1:4]):
+          termsC = list(CA(**{x[0]: 1}) for x in C_E[0].copyTerms())
+          termsE = list(CA(**{x[0]: 1}) for x in C_E[1].copyTerms())
+          termsElem = list(CA(**{x[0]: 1}) for x in elem.copyTerms())
+          if termsC[0] in termsElem or termsC[1] in termsElem:
+            if pairsFirst[cnt //2]:
+              pairsFirst[cnt //2] = False
+              pairsCE[cnt] = 1
+              pairsIdx[cnt] = idxElem
+          if termsE[0] in termsElem or termsE[1] in termsElem:
+            if pairsFirst[cnt //2]:
+              pairsFirst[cnt //2] = False
+              pairsCE[cnt] = 2
+              pairsIdx[cnt] = idxElem
+        cnt += 1
+
+  # C+J -D -G; -L B+I -A-H; G 2K -C-J    : B+I->D C+J->L ->AH->G
+  D, L, G, CJ, BI, AH = 0, 0, 0, 0, 0, 0
+  if 1 in pairsCE:
+    idxCDG = pairsCE.index(1)
+    idxAKL = idxCDG +(-1 if idxCDG %2 else 1)
+    triRow = otherRows[pairs[idxCDG //2][idxCDG %2]]
+    tri1 = triRow[1:4]
+    tri2 = triRow[4:7]
+    CJ = tri1[pairsIdx[idxCDG]]
+    BI = tri2[pairs[idxCDG //2][(idxCDG %2) +2]]
+    D = tri1[pairs[idxCDG //2][(idxCDG %2) +2]]
+    L = tri2[pairsIdx[idxCDG]]
+    tri1.remove(CJ); tri1.remove(D)
+    tri2.remove(BI); tri2.remove(L)
+    AH = tri2[0]
+    G = tri1[0]
+  else:
+    print("BAD D,G,L")
+
+  # -B E-L -G-N; -(D+K) -J -H; G+N E-L -2I    :  D+K->B E-L->J ->H->GN
+  B, J, H, DK, LE, GN = 0, 0, 0, 0, 0, 0
+  if 2 in pairsCE:
+    idxBJH = pairsCE.index(2)
+    idxHIJ = idxBJH +(-1 if idxBJH %2 else 1)
+    triRow = otherRows[pairs[idxBJH //2][idxBJH %2]]
+    tri1 = triRow[1:4]
+    tri2 = triRow[4:7]
+    LE = tri1[pairsIdx[idxBJH]]
+    DK = tri2[pairs[idxBJH //2][(idxBJH %2) +2]]
+    B = tri1[pairs[idxBJH //2][(idxBJH %2) +2]]
+    J = tri2[pairsIdx[idxBJH]]
+    tri1.remove(LE); tri1.remove(B)
+    tri2.remove(DK); tri2.remove(J)
+    H = tri2[0]
+    GN = tri1[0]
+  else:
+    print("BAD B,H,J")
+
+  # A+H -K -L; -G B+I -C-J; -L -2D A+H     : BI->K 
+  # H I -J;-G-N D+K L-E; -J 2B H           : DK->I
+  K, I = 0, 0
+  if 1 in pairsCE and 2 in pairsCE:
+    tri1 = otherRows[pairs[idxAKL //2][idxAKL %2]]
+    tri2 = otherRows[pairs[idxHIJ //2][idxHIJ %2]]
+    K = tri1[pairs[idxAKL //2][(idxAKL %2) +2] +1]
+    I = tri2[pairs[idxHIJ //2][(idxHIJ %2) +2] +1]
+    if abs(A_N[1]) == abs(abs(AH) -abs(H)):
+      A_N = [A_N[1], A_N[0]]
+  else:
+    print("BAD I,K")
+
+  out = [A_N[0], B, C_E[0], D, C_E[1], F, G, H, I, J, K, L, M, A_N[1]]
+  if pp:
+    oList = list(triads7class(x,True)[3] for x in triadsOhalf(idx))
+    oList += list(127 -y for y in reversed(oList))
+    if rowsMCA[0] and rowsMCA[0][0] and not pos in oList:
+      allG2,allG22 = makeG2(idx) # First O only
+    else:
+      allG2,allG22 = makeG2(idx, pos)
+    for rowIdx,row in enumerate(rows):
+      cnt = rowIdx //7
+      if trial in (0, cnt +1):
+        if rowIdx %7 == 0:
+          elemM = row[0] if row[0] else rows[rowIdx +1][0]
+          sys.stdout.write("M%d = %s\n"%(cnt +1, elemM))
+        for part in (1, 4, 7):
+          rowPP = "(%s)" %" ".join(_findG2(elem, allG2 +allG22, dump=dump) \
+                            for elem in row[part :part +3])
+          sys.stdout.write("%-18s=%-36s " %(rowPP, row[part :part +3]))
+        sys.stdout.write("\n")
+    for elemIdx,elem in enumerate(out[:]):
+      elemName = _findG2(elem, allG2 +allG22, dump=dump)
+      if elemName != "X":
+        out[elemIdx] = elemName
+  return out
+
+def constructAll():
+  extraG2s = (G2n,
+    ("A+H", "B", "C+J", "F", "G", "D", "E", "H", "I", "J", "F+M", "N", "D+K", "L"),
+    ("H", "D", "L-E", "F", "G+N", "B", "C", "A+H", "K", "L", "F+M", "N", "B+I", "J"),
+    ("H", "F", "G+N", "D", "L-E", "B", "C+J", "A", "F+M", "N", "K", "L", "B+I", "J"))
+  hist = [0]*4
+  same = [0]*30
+  for x in range(30):
+    z = list(triads7class(y,True)[2:] for y in triadsOhalf(x))
+    z += list((y[0],127 -y[1]) for y in reversed(z))
+    out = []
+    for y in z:
+      cnts = [y[1], -1, -1, -1]
+      for tri in (1, 2, 3):
+        g2 = constructG2(*y,pp=1,trial=tri)
+        #sum(list(map(lambda x: x == "0", g2)))==0 - All tris have solutions
+        g21 = list(map(lambda x: str(x) if str(x[0]) != "-" else str(x)[1:], g2))
+        g21 = list(map(lambda x: x[1:-1] if x[0]=="(" and x[-1]==")" else x, g21))
+        #cnts[1] += 
+        #cnts[2] += int(sum(g22) == 14) # Only one matches F1,63 transformed
+        for idx,extra in enumerate(extraG2s):
+          g22 = list(map(lambda x: x[1] == extra[x[0]], enumerate(g21)))
+          if sum(g22) == 14:
+            cnts[tri] = idx
+            if idx == 0:   # Got the real G2
+              hist[tri] += 1
+              hist[0] += 1
+              if same[x] == 0:
+                same[x] = tri
+              elif same[x] != tri:
+                same[x] = -1
+            break
+      out.append(cnts)
+    sys.stderr.write("%s %s\n" %(x, out))
+  sys.stderr.write("%s %s\n" %(hist, same))
+
+
+#--------------------------------------------------------------------------
+# https://www.math.uci.edu/~brusso/humphreys.pdf
+# (Introduction to Lie Algebras & Representation Theory)
+# gi->g0i, g-i=-gi*->gi0, gi,-j->gij where gji=gij*, i!=j
+d1 = Matrix.Diag([0]*7); d1[1][1]=1; d1[4][4]=-1
+d2 = Matrix.Diag([0]*7); d2[2][2]=1; d2[5][5]=-1
+d3 = Matrix.Diag([0]*7); d3[3][3]=1; d3[6][6]=-1
+h1 = 2*d1 -d2 -d3
+h2 = 2*d2 -d1 -d3
+h3 = 2*d3 -d1 -d2
+sr2 = math.sqrt(2)
+g12 = Matrix.Diag([0]*7); g12[1][2]=1; g12[5][4]=-1; g21 = g12.transpose()
+g13 = Matrix.Diag([0]*7); g13[1][3]=1; g13[6][4]=-1; g31 = g13.transpose()
+g23 = Matrix.Diag([0]*7); g23[2][3]=1; g23[6][5]=-1; g32 = g23.transpose()
+g01 = Matrix.Diag([0]*7); g01[0][1]=sr2; g01[4][0]=-sr2; g01[3][5]=1; g01[2][6]=-1; g10 = -g01.transpose()
+g02 = Matrix.Diag([0]*7); g02[0][2]=sr2; g02[5][0]=-sr2; g02[1][6]=1; g02[3][4]=-1; g20 = -g02.transpose()
+g03 = Matrix.Diag([0]*7); g03[0][3]=sr2; g03[6][0]=-sr2; g03[2][4]=1; g03[1][5]=-1; g30 = -g03.transpose()
+ha=g02.asym(g20); hb=g12.asym(g21)    # mapping from Humphey's to Can & Howe below
+G01 = (ha, hb,     -g20, g02,  g12, g21,   g10, -g01,  g03, -g30, -g23, -g32, g13, g31)
+G02 = (ha+3*hb, 2*ha+3*hb, ha+hb, ha+2*hb)
+Gn1 = ("ha", "hb", "X1", "Y1", "X2", "Y2", "X3", "Y3", "X4", "Y4", "X5", "Y5", "X6", "Y6")
+Gn2 = ("h13", "h23", "h11", "h12")
+
+# 
+#--------------------------------------------------------------------------
+# http://gokovagt.org/proceedings/2013/ggt13-canhowe.pdf (Branching through g2)
+# Can & Howe assuming: X1=Xa, X2=Xb, X3=Xa+b, X4=X2a+b, X5=3a+b, X6=3a+2b, same for Y's
+# X1^X2=X3, X1^X3=2X4, X1^X4=-3X5, X2^X5=-X6, X3^X4=-3X6
+# Y1^Y2=-Y3, Y1^Y3=-2Y4, Y1^Y4=3Y5, Y2^Y5=X6, Y3^Y4=3Y6
+# X1^Y1=H1, X2^Y2=H2, X3^Y3=H1+3H2, X4^Y4=2H1+3H2, X5^Y5=H1+H2, X6^Y6=H1+2H2
+# X1^Y3=-3Y2, X1^Y4=-2Y3, X1^Y5=Y4, X2^Y3=Y1, X2^Y6=Y5, X3^Y4=2Y1, X3^Y6=Y4, X4^Y5=-Y1, X4^Y6=-Y3
+# Y1^X3=3X2, Y1^X4=2X3, Y1^X5=-X4, Y2^X3=-X1, Y2^X6=-X5, Y3^X4=-2X1, Y3^X6-X4, Y4^X5=X1, Y5X6=X3
+# 
+#            X1  X2  X3  X4  X5  X6  Y1  Y2  Y3  Y4  Y5  Y6
+# Eig(H1) = ( 2, -3, -1,  1,  3,  0, -2,  3,  1, -1, -3,  0)
+# Eig(H2) = (-1,  2,  1,  0, -1,  1,  1, -2, -1,  0,  1, ?1) # correction ?=-
+
+# Generate the multiplication table for Humphrey's matching Can & Howe:
+def generateXyG2():
+  """Generate G2 multiplication table. Dump with Gn1."""
+  Gtt=[]
+  Gn = Gn1 +Gn2
+  for idx,elem1 in enumerate(G01):
+    row = []
+    for elem2 in G01:
+      x = elem1.asym(elem2) 
+      out= ""
+      for idx,y in enumerate(G01 +G02):
+        if x == Matrix.Diag([0]*7):
+          out = "0"
+        elif x == y:
+          out = Gn[idx]
+        elif x == -y:
+          out = "-" +Gn[idx]
+        elif x == 2 *y:
+          out = "2" +Gn[idx]
+        elif x == -2 *y:
+          out = "-2" +Gn[idx]
+        elif x == 3 *y:
+          out = "3" +Gn[idx]
+        elif x == -3 *y:
+          out = "-3" +Gn[idx]
+      if not out:
+        if x == Tensor.Diag(x.diag()):
+          out = x.diag()
+        else:
+          out = x
+      row.append(out)
+    Gtt.append(row)
+  return Tensor(Gtt)
+#        ha   hb   X1   Y1   X2   Y2   X3   Y3   X4   Y4   X5   Y5   X6   Y6
+#   ------------------------------------------------------------------------
+# ha|     0    0  2X1 -2Y1 -3X2  3Y2  -X3   Y3   X4  -Y4  3X5 -3Y5    0    0
+# hb|     0    0  -X1   Y1  2X2 -2Y2   X3  -Y3    0    0  -X5   Y5   X6  -Y6
+# X1|  -2X1   X1    0   ha   X3    0  2X4 -3Y2 -3X5 -2Y3    0   Y4    0    0
+# Y1|   2Y1  -Y1  -ha    0    0  -Y3  3X2 -2Y4  2X3  3Y5  -X4    0    0    0
+# X2|   3X2 -2X2  -X3    0    0   hb    0   Y1    0    0  -X6    0    0   Y5
+# Y2|  -3Y2  2Y2    0   Y3  -hb    0  -X1    0    0    0    0   Y6  -X5    0
+# X3|    X3  -X3 -2X4 -3X2    0   X1    0  h13 -3X6  2Y1    0    0    0   Y4
+# Y3|   -Y3   Y3  3Y2  2Y4  -Y1    0 -h13    0 -2X1  3Y6    0    0  -X4    0
+# X4|   -X4    0  3X5 -2X3    0    0  3X6  2X1    0  h23    0  -Y1    0  -Y3
+# Y4|    Y4    0  2Y3 -3Y5    0    0 -2Y1 -3Y6 -h23    0   X1    0   X3    0
+# X5|  -3X5   X5    0   X4   X6    0    0    0    0  -X1    0  h11    0  -Y2
+# Y5|   3Y5  -Y5  -Y4    0    0  -Y6    0    0   Y1    0 -h11    0   X2    0
+# X6|     0  -X6    0    0    0   X5    0   X4    0  -X3    0  -X2    0  h23
+# Y6|     0   Y6    0    0  -Y5    0  -Y4    0   Y3    0   Y2    0 -h23    0
+
+# The Cartan root diagram for G2 is a 12 pointed star. Adding X and Y roots above
+# gives 3 terms of Triads7[14].allSigns()[27] (without sr2 terms) & so the G2 sub-
+# algebras match some of the symmetry of the G2 diagram. We have 6 terms from the
+#  A,B...,N basis in G23 above from the wikipedia. I don't see how to get the
+# remaining terms or how to revese this mapping.
+g00s = (g10+g01, g20+g02, g30+g03, g12-g21, g23-g32, g13-g31) # g order
+g23s = (sr2*(e12+e15)-e37+e46, sr2*(e13+e16)-e45+e27, sr2*(14+e17)-e26+e35,
+        e23+e56, e34+e67, e24+e57)  # Change this to XY order
+g01s = (G01[4]-G01[5], G01[12]-G01[13], G01[10]-G01[11], G01[9]-G01[8], G01[2]-G01[3], G01[6]-G01[7])
+gn1s = ("X1-Y1", "X2-Y2", "Y3-X3", "X4-Y4", "X5-Y5", "X6-Y6")
+# = (E-L, D+K, H; ~G+N, ~M, ~J) # ~ = skewed

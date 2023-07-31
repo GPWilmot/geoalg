@@ -1,0 +1,235 @@
+########################################
+## Extend G2 construction to Spin(15)
+## File: spin15.ca - G.P.Wilmot
+####################################
+# This file is a work in progress starting from a hand generated Triads15 3-form.
+
+# indepTriads(15) has 35 terms:
+F15 = (e123, e145, e167, e189, e1AB, e1CD, e1EF, e246, e257, e28A, e29B, e2CE, e2DF, e347, e356, e38B, e39A,
+       e3CF, e3DE, e48C, e49D, e4AE, e4BF, e58D, e59C, e5AF, e5BE, e68E, e69F, e6AC, e6BD, e78F, e79E, e7AD, e7BC)
+f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fA", "fB", "fC", "fD", "fE", "fF"))
+Y15 = e123 +e145 +e167 +e189 +e1AB +e1CD +e1EF +e246 +e257 +e28A +e29B +e2CE +e2DF +e347 +e356 +e38B +e39A \
+     +e3CF +e3DE -e48C +e49D +e4AE +e4BF +e58D +e59C +e5AF +e5BE +e68E +e69F +e6AC +e6BD +e78F +e79E +e7AD +e7BC
+
+# allTriads15(1,1) => 1024,1;  (1,2) => 
+def allTriads15(siz=1, code=1):
+  biVects = list(CA.Basis(15, maxGrade=2))[15:]
+  a15 = [list(sum(F15).allSigns(21))[20]]
+  aa15 = [sum(F15)]
+  for s in range(siz):
+    for x in a15[:]:
+      print(s, len(a15), len(aa15), "%0.2f" %(Common.time()/60))
+      if code in (1,3):
+        for y in CA.Basis(15, maxGrade=1):
+          accum = y.reflect(x)
+          if accum not in a15:
+            a15.append(accum)
+            if abs(accum) not in aa15:
+              aa15.append(abs(accum))
+      if code in (2,3):
+        for y in biVects:
+          accum = x.swap(y)
+          if abs(accum) not in aa15:
+            a15.append(accum)
+            aa15.append(abs(accum))
+  return a15
+def signs(x):
+  y = 0
+  for z in x.copyTerms():
+    if z[1] < 0:
+      y += 1
+  return y
+
+# allTriads15(1,1) => 1024,1;  (1,2) => 
+F7 = (e123, e145, e167, e246, e257, e347, e356)
+def allTriads7(siz=1, code=1):
+  biVects = list(CA.Basis(7, maxGrade=2))[7:]
+  a15 = [list(sum(F7).allSigns(7))[4]]
+  aa15 = [sum(F7)]
+  for s in range(siz):
+    for x in a15[:]:
+      print(s, len(a15), len(aa15), "%0.2f" %(Common.time()/60))
+      if code in (1,3):
+        for y in CA.Basis(15, maxGrade=1):
+          accum = y.reflect(x)
+          if accum not in a15:
+            a15.append(accum)
+            if abs(accum) not in aa15:
+              aa15.append(abs(accum))
+      if code in (2,3):
+        for y in biVects:
+          accum = x.swap(y)
+          if abs(accum) not in aa15:
+            a15.append(accum)
+            aa15.append(abs(accum))
+  return a15
+
+S15 = (-e456789ABCDEF, -e236789ABCDEF, -e234589ABCDEF, -e234567ABCDEF, -e23456789CDEF, -e23456789ABEF, -e23456789ABCD, -e135789ABCDEF, -e134689ABCDEF, -e1345679BCDEF, -e1345678ACDEF, -e13456789ABDF, -e13456789ABCE, -e125689ABCDEF, -e124789ABCDEF, -e1245679ACDEF, -e1245678BCDEF, -e12456789ABDE, -e12456789ABCF, -e1235679ABDEF, -e1235678ABCEF, -e12356789BCDF, -e12356789ACDE, -e1234679ABCEF, -e1234678ABDEF, -e12346789BCDE, -e12346789ACDF, -e1234579ABCDF, -e1234578ABCDE, -e12345789BDEF, -e12345789ACEF, -e1234569ABCDE, -e1234568ABCDF, -e12345689BCEF, -e12345689ADEF)
+# S15**2 -35
+SS15 = -2e1247 -2e1256 -2e128B -2e129A -2e12CF -2e12DE -2e1346 +6e1357 -2e138A +6e139B -2e13CE +6e13DF -2e148D -2e149C -2e14AF -2e14BE -2e158C +6e159D -2e15AE +6e15BF -2e168F -2e169E -2e16AD -2e16BC -2e178E +6e179F -2e17AC +6e17BD -2e2345 -2e2367 -2e2389 -2e23AB -2e23CD -2e23EF -2e248E -2e249F -2e24AC -2e24BD -2e258F -2e259E -2e25AD -2e25BC -2e268C -2e269D +6e26AE +6e26BF -2e278D -2e279C +6e27AF +6e27BE -2e348F -2e349E -2e34AD -2e34BC -2e358E -2e359F -2e35AC -2e35BD -2e368D -2e369C +6e36AF +6e36BE -2e378C -2e379D +6e37AE +6e37BF -2e4567 -2e4589 -2e45AB -2e45CD -2e45EF -2e468A -2e469B -2e46CE -2e46DF -2e478B -2e479A -2e47CF -2e47DE -2e568B -2e569A -2e56CF -2e56DE -2e578A -2e579B -2e57CE -2e57DF -2e6789 -2e67AB -2e67CD -2e67EF -2e89AB -2e89CD -2e89EF -2e8ACE -2e8ADF -2e8BCF -2e8BDE -2e9ACF -2e9ADE -2e9BCE -2e9BDF -2eABCD -2eABEF -2eCDEF
+def all15():  # Gave up at 21000000 after 8 days
+  cnt = 0
+  for x in sum(S15).allSigns(True):
+    cnt += 1
+    if cnt %100000 == 0:
+      print(cnt)
+    if len((x*x).copyTerms()) == 35:
+      print(x)
+def all35():  # Gave up at 1300000a after 7 days
+  cnt = 0
+  for x in sum(F15).allSigns(True):
+    cnt += 1
+    if cnt %100000 == 0:
+      print(cnt)
+    if len((x*x).copyTerms()) != 105:
+      print(x)
+      break
+
+#X=sum(F15).allSigns(True) # with [20] being Sedenions
+#for x in X: print(len(Tensor.Triads(*x.spin(f15Basis)).assocCycles(f15Basis,nonAssoc=True)))
+na15 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224, 200, 208, 208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188, 220, 196, 220, 196, 204, 204, 204, 204)
+ia15 = (245, 245, 245, 245, 245, 245, 245, 245, 231, 255, 231, 255, 231, 255, 247, 247, 247, 247, 247, 247, 203, 227, 251, 275, 219, 219, 267, 267, 235, 259, 235, 259, 251, 251, 251, 251)
+FF15 = (e12345689ADEF, e12345689BCEF, e1234568ABCDF, e1234569ABCDE, e12345789ACEF, e12345789BDEF, e1234578ABCDE, e1234579ABCDF, e12346789ACDF, e12346789BCDE, e1234678ABDEF, e1234679ABCEF, e12356789ACDE, e12356789BCDF, e1235678ABCEF, e1235679ABDEF, e12456789ABCF, e12456789ABDE, e1245678BCDEF, e1245679ACDEF, e124789ABCDEF, e125689ABCDEF, e13456789ABCE, e13456789ABDF, e1345678ACDEF, e1345679BCDEF, e134689ABCDEF, e135789ABCDEF, e23456789ABCD, e23456789ABEF, e23456789CDEF, e234567ABCDEF, e234589ABCDEF, e236789ABCDEF, e456789ABCDEF)
+#FF15 = -e123456789ABCDEF *sum(FF15) # x=list(sum(F15).allSigns(21))[20] # x:35 -> xx:105 -> 33 terms:
+#FFF1520 = sum(map(lambda x: CA(**dict([x])) if abs(x[1]) == 6 else 0, (x*x).copyTerms())).copyTerms()
+FFF1520 = (-e1357, -e139B, -e13DF, e148D, e149C, e158C, -e159D, -e15BF, -e179F, -e17BD, e248E, e24AC, e268C, -e26AE, -e26BF, -e27AF, -e27BE, e348F, e34BC, -e36AF, -e36BE, e378C, -e37AE, -e37BF, e4589, e45CD, e468A, e46CE, e478B, e47CF, e89CD, e8ACE, e8BCF)
+FFFF1520 = (-e1357, -e139B, -e13DF, -e15BF, -e179F, -e17BD, -e37BF, +e579B)
+FFFFF1520 = (e1247, e1256, e128B, e129A, e12CF, e12DE, e1346, e138A, e13CE, e14AF, e14BE, e15AE, e168F, e169E, e16AD, e16BC, e178E, e17AC, e2345, e2367, e2389, e23AB, e23CD, e23EF, e249F, e24BD, e258F, e259E, e25AD, e25BC, e269D, e278D, e279C, e349E, e34AD, e358E, e359F, e35AC, e35BD, e368D, e369C, e379D, e4567, e45AB, e45EF, e469B, e46DF, e479A, e47DE, e568B, e569A, e56CF, e56DE, e578A, e579B, e57CE, e57DF, e6789, e67AB, e67CD, e67EF, e89AB, e89EF, e8ADF, e8BDE, e9ACF, e9ADE, e9BCE, e9BDF, eABCD, eABEF, eCDEF)
+SE15 = Tensor( \
+ ("-1","-f3", "f2","-f5", "f4", "f7","-f6","-f9", "f8", "fB","-fA", "fD","-fC","-fF", "fE"),
+ ( "f3", "-1","-f1","-f6","-f7", "f4", "f5","-fA","-fB", "f8", "f9", "fE", "fF","-fC","-fD"),
+ ("-f2", "f1", "-1","-f7", "f6","-f5", "f4","-fB", "fA","-f9", "f8", "fF","-fE", "fD","-fC"),
+ ( "f5", "f6", "f7", "-1","-f1","-f2","-f3","-fC","-fD","-fE","-fF", "f8", "f9", "fA", "fB"),
+ ("-f4", "f7","-f6", "f1", "-1", "f3","-f2","-fD", "fC","-fF", "fE","-f9", "f8","-fB", "fA"),
+ ("-f7","-f4", "f5", "f2","-f3", "-1", "f1","-fE", "fF", "fC","-fD","-fA", "fB", "f8","-f9"),
+ ( "f6","-f5","-f4", "f3", "f2","-f1", "-1","-fF","-fE", "fD", "fC","-fB","-fA", "f9", "f8"),
+ ( "f9", "fA", "fB", "fC", "fD", "fE", "fF", "-1","-f1","-f2","-f3","-f4","-f5","-f6","-f7"),
+ ("-f8", "fB","-fA", "fD","-fC","-fF", "fE", "f1", "-1", "f3","-f2", "f5","-f4","-f7", "f6"),
+ ("-fB","-f8", "f9", "fE", "fF","-fC","-fD", "f2","-f3", "-1", "f1", "f6", "f7","-f4","-f5"),
+ ( "fA","-f9","-f8", "fF","-fE", "fD","-fC", "f3", "f2","-f1", "-1", "f7","-f6", "f5","-f4"),
+ ("-fD","-fE","-fF","-f8", "f9", "fA", "fB", "f4","-f5","-f6","-f7", "-1", "f1", "f2", "f3"),
+ ( "fC","-fF", "fE","-f9","-f8","-fB", "fA", "f5", "f4","-f7", "f6","-f1", "-1","-f3", "f2"),
+ ( "fF", "fC","-fD","-fA", "fB","-f8","-f9", "f6", "f7", "f4","-f5","-f2", "f3", "-1","-f1"),
+ ("-fE", "fD", "fC","-fB","-fA", "f9","-f8", "f7","-f6", "f5", "f4","-f3","-f2", "f1", "-1"))
+
+# Fix inverse plus include (e1234567 +triads7all(0,4))^2 = 1!
+#############
+
+inv1 = e1+e2+e3
+inv2 = e1+e2+i3
+inv3 = e4+e0123
+inv4 = e1+e2+e12
+inv5 = e1+e2+e34
+inv6 = e1+i2+i3
+print("XXX",inv1*inv1/3,inv2*inv2,inv3*(e4-e0123)/2,inv4*inv4,inv5*(e1+e2-e34)/3,inv6*(-e1-i2-i3))
+niv1 = e1+e2+e13
+niv2 = e1+e0123
+
+def P(*morphs):
+  if not isinstance(morphs, (list, tuple)) or len(morphs) > 4:
+    raise Exception("Invalid morphs for P")
+  out = CA(1)
+  for p in morphs:
+    term = p.basisTerms()[0][0]
+    if len(term) %2:
+      out *= p
+    elif not term:
+      out *= (1+p*e1234567)/math.sqrt(2)
+    else:
+      out *= (pi/2+p).versor()
+  return out
+
+def Lie(x):
+  """Asym multiply x with all of G2."""
+  aa = makeG2(0)
+  for a in aa[0] +aa[1]:
+    print(_findG2(a,aa[0] +aa[1]),"^",_findG2(x,aa[0] +aa[1]),_findG2(a.asym(x),aa[0] +aa[1]),a.asym(x))
+
+phi15 = e123 +e145 +e167 +e189 +e1AB +e1CD +e1EF +e246 +e257 +e28A +e29B +e2CE +e2DF +e347 +e356 +e38B +e39A \
+       +e3CF +e3DE -e48C +e49D +e4AE +e4BF +e58D +e59C +e5AF +e5BE +e68E +e69F +e6AC +e6BD +e78F +e79E +e7AD +e7BC
+
+def subalgebra15():
+  p8 = (phi15 *phi15 *phi15 *phi15).pure(8)//8   #435 terms
+  p4 = (p8 *p8).pure(4)
+  acc1 = []
+  for x in p8.basisTerms()[0]:
+    acc2 = []
+    for y in p4.basisTerms()[0]:
+      acc2.append(CA.Eval(x).asym(CA.Eval(y)))
+    if sum(acc2) == 0:
+      acc1.append(CA.Eval(x))
+  return acc1
+
+R15 = [e12478BDE, e12479ACF, e12568BCF, e12569ADE, e13468ADF, e13469BCE, e13578ACE, e13579BDF,\
+       e234589EF, e2345ABCD, e236789CD, e2367ABEF, e456789AB, e4567CDEF, e89ABCDEF]
+
+def Comb8_2_2_2_2():
+  """Return all 105 combination pairs in 8."""
+  acc = []
+  init = list(Common.comb(8,2,True))
+  for pos in Common.comb(28,4,True):
+    mash = [init[pos[0]-1]]
+    rest = [init[pos[1]-1], init[pos[2]-1], init[pos[3]-1]]
+    found = True
+    for x in rest:
+      for y in mash:
+        if x[0] in y or x[1] in y:
+          found = False
+          break
+      mash.append(x)
+    if found:
+      acc.append(mash)
+  return acc
+
+comb8_2s = [ \
+  [[1, 2], [3, 4], [5, 6], [7, 8]], [[1, 2], [3, 4], [5, 7], [6, 8]], [[1, 2], [3, 4], [5, 8], [6, 7]], [[1, 2], [3, 5], [4, 6], [7, 8]],\
+  [[1, 2], [3, 5], [4, 7], [6, 8]], [[1, 2], [3, 5], [4, 8], [6, 7]], [[1, 2], [3, 6], [4, 5], [7, 8]], [[1, 2], [3, 6], [4, 7], [5, 8]],\
+  [[1, 2], [3, 6], [4, 8], [5, 7]], [[1, 2], [3, 7], [4, 5], [6, 8]], [[1, 2], [3, 7], [4, 6], [5, 8]], [[1, 2], [3, 7], [4, 8], [5, 6]],\
+  [[1, 2], [3, 8], [4, 5], [6, 7]], [[1, 2], [3, 8], [4, 6], [5, 7]], [[1, 2], [3, 8], [4, 7], [5, 6]], [[1, 3], [2, 4], [5, 6], [7, 8]],\
+  [[1, 3], [2, 4], [5, 7], [6, 8]], [[1, 3], [2, 4], [5, 8], [6, 7]], [[1, 3], [2, 5], [4, 6], [7, 8]], [[1, 3], [2, 5], [4, 7], [6, 8]],\
+  [[1, 3], [2, 5], [4, 8], [6, 7]], [[1, 3], [2, 6], [4, 5], [7, 8]], [[1, 3], [2, 6], [4, 7], [5, 8]], [[1, 3], [2, 6], [4, 8], [5, 7]],\
+  [[1, 3], [2, 7], [4, 5], [6, 8]], [[1, 3], [2, 7], [4, 6], [5, 8]], [[1, 3], [2, 7], [4, 8], [5, 6]], [[1, 3], [2, 8], [4, 5], [6, 7]],\
+  [[1, 3], [2, 8], [4, 6], [5, 7]], [[1, 3], [2, 8], [4, 7], [5, 6]], [[1, 4], [2, 3], [5, 6], [7, 8]], [[1, 4], [2, 3], [5, 7], [6, 8]],\
+  [[1, 4], [2, 3], [5, 8], [6, 7]], [[1, 4], [2, 5], [3, 6], [7, 8]], [[1, 4], [2, 5], [3, 7], [6, 8]], [[1, 4], [2, 5], [3, 8], [6, 7]],\
+  [[1, 4], [2, 6], [3, 5], [7, 8]], [[1, 4], [2, 6], [3, 7], [5, 8]], [[1, 4], [2, 6], [3, 8], [5, 7]], [[1, 4], [2, 7], [3, 5], [6, 8]],\
+  [[1, 4], [2, 7], [3, 6], [5, 8]], [[1, 4], [2, 7], [3, 8], [5, 6]], [[1, 4], [2, 8], [3, 5], [6, 7]], [[1, 4], [2, 8], [3, 6], [5, 7]],\
+  [[1, 4], [2, 8], [3, 7], [5, 6]], [[1, 5], [2, 3], [4, 6], [7, 8]], [[1, 5], [2, 3], [4, 7], [6, 8]], [[1, 5], [2, 3], [4, 8], [6, 7]],\
+  [[1, 5], [2, 4], [3, 6], [7, 8]], [[1, 5], [2, 4], [3, 7], [6, 8]], [[1, 5], [2, 4], [3, 8], [6, 7]], [[1, 5], [2, 6], [3, 4], [7, 8]],\
+  [[1, 5], [2, 6], [3, 7], [4, 8]], [[1, 5], [2, 6], [3, 8], [4, 7]], [[1, 5], [2, 7], [3, 4], [6, 8]], [[1, 5], [2, 7], [3, 6], [4, 8]],\
+  [[1, 5], [2, 7], [3, 8], [4, 6]], [[1, 5], [2, 8], [3, 4], [6, 7]], [[1, 5], [2, 8], [3, 6], [4, 7]], [[1, 5], [2, 8], [3, 7], [4, 6]],\
+  [[1, 6], [2, 3], [4, 5], [7, 8]], [[1, 6], [2, 3], [4, 7], [5, 8]], [[1, 6], [2, 3], [4, 8], [5, 7]], [[1, 6], [2, 4], [3, 5], [7, 8]],\
+  [[1, 6], [2, 4], [3, 7], [5, 8]], [[1, 6], [2, 4], [3, 8], [5, 7]], [[1, 6], [2, 5], [3, 4], [7, 8]], [[1, 6], [2, 5], [3, 7], [4, 8]],\
+  [[1, 6], [2, 5], [3, 8], [4, 7]], [[1, 6], [2, 7], [3, 4], [5, 8]], [[1, 6], [2, 7], [3, 5], [4, 8]], [[1, 6], [2, 7], [3, 8], [4, 5]],\
+  [[1, 6], [2, 8], [3, 4], [5, 7]], [[1, 6], [2, 8], [3, 5], [4, 7]], [[1, 6], [2, 8], [3, 7], [4, 5]], [[1, 7], [2, 3], [4, 5], [6, 8]],\
+  [[1, 7], [2, 3], [4, 6], [5, 8]], [[1, 7], [2, 3], [4, 8], [5, 6]], [[1, 7], [2, 4], [3, 5], [6, 8]], [[1, 7], [2, 4], [3, 6], [5, 8]],\
+  [[1, 7], [2, 4], [3, 8], [5, 6]], [[1, 7], [2, 5], [3, 4], [6, 8]], [[1, 7], [2, 5], [3, 6], [4, 8]], [[1, 7], [2, 5], [3, 8], [4, 6]],\
+  [[1, 7], [2, 6], [3, 4], [5, 8]], [[1, 7], [2, 6], [3, 5], [4, 8]], [[1, 7], [2, 6], [3, 8], [4, 5]], [[1, 7], [2, 8], [3, 4], [5, 6]],\
+  [[1, 7], [2, 8], [3, 5], [4, 6]], [[1, 7], [2, 8], [3, 6], [4, 5]], [[1, 8], [2, 3], [4, 5], [6, 7]], [[1, 8], [2, 3], [4, 6], [5, 7]],\
+  [[1, 8], [2, 3], [4, 7], [5, 6]], [[1, 8], [2, 4], [3, 5], [6, 7]], [[1, 8], [2, 4], [3, 6], [5, 7]], [[1, 8], [2, 4], [3, 7], [5, 6]],\
+  [[1, 8], [2, 5], [3, 4], [6, 7]], [[1, 8], [2, 5], [3, 6], [4, 7]], [[1, 8], [2, 5], [3, 7], [4, 6]], [[1, 8], [2, 6], [3, 4], [5, 7]],\
+  [[1, 8], [2, 6], [3, 5], [4, 7]], [[1, 8], [2, 6], [3, 7], [4, 5]], [[1, 8], [2, 7], [3, 4], [5, 6]], [[1, 8], [2, 7], [3, 5], [4, 6]],\
+  [[1, 8], [2, 7], [3, 6], [4, 5]]]
+
+def split4(form8):
+  acc = []
+  spl = form8.basisTerms()[0][0]
+  for x in comb8_2s:
+    g4 = 0
+    sgn = 1
+    for y in x:
+      g4 += sgn *CA.Eval([spl[y[0]-1], spl[y[1]-1]])
+      sgn = -sgn
+    acc.append(g4)
+  return acc
+
+def split2(form8):
+  acc = []
+  spl = form8.basisTerms()[0][0]
+  g4 = 0
+  sgn = 1
+  for x in ((0,2,4,6), (0,4,2,6), (0,6,2,4)):
+    g4 = CA.Eval([spl[x[0]], spl[x[0]+1], spl[x[1]], spl[x[1]+1]])\
+        +sgn *CA.Eval([spl[x[2]], spl[x[2]+1], spl[x[3]], spl[x[3]+1]])
+    #sgn = -sgn
+    acc.append(g4)
+  return acc
