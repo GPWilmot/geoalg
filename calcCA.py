@@ -1512,8 +1512,9 @@ class CA():
         odd += 1 if 'i' in base else 0
         if (len(base) +odd +parity) %2 == 0:
           yield CA(**{base: 1})
-    for x in CA.BasisArgs(eDim, iDim, maxGrade):
-      yield CA(**{x: 1})
+    else:
+      for base in CA.BasisArgs(eDim, iDim, maxGrade):
+        yield CA(**{base: 1})
 
   @staticmethod
   def BasisArgs(eDim, iDim=0, maxGrade=0):

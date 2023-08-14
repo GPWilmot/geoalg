@@ -587,7 +587,7 @@ class O():
        The signature includes scalar and is flat=1 if more positive, flat=-1
        if more negative and flat=0 if equal. Hyperbolic versors have flat=1
        while rotation versors are 0 or +1 if cnt==1. If both check inverse
-       is a versor with even parts only. Psuedo-versor has cnt < 0."""
+       is a versor with even parts only. Psuedo-versor has cnt < 0. TBD."""
     out = None
     if inversed:
       out = CA(self.w) 
@@ -977,7 +977,7 @@ class O():
     """rotation(rot)
        Rotate self inplace by rot, if necessary. Applying to versors rotates
        in the same sense as quaternions and frame. For O vectors this is the
-       same as rot.inverse()*self*rot."""
+       same as rot.inverse()*self*rot. Multiple rotations are TBD."""
     Common._checkType(rot, O, "rotation")
     precision = Common._getPrecision()
     inv,flat,n2,cnt = rot.__versor(inversed=True, both=True)
@@ -1025,7 +1025,8 @@ class O():
   def versor(self, noError=False):
     """versor()
        Return a versor of length 1 assuming w is the angle(rad) ready for
-       rotation. Opposite of frame. See norm. Handles both signatures."""
+       rotation. Opposite of frame. See norm. Handles both signatures.
+       Greater than 4-form versors are TBD."""
     precision = Common._getPrecision()
     tmp,flat,n2,cnt = self.__versor()
     w1 = self.w
@@ -1152,9 +1153,9 @@ class O():
     """euler([noError])
        Quaternion versors can be converted to Euler Angles & back uniquely for
        normal basis order. Error occurs for n-D greater than 3 or positive
-       signature.  Euler parameters are of the form cos(W/2) +n sin(W/2),
-       n pure unit versor. Set noError to return a zero Euler if self is not
-       valid to be a versor or norm if possible."""
+       signature.  Euler parameters are of the form cos(W/2) +m sin(W/2),
+       m pure unit versor. Set noError to return a zero Euler if self is not
+       valid to be a versor or norm. n>3 is under development TBD."""
     if self.basis()[0] > 2 or self.basis()[1] > 0:
       raise Exception("Illegal versor signature or size for euler")
     tmp,flat,n2,cnt = self.__versor()
@@ -1300,7 +1301,7 @@ class O():
   def Euler(*args, **kwargs): #order=[], implicit=False):
     """Euler([angles, ...][o1=multiplier, ...][order, implicit])
        Euler angles in higher dimensions have (D 2)T=D(D-1)/2 parameters.
-       SO(4) has 6 and can be represented by two Oernions. Here they are
+       SO(4) has 6 and can be represented by two octonions. Here they are
        changed to a versor using explicit rotation & this is returned.
        So in 3-D q' = (cx+sx e23) *(cy+sy e13) *(cz+sz e12).
        kwargs may contains "order" and "implicit".  The args arguments
@@ -1309,7 +1310,8 @@ class O():
        array which must be as long as the list of angles. The default is 
        [1,2,...] and must have unique numbers. If implicit is set True then
        repeats. So Euler(x,y,z,order=[3,1,3]) is R=Z(x)X'(y)Z''(z). If the
-       quat module is included then args can be a Euler object."""
+       quat module is included then args can be a Euler object. n>3 is under
+       development TBD."""
     order = kwargs["order"] if "order" in kwargs else [] # for importlib
     implicit = kwargs["implicit"] if "implicit" in kwargs else False
     Common._checkType(order, (list, tuple), "Euler")

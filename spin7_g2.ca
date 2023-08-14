@@ -71,6 +71,9 @@ SS1o = e1234 +e1235 -e1236 +e1237 -e1245 +e1246 -e1257 -e1267 -e1345 +e1347 +e13
 # TriadsOhalf = list(Common.chain(*(triadsOhalf(x) for x in range(30)))) # len=240
 # Octonians = TriadsOhalf +(-1*Tensor(TriadsOhalf))                      # len=480
 
+reese=e123-e147-e156+e246-e257-e345-e367 # O-:5.117
+reesec=e1245 -e1267 +e1346 +e1357 -e2347 +e2356 +e4567
+
 # Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Tensor.Table/Cycles(basis)
 f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))    # morph(PP1, f7Basis)
 #       f1  f2  f3  f4  f5  f6  f7
@@ -583,7 +586,7 @@ def makeG2(idx=0, pos=None):
   ref2 = AutoTriadsO[idx][listO.index(pos if pos < 64 else 127 -pos)]
   if pos > 63:
     ref2 *= e1234567
-  global A, B, C, D, E, F, G, H, I, J, K, L, M, N, allG2, allG22, allG23
+  global A, B, C, D, E, F, G, H, I, J, K, L, M, N, allG2, allG22
   A = ref2.reflect(ref1.reflect(G21[0].swap(swap)))
   B = ref2.reflect(ref1.reflect(G21[1].swap(swap)))
   C = ref2.reflect(ref1.reflect(G21[2].swap(swap)))
@@ -600,7 +603,6 @@ def makeG2(idx=0, pos=None):
   N = ref2.reflect(ref1.reflect(G21[13].swap(swap)))
   allG2 = (A, B, C, D, E, F, G, H, I, J, K, L, M, N)
   allG22 = (A+H, B+I, C+J, D+K, F+M, G+N, L-E)
-  allG23 = (A-H, B-I, C-J, D-K, F-M, G-N, L+E) #TBC
   return (allG2, allG22)
 
 def mapG2(idx=0, pos=0, g2=G21, dump=False):

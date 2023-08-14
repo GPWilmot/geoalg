@@ -1467,7 +1467,10 @@ class Tensor(list):
           accum.append(x)
         elif not out and not nonAssoc:
           accum.append(x)
-    return accum
+    ret = []
+    for x in accum:
+      ret.append(list(basis[y -1] for y in x))
+    return ret
 
   def isomorph(self, basis, perm):
     """isomorph(basis, perm)

@@ -10,7 +10,9 @@ F15 = (e123, e145, e167, e189, e1AB, e1CD, e1EF, e246, e257, e28A, e29B, e2CE, e
 f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fA", "fB", "fC", "fD", "fE", "fF"))
 Y15 = e123 +e145 +e167 +e189 +e1AB +e1CD +e1EF +e246 +e257 +e28A +e29B +e2CE +e2DF +e347 +e356 +e38B +e39A \
      +e3CF +e3DE -e48C +e49D +e4AE +e4BF +e58D +e59C +e5AF +e5BE +e68E +e69F +e6AC +e6BD +e78F +e79E +e7AD +e7BC
-
+P15 = e12478BDE +e12479ACF +e12568BCF +e12569ADE +e13468ADF +e13469BCE +e13578ACE \
+     +e13579BDF +e234589EF +e2345ABCD +e236789CD +e2367ABEF +e456789AB +e4567CDEF \
+     +e89ABCDEF 
 # allTriads15(1,1) => 1024,1;  (1,2) => 
 def allTriads15(siz=1, code=1):
   biVects = list(CA.Basis(15, maxGrade=2))[15:]
