@@ -841,7 +841,7 @@ class O():
   def conjugate(self, split=False):
     """conjugate([split])
        Return copy of self with imaginary (all if split) parts negated."""
-    out = self.copy(self.w /l2)
+    out = self.copy(self.w)
     if split:
       for grade in out.__g:
         grade.value = -grade.value
@@ -918,10 +918,30 @@ class O():
     Common._checkType(q, O, "asym")
     return (self *q -q *self) *0.5 
  
-  def assoc(self, p, q):
-    """assoc(p,q)
-       Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
+  def assoc(self, p, q, nonAlternate=False, nonPower=False):
+    """assoc(p,q, [nonAlternate,nonPower])
+       Return the associator [self,p,q] = (self * p) *q - self *(p * q) or
+       the first non-alternate or non-power if non-associative where alternate
+       if assoc(x,x,y)==0 and power if assoc(x,x,x)==0 for any input x."""
+    Common._checkType(p, (O), "assoc")
+    Common._checkType(q, (O), "assoc")
+    Common._checkType(nonAlternate, bool, "assocCycles")
+    Common._checkType(nonPower, bool, "assocCycles")
+    if nonAlternate and nonPower:
+      raise Exception("Invalid number of options in assoc")
+    accum = []
     out = (self * p) *q - self *(p * q)
+    if out and nonAlternate:
+      for y in ((self, self, p), (p, self, self), (p, p, q),
+                (q, p, p), (self, self, q), (q, self, self)):
+        out = (y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2])
+        if out:
+          break
+    elif out and nonPower:
+      for y in ((self, self, self), (p, p, p), (q, q, q)):
+        out = (y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2])
+        if out:
+          break
     return out
 
   def moufang(self, p, q, number=0):
@@ -937,10 +957,11 @@ class O():
     elif number == 4: out = (q*self) *(p*q) -q *((self*p) *q)
     elif number != 0:
       raise Exception("Invalid vaue for number in moufang")
-    out = q*(self *(q*p)) -((q*self) *q) *p \
-        + self *(q* (p*q)) -((self*q) *p) *q \
-        + (q*self) *(p*q) -(q *(self*p)) *q \
-        + (q*self) *(p*q) -q *((self*p) *q)
+    else:
+      out = q*(self *(q*p)) -((q*self) *q) *p \
+          + self *(q* (p*q)) -((self*q) *p) *q \
+          + (q*self) *(p*q) -(q *(self*p)) *q \
+          + (q*self) *(p*q) -q *((self*p) *q)
     return out
 
   def projects(self, q):

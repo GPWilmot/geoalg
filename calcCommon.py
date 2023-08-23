@@ -578,7 +578,7 @@ class Tensor(list):
     a = []
     if isinstance(mat, Tensor):
       if self.__size[1] != mat.__size[0]:
-        raise Exception("Invalid Matrix sizes for multiply: %sx%s" \
+        raise Exception("Invalid Matrix sizes for multiplying: %sx%s" \
                      %(self.__size, mat.__size))
       if self and isinstance(self[0], (list, tuple)): # self.__size > (1,1)
         if mat.__size[1] > 1:                         # matrix * matrix
@@ -600,7 +600,7 @@ class Tensor(list):
           a.append(self[0] *val1[0])
           for col,val2 in enumerate(val1[1:]):
             a[row] += self[col +1] *val2
-      elif self.__size[0] != mat.__size[1]:
+      elif self.__size[1] != mat.__size[0]:
         raise Exception("Invalid Matrix sizes for product: %sx%s" \
                      %(self.__size, mat.__size))
       elif self.__size[0] == 1:
@@ -801,7 +801,8 @@ class Tensor(list):
       mat = Tensor(*mat)
     Common._checkType(mat, Tensor, "multiply")
     if self.__size != mat.__size:
-      raise Exception("Invalid Matrix size for multiply")
+      raise Exception("Invalid Matrix sizes for multiply %sx%s" \
+                     %(self.__size, mat.__size))
     if self and isinstance(self[0], (list, tuple)):
       for idx1,val1 in enumerate(self):
         out.append([])
@@ -1193,22 +1194,30 @@ class Tensor(list):
     if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
       raise Exception("Tensor is not the same type as basis for %s" %name)
 
-  def search(self, basis, cf, cfBasis=None, diffs=-2, num=-2, cycles=True):
-    """search(basis, cf, [cfBasis,diffs,num,cycles])
+  def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True, initPerm=[]):
+    """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm])
        Find self in signed permutation of cf for basis optionallly replacing
-       cfBasis in cf with basis. All n! permutations and n(n-1) combinations of
-       signs are searched. If found then the signed permutation is returned else
-       return the histogram of counts of differences. This is also returned if
-       diffs>-1 then print each list of differing indicies whose len is < diffs
-       along with index and length. If diff=-1 then report found only else <-1 
-       (default) report diffs histogram. If num>-2 then stop at this index (>=0)
-       or if found (-1). Parameter cf is swapped as cfBasis -> basis and text
-       searching is quicker.Parameter cycle is also quicker (default) because it
-       converts to Tensor.cycles and uses morphCycles instead of isomorph."""
+       cfBasis in cf with basis. All n! permutations and 2**n combinations of
+       signs are searched and the histogram of difference counts is returned
+       (default num=-2). If num=-1 then return the first match while num>-1
+       returns this signed permutation. Otherwise diffs>=0 can be used to
+       report each permutation for this many differences or less. Parameter cf
+       is swapped as cfBasis -> basis and text searching is quicker. Parameter
+       cycle is also quicker (default) because it converts to Tensor.cycles
+       and uses morphCycles instead of isomorph. Parameter initPerm is used
+       to fix the first part of all permutations such as octonians when
+       looking for sedenions."""
     self.__checkSquare(basis, "search", "basis")
     if cfBasis:
       cf.__checkSquare(cfBasis, "search", "cf")
+    Common._checkType(num, int, "search""search")
+    Common._checkType(diffs, int, "search")
     Common._checkType(cycles, bool, "search")
+    Common._checkType(initPerm, (list, tuple), "search")
+    chkPerm = list(x for x in sorted(list(abs(y) for y in initPerm)))
+    for idx in range(len(initPerm)):
+      if chkPerm[idx] != idx +1:
+        raise Exception("Search initPerm needs numbers %s" %range(len(initPerm)))
     cf = Tensor(*cf)
     dim = len(basis)
     val1 = self[0]
@@ -1225,9 +1234,10 @@ class Tensor(list):
         raise Exception("Search cfBasis length is not valid")
       if not cycles:
         cf = cf.morph(cfBasis, basis)
+    dim -= len(initPerm) 
     perms = Common.perm(dim, dim)
     difHisto = {}
-    difRange = [999, 0]
+    difRange = [99999, 0]
     isStr = isinstance(basis[0], Common._basestr)
     if isStr:
       mBasis = list((x[1:] if x[:1] == "-" else ("-" +x) for x in basis))
@@ -1237,14 +1247,16 @@ class Tensor(list):
       cf = cf.cycles(cfBasis if cfBasis else basis)
       cycleIso = self.cycles(basis)
       if len(cf) < len(self) or len(cycleIso) < len(self):
-        raise Exception("Invalid basis for table.cycle()")
+        print(len(cf), len(self), len(cycleIso),cf)
+        raise Exception("Invalid basis for table.cycles()")
     cnt = 0
-    for p in perms:                # For all permutation
+    for p in perms:                # For all permutations
       for n in range(dim +1):      # For all negative sign combinations
         for sgns in Common.comb(dim, n, True):
-          p0 = p[:]
+          p0 = list(x +len(initPerm) for x in p)
           for sgn in sgns:
             p0[sgn -1] *= -1
+          p0 = initPerm +p0
 
           # iso = self.isomorph(basis, p0)   # Signed swap rows, columns & cells
           if cycles:
@@ -1252,39 +1264,29 @@ class Tensor(list):
           else:
             pBasis = list((basis[x-1] if x>0 else mBasis[-x-1] for x in p0))
             morphed = self.__morph(basis, pBasis)
-            iso = morphed.permute(p0)
+            iso = morphed.permute(p0, True)
 
           # Now report found, perm, diffs & accumulate histogram
-          if diffs == -1:
+          if diffs < 0:
             dif = [0]
             if iso == cf:
-              if num < -1:
-                return iso
-              p1 = p0[:]
-              parity = 0
-              for x0 in range(len(p1)-1):
-                for y0 in range(x0,len(p1)-1):
-                  if abs(p1[y0+1]) < abs(p1[y0]):
-                    tmp = p1[y0]; p1[y0] = p1[y0+1]; p1[y0+1] = tmp
-                    parity += 1
-              if num == -1:
-                return p0
-              sys.stdout.write("FOUND at %d: %s %d\n" %(cnt, p0, parity %2))
+              dif = []
           else:
             dif = iso.differences(cf)
-            if num == -1 and len(dif) == 0:
-              return p0
           if len(dif) not in difHisto:
             difHisto[len(dif)] = 0
           difRange[0] = len(dif) if len(dif) <= difRange[0] else difRange[0]
           difRange[1] = len(dif) if len(dif) >= difRange[1] else difRange[1]
           difHisto[len(dif)] += 1
-          if diffs >= -1:
-            if len(dif) <= diffs:
-              sys.stdout.write("DIFFS %d at %d: %s %s\n" %(len(dif), cnt, p0, dif))
-            elif len(dif) == 0: # iso == cf
-              sys.stdout.write("FOUND at %d: %s\n" %(cnt, p0))
-          if cnt == num:
+          if diffs >= 0:
+            if len(dif) == 0: # iso == cf
+              sys.stdout.write("FOUND at %d %s\n" %(cnt, p0))
+            elif len(dif) <= diffs:
+              sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p0, len(dif), dif))
+          if cnt == num or (num == -1 and len(dif) == 0):
+            if diffs < 0:
+              sys.stdout.write("%s at %d %s\n" \
+                   %("FOUND" if num == -1 else "GOT", cnt, p0))
             return iso
           cnt += 1
     i = difRange[0]
@@ -1373,11 +1375,15 @@ class Tensor(list):
 
   def __assocCycles1(self, x1, x2, basis, mBasis):
     """Internal function to return +/- index of x1 * x2 from square table."""
-    if x1 == 0: return x2
-    if x2 == 0: return x1
-    if abs(x1) == abs(x2): return 0
+    scalar = len(basis) +1  # Represent +-1 as +-(len(basis) +1)
+    if abs(x1) == scalar: return x2 *(-1 if x1 < 0 else 1)
+    if abs(x2) == scalar: return x1 *(-1 if x2 < 0 else 1)
     mul = self[abs(x1) -1][abs(x2) -1]
-    idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul)) -1
+    if abs(x1) == abs(x2):
+      neg = (mul[0] == "-") if isinstance(mul, Common._basestr) else (mul < 0)
+      idx = scalar * (-1 if neg else 1)
+    else:
+      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul)) -1
     if (x1 < 0) != (x2 < 0):
       idx = -idx
     return idx
@@ -1392,33 +1398,36 @@ class Tensor(list):
       idx = self.__assocCycles1(x[0], rhs, basis, mBasis)
     return idx
 
-  def assocCycles(self, basis, nonAssoc=False, alternate=False, power=False,
+  def assocCycles(self, basis, nonAssoc=False, nonAlternate=False, nonPower=False,
                   moufang=0):
-    """assocCycles(basis, [nonAssoc,alternate,power,moufang])
-       Return list of 3 +/- basis indicies [non]associative, alternate, power
-       associative, moufang associativity] entries in self table. Any mutually
+    """assocCycles(basis, [nonAssoc,nonAlternate,nonPower,moufang])
+       Return list of 3 +/- basis indicies associative, nonAssociative, nonPower
+       nonAlternate or moufang associativity entries in self table. Any mutually
        exclusive, non-associative parameter enabled will return such triples.
        Associator is [a,b,c] = [a,[b,c]] - [[a,b],c] and associativity means
        [a,b,c] = 0. Alternate associativity is [a,b,c] = 0 if any two of a,b,c
-       are equal and Power associativity means [a,a,a] = 0.
-       Optional parameters are boolean apart from moufang which is a number 0-5
-       where 0 is off and 5 is the sum of all 4 Moufang checks:
+       are equal and Power associativity means [a,a,a] = 0 and are counted only
+       if associator is non-zero. Optional parameters [only one allowed] are
+       boolean apart from moufang which is a number 0-5 where 0 is off and 5
+       is the sum of all 4 Moufang checks:
          1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
          3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
     self.__checkSquare(basis, "assocCycles", "basis")
-    Common._checkType(basis, (list, tuple), "assocCycles")
     Common._checkType(nonAssoc, bool, "assocCycles")
-    Common._checkType(alternate, bool, "assocCycles")
-    Common._checkType(power, bool, "assocCycles")
+    Common._checkType(nonAlternate, bool, "assocCycles")
+    Common._checkType(nonPower, bool, "assocCycles")
     Common._checkType(moufang, int, "assocCycles")
+    if moufang not in range(6):
+      raise Exception("Invalid vaue for number in moufang")
+    assoc = int(nonAssoc) +int(nonAlternate) +int(nonPower) +int(moufang>0)
+    if assoc > 1:
+      raise Exception("Invalid number of options in assocCycles")
     accum = []
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
     for x in Common.comb(len(basis), 3, True):
       out = 0
       if moufang:
-        if moufang not in range(6):
-          raise Exception("Invalid vaue for number in moufang")
         if moufang in (1, 5):
           lhs = self.__assocCycles2((x[1], x[0], x[2]), False, basis, mBasis)
           rhs = self.__assocCycles2((x[0], x[1], x[0]), True, basis, mBasis)
@@ -1448,24 +1457,29 @@ class Tensor(list):
             -self.__assocCycles1(x[0], ths, basis, mBasis):
             if x not in accum:
               accum.append(x)
-      elif alternate:
-        for y in ((x[1], x[1], x[2]), (x[0], x[2], x[2]), (x[0], x[1], x[0])):
-           if self.__assocCycles2(x, True, basis, mBasis) \
-             -self.__assocCycles2(x, False, basis, mBasis):
-            if x not in accum:
-              accum.append(x)
-      elif power:
-        for y in ((x[0], x[0], x[0]), (x[1], x[1], x[1]), (x[2], x[2], x[2])):
-          if self.__assocCycles2(y, True, basis, mBasis) \
-            -self.__assocCycles2(y, False, basis, mBasis):
-            if x not in accum:
-              accum.append(x)
       else:
         out = self.__assocCycles2(x, True, basis, mBasis) \
              -self.__assocCycles2(x, False, basis, mBasis)
-        if out and nonAssoc:
+        if out and nonAlternate:
+          for y in ((x[0], x[0], x[1]), (x[1], x[0], x[0]), (x[1], x[1], x[2])):
+             if self.__assocCycles2(y, True, basis, mBasis) \
+               -self.__assocCycles2(y, False, basis, mBasis):
+               if y not in accum:
+                 accum.append(y)
+          for y in ((x[2], x[1], x[1]), (x[0], x[0], x[2]), (x[2], x[0], x[0])):
+             if self.__assocCycles2(y, True, basis, mBasis) \
+               -self.__assocCycles2(y, False, basis, mBasis):
+               if y not in accum:
+                 accum.append(y)
+        elif out and nonPower:
+          for y in ((x[0], x[0], x[0]), (x[1], x[1], x[1]), (x[2], x[2], x[2])):
+            if self.__assocCycles2(y, True, basis, mBasis) \
+              -self.__assocCycles2(y, False, basis, mBasis):
+              if x not in accum:
+                accum.append(x)
+        elif out and nonAssoc:
           accum.append(x)
-        elif not out and not nonAssoc:
+        elif assoc == 0 and not out:
           accum.append(x)
     ret = []
     for x in accum:
@@ -1474,7 +1488,7 @@ class Tensor(list):
 
   def isomorph(self, basis, perm):
     """isomorph(basis, perm)
-       Return self permuted and cells swapped by signed perm as list."""
+       Return self permuted and cells swapped by signed, inverted perm."""
     self.__checkSquare(basis, "isomorph", "basis")
     Common._checkType(perm, (list, tuple), "isomorph")
     if len(basis) == 0 or len(basis) != len(self) or len(perm) != len(basis):
@@ -1485,11 +1499,11 @@ class Tensor(list):
     else:
       mBasis = list((-x for x in basis))
     pBasis = list((basis[x-1] if x>0 else mBasis[-x-1] for x in perm))
-    out = self.permute(perm)
+    out = self.permute(perm, True)
     return Tensor(*out.morph(basis, pBasis))
 
-  def permute(self, perm):
-    """permute(perm)
+  def permute(self, perm, invert=False):
+    """permute(perm, [invert])
        Return self with rows and columns swapped and signed by perm."""
     Common._checkType(perm, (list, tuple), "permute")
     if self.__size[0] <= 1 or self.__size[0] != len(perm):
@@ -1498,12 +1512,14 @@ class Tensor(list):
       raise Exception("Swap perm index is out of range")
     isStr = isinstance(self[0] if self.__size[1]<2 else self[0][1],
                        Common._basestr)
-    compPerm = []
-    for x in range(1, len(perm) +1):
-      if x in perm:
-        compPerm.append(perm.index(x) +1)
-      else:
-        compPerm.append(-perm.index(-x) -1)
+    compPerm = perm
+    if invert:
+      compPerm = []
+      for x in range(1, len(perm) +1):
+        if x in perm:
+          compPerm.append(perm.index(x) +1)
+        else:
+          compPerm.append(-perm.index(-x) -1)
     rows = []
     for idx in compPerm: # Swap rows
       if idx > 0:
