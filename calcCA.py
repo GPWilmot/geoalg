@@ -56,8 +56,6 @@ class CA():
   __maxBasis    = ['0', '0']             # Store the max dimensions
   __useQuat     = False                  # Notify Q is included
   dumpRepr      = False                  # Repr defaults to str
-  newMul = False
-  dumpMul = False
 
   class Grade:
     """Each CA has an list of e & i basis elements ordered by grade. Each
@@ -103,6 +101,17 @@ class CA():
       return CA.Grade(self.value if value is None else value,
                      (self.__eBase[:], self.__iBase[:]))
 
+    def commutes(self, rhs):
+      """Return boolean of self commutes with rhs."""
+      cnt = 0
+      for bas in rhs.__eBase:
+        cnt += len(self.__eBase) -(1 if bas in self.__eBase else 0) \
+              +len(self.__iBase)
+      for bas in rhs.__iBase:
+        cnt += len(self.__iBase) -(1 if bas in self.__iBase else 0) \
+              +len(self.__eBase) +len(rhs.__eBase)
+      return cnt %2 == 0
+
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
       return abs(self.value -cf.value) < precision \
@@ -129,59 +138,9 @@ class CA():
         return 1
       return 0
 
-    def mergeBasisNew(self, value, rhs):
-      """Multiple graded basis elements."""
-      lhs = self.bases()
-      bases = [lhs[0], lhs[1]]  # Base for lhs e and i, resp
-      offs = len(bases[1])
-      sgn = 0
-      if value and len(rhs[0]) +len(rhs[1]):
-        for index,rBase in enumerate(rhs): # Iterate rhs e and i
-          lBase = lhs[index]
-          base = ""
-          pos = 0
-          for char in rBase +"0":
-            while True:
-              if pos == len(lBase):
-                break
-              nch = lBase[pos]
-              if ch < char:
-                base += ch
-                pos += 1
-                if Common._isVerbose():
-                  print("X1 %s(%s)%d %s(%s)" %(ch, lBase, pos, char, rBase), sgn, base)
-              elif ch == char:
-                pos += 1
-                sgn += len(lBase) -pos +offs     # Sign factor
-                if index == 1:
-                  sgn += 1
-                if Common._isVerbose():
-                  print("X2 %s(%s)%d %s(%s)" %(ch, lBase, pos, char, rBase), sgn, base)
-                char = '0'
-                break
-              else: # ch > char
-                if char == '0':
-                  base += ch
-                  pos += 1
-                  if Common._isVerbose():
-                    print("X3 %s(%s)%d %s(%s)" %(ch, lBase, pos, char, rBase), sgn, base)
-                else:
-                  sgn+= len(lBase) -pos +offs    # Sign factor
-                  base += char
-                  if Common._isVerbose():
-                    print("X4 %s(%s)%d %s(%s)" %(ch, lBase, pos, char, rBase), sgn, base)
-                  break
-            if pos == len(lBase) and char != '0':
-              base += char
-          bases[index] = base
-          offs = 0
-      return CA.Grade(-value if sgn %2 else value, bases)
-
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs."""
       value *= self.value
-      if CA.newMul:
-        return self.mergeBasisNew(value, rhs)
       lhs = self.bases()
       bases = [None, None]  # Basis for output
       sgn = 0
@@ -412,8 +371,6 @@ class CA():
   def __mul__(self, ca):
     """Multiplication of 2 CAs or self by scalar."""
     if isinstance(ca, CA):
-      if Common._isVerbose() and CA.dumpMul:
-        print("MUL %s * %s" %(self, ca))
       out = CA(self.w *ca.w)
       out.__entered0 = self.__entered0 | ca.__entered0
       if self.w:
@@ -513,8 +470,6 @@ class CA():
        storage by remembering last addition position."""
     if sum(grade.lens()) == 0:
       self.w += grade.value
-      if Common._isVerbose() and CA.dumpMul:
-        print("ADD0", self, "=", grade, '=>', str(self))
       return
     if self.__currentAdd >= 0: 
       order = self.__g[self.__currentAdd].order(grade)
@@ -532,9 +487,6 @@ class CA():
         if not self.__g[idx].value:
           del(self.__g[idx])
           self.__currentAdd -= 1
-        if Common._isVerbose() and CA.dumpMul:
-          print("XXX", pos, self.__currentAdd)
-          print("ADD", self, "=", grade, '=>', str(self))
         return
       elif order > 0:
         pos = idx
@@ -544,11 +496,6 @@ class CA():
     if grade.value:
       self.__currentAdd = pos
       self.__g.insert(pos, grade)
-    if Common._isVerbose() and CA.dumpMul:
-      print("XXX", pos, self.__currentAdd)
-      print("NEW", self, "=", grade.strs(), '=>', str(self))
-      if not self.__g and self.__currentAdd > 0:
-        raise Exception("XXX")
 
   def __copy(self):
     """Used by copy() to turn the basis into a kwargs dictionary."""
@@ -574,45 +521,75 @@ class CA():
       out.append(grade.copy())
     return out
 
-  def __versor(self, inversed=False, both=False):
-    """If inversed return the out=conjugate, signature, square and term cnt.
-       Otherwise return out=None, sign=2, 0, 0 if not versor.
-       Return square as sum of pure scalars squared and cnt as term count.
-       The signature includes scalar and is flat=1 if more positive, flat=-1
-       if more negative and flat=0 if equal. Hyperbolic versors have flat=1
-       while rotation versors are 0 or +1 if cnt==1. If both check inverse
-       is a versor with even parts only. Psuedo-versor has cnt < 0."""
-    out = None
-    if inversed:
+  def commutes(self, rhs):
+    """Return array of booleans for commutes for each term by term expansion."""
+    out = ([True] *(len(rhs.__g) +(1 if rhs.w else 0))) if self.w else []
+    for lhsBase in self.__g:
+      if rhs.w:
+        out += [True]
+      for rhsBase in rhs.__g:
+        out.append(lhsBase.commutes(rhsBase))
+    return out
+
+  def __invertible(self, conj=True):
+    """Return (conjugate, simple, even, hyperbolic, sum of basis squares).
+       This is correct for simple forms but may fail otherwise.
+       Flat = [number of imaginary terms, number of hyperbolic terms].
+       Diff = Flat[0] == Flat[1] + 1 if scalar != 0.
+       Simple = (Diff != Commutes) and 2 or less grades with scalar.
+       Even = all even terms including scalar. Commutes = +ve/-ve terms commute.
+       Hyperbolic = has x*x>0 terms but no imaginary terms."""
+    out = self
+    sgnOut = CA()
+    if conj:
       out = CA(self.w) 
       out.__entered0 = self.__entered0
     n2 = 0
-    cnt = 0 if self.w == 0.0 else 1
-    flat = [0, cnt]
-    even = 1 if cnt else -1
+    lastDim = (0, 0)
+    cnt = 0        # Count of total basis terms
+    flat = [0, 0]  # Count of Imaginaries, Hyperbolics with different basis dims
+    even = True
     for grade in self.__g:
-      dim = int(sum(grade.lens()) %2 == 0)
-      if even == -1:
-        even = dim
+      dim = grade.lens()
       cnt += 1
-      if (inversed and not both) or dim == even:
+      if dim != lastDim:
+        lastDim = dim
         sgnVal = grade.copy(1)
         sgnVal = sgnVal.mergeBasis(1, grade.bases())
-        n2 += grade.value *grade.value
         flat[int(sgnVal.value > 0)] += 1
-        if inversed:
-          value = grade.value
-          if sgnVal.value < 0:
-            value *= -1
+        if sum(dim) %2 == 1:
+          even = False
+      value = grade.value
+      n2 += value *value
+      if conj:
+        if sgnVal.value < 0:
+          value *= -1
+          sgnOut.__g.append(self.Grade(value, grade.bases()))
+        else:
           out.__g.append(self.Grade(value, grade.bases()))
+    scalar = (1 if self.w else 0)
+    simple = False
+    if conj:
+      if cnt +scalar == 1:
+        simple = True
+      elif flat[0] == 1:
+        if flat[1] == 0 and scalar:
+          simple = True
+        elif flat[1] + scalar == 1:
+          commutes = out.commutes(sgnOut)
+          simple = sum(commutes) == len(commutes)
+    return out +sgnOut, simple, even, (flat[1] > 0 and flat[0] == 0), n2
+
+  def __versible(self, conj):
+    """Try self*conj to see if it generates a single invertible term. Return
+       self/this or 0 if not single. This tests for large versors."""
+    tmp = (self * conj).trim()   # Could work anyway
+    if sum(tmp.grades()) == 1: # Single term
+      if tmp < 0:
+        return -conj *(-tmp).inverse(False)
       else:
-        return None, 2, 0, 0  # Not a versor
-    outFlat = 0
-    if flat[1] > flat[0]:
-      outFlat = 1 
-    elif flat[1] < flat[0]:
-      outFlat = -1
-    return out, outFlat, n2, cnt if even else -cnt
+        return conj *tmp.inverse(False)
+    return 0
 
   def __bar(self, ca, sign):
     """Return semi-graded sym or asym product for sign=-1 or 1."""
@@ -665,12 +642,18 @@ class CA():
 
   def isVersor(self, nonHyperbolic=False):
     """isVersor(, nonHyperbolic)
-       Return true if positive (if !nonHyperbolic) or mixed signature."""
+       Return true if invertible (if !nonHyperbolic) and even. See versor."""
     precision = Common._getPrecision()
-    tmp,flat,n2,cnt = self.__versor()
-    if nonHyperbolic and flat == 1:
+    conj,simple,even,hyperbolic,n2 = self.__invertible()
+    l2 = float(n2 + self.w *self.w)
+    if l2 < precision or not (simple and even):
+      if l2 >= Common._getPrecision() and conj.w >= 0 and \
+         sum(out.grades()) == 1:
+        return True
+      return (self.__versible(conj) != 0)
+    if nonHyperbolic and hyperbolic:
       return abs(math.sqrt(n2 +self.w *self.w) -1.0) < precision
-    return (flat == 0 or abs(cnt) == 1) and \
+    return not hyperbolic and \
            abs(math.sqrt(n2 +self.w *self.w) -1.0) < precision
 
   def degrees(self, ang=None):
@@ -716,13 +699,17 @@ class CA():
 
   def pure(self, dim=[], even=False, odd=False):
     """pure([dim,even,odd])
-       Return the pure dim part or parts if dim is a list (non-scalar if
-       empty). Else all even or odd grades above dim."""
+       Return the pure dim part or parts if dim is a list (CA() if empty).
+       Else all even or odd grades above dim."""
     Common._checkType(dim, (int, tuple, list), "pure")
     Common._checkType(even, (bool), "pure")
     Common._checkType(odd, (bool), "pure")
     useDim = (not (even or odd) and isinstance(dim, int))
     maxDim = 0
+    if not (dim or even or odd):
+      tmp = self.copy()
+      tmp.w = 0
+      return tmp
     if not isinstance(dim, (list, tuple)):
       dim = [dim]
     for i in dim:
@@ -852,23 +839,37 @@ class CA():
 
   def inverse(self, noError=False):
     """inverse([noError])
-       Return inverse attempt of self which is conj()/len() if len()!=0 and not
-       known failures. Raise an error on failure or return 0 if noError."""
-    out,flat,n2,cnt = self.__versor(inversed=True)
+       Return inverse of self which is conj()/len() if len()!=0 and a versor.
+       Simple forms with only two grades can be checked immediately. Simple
+       odd and mixed forms are also immediate. But with more than two grades
+       an inverse is possible so if noError then try self*self & self*conj().
+       If this produces a single term then divide by this term which captures
+       examples 3e1234567 +e123 +e145 +e167 +e246 +e257 +e347 +e356 and
+       (e0+e1+e2+e12)^2 = 2e012 (ie inverse -e0+e01-e02-e12). If not invertible
+       then raise an exception unless !noError in which case 0 is returned."""
+    out,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = float(n2 +self.w *self.w)
-    isInvertable = (flat <= 0 or abs(cnt) == 1) and l2 >= Common._getPrecision()
-    if not isInvertable:  # Could be anti-symmetric - check
-      if not noError:
-        raise Exception("Illegal versor for inverse()")
-      tmp = self * self
-      if not tmp.__g and tmp.w:
-        out = self.copy(self.w /tmp.w)
+    if l2 < Common._getPrecision() or not simple:
+      if l2 >= Common._getPrecision() and out.w >= 0 and sum(out.grades()) == 1:
+        return out *(1/l2)
+      tmp = (self * self).trim()  # Could be anti-symmetric - check
+      if sum(tmp.grades()) == 1:  # Single term
+        if tmp < 0:
+          tmp = -(-tmp).inverse(True)
+        else:
+          tmp = tmp.inverse(True)
+        out = self *tmp
+      else:
+        out = self.__versible(out)
+    else:
+      if out.w < 0 and not out.__g:
+        out = 0
+      else:
+        out.w /= l2
         for grade in out.__g:
-          grade.value /= float(tmp.w)
-        return out
-    out.w /= l2
-    for grade in out.__g:
-      grade.value /= l2
+          grade.value /= l2
+    if out == 0 and not noError:
+      raise Exception("Illegal form for inverse")
     return out
 
   def dot(self, ca):
@@ -964,27 +965,27 @@ class CA():
 
   def reflect(self, ca):
     """reflect(ca)
-       Reflect ca by self taking into account r-form parity."""
+       Reflect ca by self taking into account self-form parity."""
     Common._checkType(ca, CA, "reflect")
     parity = self.basisTerms()
-    if not parity[0]: # Ignore scalars
+    if len(parity[0]) == 0: # Ignore scalars
       return ca
     if len(parity[0]) != 1:
       raise Exception("Illegal basis for reflect()")
-    inv,flat,n2,cnt = self.__versor(inversed=True)
-    return self *ca *inv *(1 if len(parity[0][0]) %2 else -1)
+    inv,simple,even,hyperbolic,n2 = self.__invertible()
+    return self *ca *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
 
   def reflection(self, ref):
     """reflection(ref)
-       Reflect self inplace by ref taking into account r-form parity."""
+       Reflect self inplace by ref taking into account ref-form parity."""
     Common._checkType(ref, CA, "reflection")
     parity = ref.basisTerms()
-    if not parity[0]: # Ignore scalars
+    if len(parity[0]): # Ignore scalars
       return
     if len(parity[0]) != 1:
       raise Exception("Illegal basis for reflection")
-    inv,flat,n2,cnt = ref.__versor(inversed=True)
-    newSelf = ref *self *inv *(1 if len(parity[0][0]) %2 else -1)
+    inv,simple,even,hyperbolic,n2 = self.__invertible()
+    newSelf = ref *self *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
     self.__g = newSelf.__g
 
   def rotate(self, ca):
@@ -992,12 +993,14 @@ class CA():
        Rotate ca by self converting to versor first. See rotation."""
     Common._checkType(ca, CA, "rotate")
     precision = Common._getPrecision()
-    inv,flat,n2,cnt = self.__versor(inversed=True, both=True)
+    inv,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = float(n2 + self.w *self.w)
-    if (flat != 0 and cnt != 1) or l2 < precision:
-      raise Exception("Illegal versor for rotate")
+    if l2 < precision or not (simple and even):
+      inv = self.__versible(inv)
+      if inv == 0:
+        raise Exception("Illegal versor for rotate")
     if n2 < precision:
-      return ca
+      return ca.copy()
     if abs(l2 -1.0) < precision:
       l2 = 1.0
     return self *ca *inv /l2
@@ -1006,15 +1009,17 @@ class CA():
     """rotation(rot)
        Rotate self inplace by rot converting rot to versor first, if necessary.
        Applying to versors rotates in the same sense as quaternions and frame.
-       For CA vectors this is the same as rot.inverse()*self*rot."""
+       For CA vectors this is the same as rot.inverse()*self*rot. See versor."""
     Common._checkType(rot, CA, "rotation")
     precision = Common._getPrecision()
-    inv,flat,n2,cnt = rot.__versor(inversed=True, both=True)
+    inv,simple,even,hyperbolic,n2 = rot.__invertible()
     l2 = float(n2 + rot.w *rot.w)
-    if (flat != 0 and cnt != 1) or l2 < precision:
-      raise Exception("Illegal versor for rotation")
+    if l2 < precision or not (simple and even):
+      inv = self.__versible(inv)
+      if inv == 0:
+        raise Exception("Illegal versor for rotation")
     if n2 < precision:
-      return self.copy()
+      return
     if abs(l2 -1.0) < precision:
       l2 = 1.0
     newSelf = rot *self *inv /l2
@@ -1026,14 +1031,17 @@ class CA():
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
        Ready for frameMatrix. Also handles hyperbolic vector. See versor."""
     precision = Common._getPrecision()
-    tmp,flat,n2,cnt = self.__versor()
+    conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = n2 +self.w *self.w
-    if (flat != 0 and cnt != 1) or abs(math.sqrt(l2) -1.0) >= precision:
+    if abs(math.sqrt(l2) -1.0) >= precision or not even:
       if not noError:
+        raise Exception("Illegal versor for frame")
+    if not simple:
+      if self.__versible(conj) == 0:
         raise Exception("Illegal versor for frame")
     if n2 < precision:
       return CA(1)
-    if flat > 0:
+    if hyperbolic:
       w = abs(self.w)
       if w < 1.0:
         raise Exception("Invalid hyperbolic frame angle")
@@ -1043,44 +1051,40 @@ class CA():
     else:
       w = (self.w +1.0) %2.0 -1.0
       out = self.copy(math.acos(w) *2)
-    n1 = math.sqrt(n2)
+    p1 = math.sqrt(n2)
     if n1 >= precision:
-      n0 = 1.0 /n1
+      p0 = 1.0 /p1
       for base in out.__g:
-        base.value *= n0
+        base.value *= p0
     return out
     
-  def versor(self, nonHyperbolic=False, noError=False):
-    """versor([noError])
+  def versor(self, nonHyperbolic=False):
+    """versor([nonHyperbolic])
        Return the generalised even parts as unit() and scalar as angle. Opposite
-       of frame. See norm. Needs mixed or positive signature or single grade."""
+       of frame. See norm. Needs even grade and like inverse if more than a
+       simple number of grades then need to try self*conj. Hyperbolic versors
+       use cosh and sinh expansions unless nonHyperbolic is set."""
     precision = Common._getPrecision()
-    tmp,flat,n2,cnt = self.__versor()
-    w1 = self.w
-    if cnt < 0:
-      w1 = self.__g[-1].value
-      n2 -= w1 *w1
-    l2 = n2 +w1 *w1
-    if (flat > 0 and cnt != 1) or l2 < precision:
-      if not noError:
+    conj,simple,even,hyperbolic,n2 = self.__invertible()
+    l2 = n2 +self.w *self.w
+    if math.sqrt(l2) < precision or not even:
+      raise Exception("Illegal versor for versor")
+    if not simple:
+      if self.__versible(conj) == 0:
         raise Exception("Illegal versor for versor")
     if n2 < precision:
       return CA(1)
-    if flat > 0:
-      sw = math.sinh(w1 /2.0)
-      cw = math.cosh(w1 /2.0)
+    if hyperbolic:
+      if nonHyperbolic:
+        raise Exception("Illegal hyperbolic versor for versor")
+      sw = math.sinh(self.w /2.0)
+      cw = math.cosh(self.w /2.0)
     else:
-      sw,cw = Common._sincos(w1 /2.0)
+      sw,cw = Common._sincos(self.w /2.0)
     sw /= math.sqrt(n2)
-    if cnt < 0:
-      out = self.copy()
-      for base in out.__g[:-1]:
-        base.value *= sw
-      out.__g[-1].value = cw
-    else:
-      out = self.copy(cw)
-      for base in out.__g:
-        base.value *= sw
+    out = self.copy(cw)
+    for base in out.__g:
+      base.value *= sw
     return out
 
   def unit(self):
@@ -1123,8 +1127,8 @@ class CA():
        For even q=w+v then a=|q|cos(a) & v=n|q|sin(a), n unit."""
     # Look for even, non-hyperbolic form
     Common._checkType(exp, (int, float), "pow")
-    tmp,flat,n2,cnt = self.__versor()
-    if flat <= 0:
+    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
+    if (simple and even) and not hyperbolic:
       l1 = math.sqrt(n2 +self.w *self.w)
       w = pow(l1, exp)
       if l1 < Common._getPrecision():
@@ -1150,10 +1154,10 @@ class CA():
     """exp()
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
     # Look for even, non-hyperbolic form
-    tmp,flat,n2,cnt = self.__versor()
-    if out and n2 < Common._getPrecision():
+    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
+    if n2 < Common._getPrecision():
       return CA(self.w)
-    if out and flat <= 0:
+    if even and not hyperbolic:
       n1 = math.sqrt(n2)
       s,c = Common._sincos(n1)
       exp = pow(math.e, self.w)
@@ -1169,11 +1173,11 @@ class CA():
   def log(self):
     """log()
        The functional inverse of the even exp()."""
-    tmp,flat,n2,cnt = self.__versor()
+    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
     l1 = math.sqrt(self.w *self.w +n2)
-    if out and n2 < Common._getPrecision():
+    if n2 < Common._getPrecision():
       return CA(math.log(l1))
-    if out and flat <= 0:
+    if even and not hyperbolic:
       s = math.acos(self.w /l1) /math.sqrt(n2)
       out = CA(math.log(l1))
       out.__entered0 = self.__entered0
@@ -1222,11 +1226,11 @@ class CA():
        until 3-D is reached. See Common.Euler.Matrix. Once 3-D is reached the
        quaternion.euler() calculation can be used. Euler parameters are of the
        form cos(W/2) +n sin(W/2), n pure unit versor. Set noError to return a
-       zero Euler if self is not valid to be a versor or norm if possible.
-       Also signature must be positive."""
-    tmp,flat,n2,cnt = self.__versor()
+       zero Euler if self is not valid to be a versor. Also signature must be
+       positive as hyperbolic is not implemented."""
+    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
     l2 = n2 +self.w *self.w
-    if flat != 0 or cnt != 1:
+    if hyperbolic or not even:
       if not noError:
         raise Exception("Illegal versor for euler")
     if abs(l2 -1.0) >= Common._getPrecision():
@@ -1582,25 +1586,40 @@ class CA():
 
   @staticmethod
   def Versor(*args, **kwargs):
-    """Versor([scalar, e1 multiplier, ...][basis=multiplier, ...])
+    """Versor([e12 multiplier, ...],[basis=multiplier, ...])
        Return versor(2-D +...) where ... is higher dimensions in the
        form e32=x, e13=y, e21=z, .... Each dimension has (D 2)T=D(D-1)/2
        parameters and these are added as e4 to xyz, e5 to these +e45, etc.
-       Use VersorArgs() to see this list. See Euler() for an angle version
-       instead of parameters being n sin(W/2), n unit."""
+       Use VersorArgs() to see this list. Same result as Euler() but allows
+       for any dimension angle instead of listing all dimensions."""
     # See Wikipedia.org rotations in 4-dimensional Euclidean space
-    if args:
-      dim = int((math.sqrt(8*(len(args)-1) +1) +1) /2 +0.9) # l=comb(dim,2)
-      if dim > CA.__HEX_BASIS:
-        raise Exception("Invalid number of Versor euler angles")
-      xyz = CA.VersorArgs(dim, rotate=True)
-      for idx,val in enumerate(args[1:]):
-        if xyz[idx] in kwargs:
-          raise Exception("Invalid Versor basis duplication: %s" %xyz[idx])
-        kwargs[xyz[idx]] = val
-      args = args[:1]
-    ca = CA(*args, **kwargs)
-    return ca.versor()
+    # Number of versors in len(args)=comb(dim,2) inversed is:
+    dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) if args else 0
+    if dim > CA.__HEX_BASIS:
+      raise Exception("Invalid number of Versor euler angles")
+    dim = max(dim, 2)
+    for key,value in kwargs.items():
+      Common._checkType(value, (int, float), "CA")
+      if value:
+        grades = CA._init(key, value, False)[0].lens()
+        if grades[0] != 2 or grades[1]:
+          raise Exception("Invalid basis for Versor: %s" %key)
+        val1 = int(key[1], CA.__HEX_BASIS +1)
+        val2 = int(key[2], CA.__HEX_BASIS +1)
+        dim = max(val1, val2, dim)
+    xyz = CA.VersorArgs(dim, rotate=True)
+    out = [0] *len(xyz)
+    for key,value in kwargs.items():
+      if key in xyz:
+        idx = xyz.index(key)
+      else:
+        idx = xyz.index("e" +key[2] +key[1])
+      if idx < len(args):
+        raise Exception("Invalid Versor basis duplication: %s" %xyz[idx])
+      out[idx] = value
+    for idx,value in enumerate(args):
+      out[idx] = value
+    return CA.Euler(*out)
 
   @staticmethod
   def Euler(*args, **kwargs): #order=[], implicit=False):
@@ -1754,8 +1773,9 @@ class CA():
     """Eval(sets)
        Return the CA evaluated from sets of e-basis, str lists or dict pairs."""
     Common._checkType(sets, (list, tuple), "Eval")
-    if not isinstance(sets[0], (list, tuple)):
+    if not (len(sets) and isinstance(sets[0], (list, tuple))):
       sets = [sets]
+    scalar = 0
     terms = {}
     for item in sets:
       Common._checkType(item, (list, tuple), "Eval")
@@ -1764,6 +1784,8 @@ class CA():
         terms[base] = 1
       elif not isinstance(item, (list, tuple)):
         raise Exception("Invalid basis for Eval: %s" %item)
+      elif len(item) == 0:
+        scalar = 1
       elif isinstance(item[0], Common._basestr):
         base = item[0] if item[0][:1] in CA.__allChars else ("e" +item[0])
         terms[base] = item[1]
@@ -1776,7 +1798,7 @@ class CA():
           if num < 0:
             sgn *= -1
         terms[base] = sgn
-    return CA(**terms)
+    return CA(scalar, **terms)
 
   @staticmethod
   def Spin(triList):
@@ -1934,6 +1956,8 @@ if __name__ == '__main__':
   import traceback
   import sys, os
   from math import *
+  exp = Common.exp
+  log = Common.log
   try:
     import importlib
   except:
@@ -1948,7 +1972,7 @@ if __name__ == '__main__':
        test = Rx.frameMatrix() *c.vector(); store = (rx*c*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
-       Rx=d60+e13; rx=CA.Versor(d60,0,1)
+       Rx=d60+e13; rx=CA.Versor(e13=d60)
        test = Rx.frameMatrix() *c.vector(); store = (rx.rotate(c)).vector()
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.

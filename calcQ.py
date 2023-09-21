@@ -904,6 +904,8 @@ if __name__ == '__main__':
   import traceback
   import sys, os
   from math import *
+  exp = Common.exp
+  log = Common.log
   try:
     import importlib
   except:

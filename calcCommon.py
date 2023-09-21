@@ -61,6 +61,19 @@ class Common():
   else:
     _basestr = str
 
+  # Overload globals and maths functions (abs & pow handled within classes)
+  @staticmethod
+  def exp(arg):
+    if isinstance(arg, (float,int)):
+      return math.exp(arg)
+    return arg.exp()
+
+  @staticmethod
+  def log(arg):
+    if isinstance(arg, (float,int)):
+      return math.log(arg)
+    return arg.log()
+
   @staticmethod
   def version():
     """version()
@@ -1024,10 +1037,10 @@ class Tensor(list):
         for idx1,val1 in enumerate(self):
           out.append([])
           for val2 in val1:
-            out.append(Common._morph(val2, 1, pairs)[val2])
+            out.append(Common._morph(val2, 1, basis)[val2])
         return Tensor(*out)
       for idx1,val1 in enumerate(self):
-        out.append(Common._morph(val1, 1, pairs)[val1])
+        out.append(Common._morph(val1, 1, basis)[val1])
       return self.copy(out)
     Common._checkType(labels, (list, tuple), "morph")
     if len(basis) != len(labels) or len(self) < len(basis):
@@ -1977,6 +1990,8 @@ if __name__ == '__main__': # Might as well run calcR
   import sys, os
   from math import *
   from calcR import *
+  exp = Common.exp
+  log = Common.log
   try:
     import importlib
   except:
@@ -1990,3 +2005,4 @@ elif sys.version_info.major != 2:  # Python 3
     """To match Python2's execfile need: from pathlib import Path
        exec(Path(fName).read_text())."""
     exec(Common.readText(fName))
+

@@ -558,8 +558,10 @@ class Calculator:
       param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else None
       extra = pline[pos2 +1:].strip()                # Anything after word or )
       if word and extra:
-        raise Exception("Command arguments must be inside brackets")
-      if not word or extra or pline[:pos1].strip():  # Ignore if not single cmd
+        if sline.find(word) == 0:
+          raise Exception("Command arguments must be inside brackets")
+        code += sline +';'
+      elif not word or extra or pline[:pos1].strip():  # Ignore if not single cmd
         code += sline +';'
       else:  # Separate out parameters
         if param and len(param) > 1:   # Remove quotes
@@ -638,13 +640,13 @@ class Calculator:
       if token.type == "NEWLINE" and quotesCnt %2 == 0:
         if state.extendLine:
           quoteCnt = 0
-          state.startLine = True
           if state.store:
             token.value = ""
         else:
           checkStore = True
           isComment = False
           doLineExpand = True
+          state.startLine = True
           if state.store:
             state.isNewLine = True
             token.value = ""
@@ -670,10 +672,6 @@ class Calculator:
           bracketCnt -= 1
           if bracketCnt <= noBrackExpand:
             noBrackExpand = 0
-        checkStore = True
-      elif noBrackExpand:
-        if bracketCnt < noBrackExpand:
-          noBrackExpand = 0 
         checkStore = True
       elif token.type == "EQUALS":
         checkStore = True
@@ -706,7 +704,7 @@ class Calculator:
         token.value = ""
       elif token.type == "NAME":
         validBasis = Calculator.__inCls._validBasis(token.value)
-        if validBasis and doLineExpand:
+        if validBasis and doLineExpand and not noBrackExpand:
           sgn = "-1" if state.lastTyp == "SIGNS" and state.lastVal == "-" \
                      else "+1"
           if state.store:
@@ -779,6 +777,7 @@ class Calculator:
         state.lastTyp = token.type
         if token.type in (':', ';'):
           state.startLine = True
+          noUsefulWord = False
           doLineExpand = True
           if token.type == ';': #TBD
             isAns = False

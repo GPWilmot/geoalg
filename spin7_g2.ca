@@ -42,6 +42,8 @@ PP1 = (e1247, e1256, e1346, e1357, e2345, e2367, e4567) # = sum(PP1) = -e1234567
 PPP1 = list(Common.chain(*([CA.Eval([x[0],x[1]])+CA.Eval([x[2],x[3]]), CA.Eval([x[0],x[2]])+CA.Eval([x[1],x[3]]),
         CA.Eval([x[0],x[3]])+CA.Eval([x[1],x[2]])] for x in (y.basisTerms()[0][0] for y in PP1))))
 
+PP1p = (e1247, e1256, -e4567, -e1346, e2367, e1357, e2345) # Is +ve triads == Triads7[0].spin(.)
+
 # Pick one P1o = next(negTriO(P1)) & define PP1o = -e1234567 *P1o  # This P1o negates e246 from P1.
 # Find PP1o = (P1o*P1o+7)/6 & P1o*(PP1o+6) = 7e1234567
 P1o = e123 +e145 +e167 -e246 +e257 +e347 +e356
