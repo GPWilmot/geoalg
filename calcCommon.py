@@ -362,7 +362,7 @@ class Common():
        Return the number of permutations of n elements or set of r in n perms
        as a generator."""
     Common._checkType(n, int, "perm")
-    if isinstance(r, int):
+    if isinstance(r, int) and not isinstance(r, bool):
       return Common.__perm(n, [1] *r, 0)
     elif r is None:
       return math.factorial(n) 
@@ -1515,6 +1515,17 @@ class Tensor(list):
     out = self.permute(perm, True)
     return Tensor(*out.morph(basis, pBasis))
 
+  def permInvert(self):
+    """permInvert()
+       Return inverted vector permutation."""
+    compPerm = []
+    for x in range(1, len(self) +1):
+      if x in self:
+        compPerm.append(self.index(x) +1)
+      else:
+        compPerm.append(-self.index(-x) -1)
+    return Tensor(compPerm)
+
   def permute(self, perm, invert=False):
     """permute(perm, [invert])
        Return self with rows and columns swapped and signed by perm."""
@@ -1525,14 +1536,7 @@ class Tensor(list):
       raise Exception("Swap perm index is out of range")
     isStr = isinstance(self[0] if self.__size[1]<2 else self[0][1],
                        Common._basestr)
-    compPerm = perm
-    if invert:
-      compPerm = []
-      for x in range(1, len(perm) +1):
-        if x in perm:
-          compPerm.append(perm.index(x) +1)
-        else:
-          compPerm.append(-perm.index(-x) -1)
+    compPerm = Tensor(perm).permInvert() if invert else perm
     rows = []
     for idx in compPerm: # Swap rows
       if idx > 0:
@@ -1544,15 +1548,19 @@ class Tensor(list):
         else:
           rows.append(list((v[1:] if v[0]=="-" else "-" +v for v in val)))
       elif self.__size[1] == 1:
-        rows.append(-self[-idx -1][:])
+        rows.append(-self[-idx -1])
       else:
         rows.append(list((-v for v in self[-idx -1])))
+    out = []  # Swap columns
     if self.__size[1] == 1:
+      if len(self) != len(compPerm):
+        raise Exception("Invalid permute row length")
       out = rows
     else:
-      out = []  # Swap columns
-      for x in range(len(rows)):
+      for idx in range(len(rows)):
         out.append([]) 
+        if len(self[idx]) != len(compPerm):
+          raise Exception("Invalid permute row length")
       for idx1,row in enumerate(out):
         for idx2 in compPerm:
           if idx2 > 0:

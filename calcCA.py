@@ -21,7 +21,7 @@
 ## A quaternion maps as i->e32, j->e13, k->e21 & e123 maps to vector basis.
 ## Quaternions are of the form q = w + _v_ where _v_ is a i,j,k vector
 ## s.t. _v_*_v_ >= 0 and w is a scalar. A pure quaternion has w==0.
-## A unit quaternion has _n_*_n_ = -1. A versor has norm = 1 which means
+## A unit quaternion has _n_*_n_ = -1. A versor has len = 1 which means
 ## r = cos(a) + sin(a) * _n_ where _n_ in a unit. This is extended to CA for
 ## the n-D rotation group, O(n) where _n_ = e12, e13, e14, ... e(n-1)n.
 ## This gives a rank-n rotation matrix with twice the rotation angle as the
@@ -259,6 +259,10 @@ class CA():
         raise Exception("Invalid basis: %s" %key)
     return lGrade.mergeBasis(1, rBases), entered0
 
+  def __float__(self):
+    return float(self.w)
+  def __int__(self):
+    return trunc(self.w)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
     out = ""
@@ -592,15 +596,20 @@ class CA():
     return 0
 
   def __bar(self, ca, sign):
-    """Return semi-graded sym or asym product for sign=-1 or 1."""
-    out = CA(0)
-    out.__entered0 = self.__entered0
+    """Return semi-graded sym or asym product for sign=-1 or 1. Different
+       definition to structure paper due to Pertti Lounesto feedback.
+       Probably upsets Pfaffian proof though."""
+    if sign == -1:
+      out = CA(0)
+      out.__entered0 = self.__entered0
+    else:
+      out = self.w *ca.w +self *ca.w +ca *self.w
     for grade1 in self.__g:
       l1 = sum(grade1.lens())
       for grade2 in ca.__g:
         l2 = sum(grade2.lens())
         out.__add(grade1.mergeBasis(grade2.value *0.5, grade2.bases()))
-        sgn = -sign if (l1 +l2) %2 == 0 else sign
+        sgn = sign if (l1 %2 == 0 or l2 %2 == 0) else -sign
         out.__add(grade2.mergeBasis(grade1.value *0.5 *sgn, grade1.bases()))
     return out
 
@@ -666,7 +675,7 @@ class CA():
 
   def scalar(self, w=None):
     """scalar([w])
-       Return or set scalar part."""
+       Return or set scalar part. Use float() [automatic] for return."""
     if w:
       Common._checkType(w, (int, float), "scalar")
       self.w = w
@@ -837,6 +846,16 @@ class CA():
         grade.value *= sgnVal.value
     return out
 
+  def norm(self):
+    """norm()
+       Return the scalar square sum of the product without conjugation."""
+    n2 = self.w *self.w
+    for grade in self.__g:
+      sgnVal = grade.copy(1)
+      sgnVal = sgnVal.mergeBasis(1, grade.bases())
+      n2 += grade.value *grade.value *sgnVal.value
+    return n2
+
   def inverse(self, noError=False):
     """inverse([noError])
        Return inverse of self which is conj()/len() if len()!=0 and a versor.
@@ -874,52 +893,45 @@ class CA():
 
   def dot(self, ca):
     """dot(ca)
-       Return dot product of pure(1) parts and squaring instead of using sym."""
+       Return odd overlap contraction. Dot product for vectors."""
     Common._checkType(ca, CA, "dot")
-    out = idx1 = idx2 = 0
-    x = self.__g[0]
-    y = ca.__g[0]
-    while idx1 < len(self.__g) and idx2 < len(ca.__g):
-      x = self.__g[idx1]
-      y = ca.__g[idx2]
-      if sum(x.lens()) > 1 or sum(y.lens()) > 1:
-        break
-      order = x.order(y)
-      if order < 0:
-        idx1 += 1
-      elif order > 0:
-        idx2 += 1
-      else:
-        sgn = 1 if x.lens()[0] == 1 else -1
-        out += x.value *y.value *sgn 
-        idx1 += 1
-        idx2 += 1
-    return out
+    return self.__bar(ca, -1)
+
+  def wedge(self, ca):
+    """wed[ge](ca)
+       Return even overlap & scalar expansion. Exterior part if no overlap."""
+    Common._checkType(ca, CA, "wedge")
+    return self.__bar(ca, 1)
+  wed = wedge
 
   def cross(self, ca):
     """cross(ca)
-       Return cross product of pure(1) parts and using e321 * asym product."""
+       Return cross product of pure(1) parts and using e321 * asym/2 product."""
     Common._checkType(ca, CA, "cross")
     x = self.pure(1)
     y = ca.pure(1)
+    bases = (x+y).basisTerms()
+    if len(bases) > 0:
+      for base in bases[0]:
+        if base[0] > 3:
+          raise Exception("Invalid vector in cross")
     out = CA(e321=1) *(x *y -y *x) *0.5 
     out.__entered0 = self.__entered0
     return out
 
   def sym(self, ca):
     """sym(ca)
-       Return symmetric product of two CAs. The dot product is for vectors."""
+       Return symmetric product of two CAs. The dot product *2 for vectors."""
     Common._checkType(ca, CA, "sym")
-    out = (self *ca +ca *self) *0.5 
+    out = self *ca +ca *self
     out.__entered0 = self.__entered0
     return out
 
   def asym(self, ca):
     """asym(ca)
-       Return anti-symmetric product of two CAs. The wedge product is the
-       exterior pure of this product."""
+       Return antisymmetric product of two CAs. Wedge product*2 for vectors."""
     Common._checkType(ca, CA, "asym")
-    out = (self *ca -ca *self) *0.5 
+    out = self *ca -ca *self
     out.__entered0 = self.__entered0
     return out
  
@@ -929,18 +941,6 @@ class CA():
     out = (self * p) *q - self *(p * q)
     out.__entered0 = self.__entered0
     return out
-
-  def symbar(self, ca):
-    """symbar(ca)
-       Return semi-graded symmetric product of two CAs."""
-    Common._checkType(ca, CA, "symbar")
-    return self.__bar(ca, -1)
-
-  def asymbar(self, ca):
-    """asymbar(ca)
-       Return semi-graded anti-symmetric product of two CAs."""
-    Common._checkType(ca, CA, "asymbar")
-    return self.__bar(ca, 1)
 
   def projects(self, ca):
     """projects(ca)
@@ -1027,9 +1027,10 @@ class CA():
     self.__g = newSelf.__g
 
   def frame(self, noError=False):
-    """frame()
+    """frame([noError])
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
-       Ready for frameMatrix. Also handles hyperbolic vector. See versor."""
+       Ready for frameMatrix. Also handles hyperbolic vector. See versor.
+       Set noError to try an untested solution anyway."""
     precision = Common._getPrecision()
     conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = n2 +self.w *self.w
@@ -1061,7 +1062,7 @@ class CA():
   def versor(self, nonHyperbolic=False):
     """versor([nonHyperbolic])
        Return the generalised even parts as unit() and scalar as angle. Opposite
-       of frame. See norm. Needs even grade and like inverse if more than a
+       of frame. See normalise. Needs even grade and like inverse if more than a
        simple number of grades then need to try self*conj. Hyperbolic versors
        use cosh and sinh expansions unless nonHyperbolic is set."""
     precision = Common._getPrecision()
@@ -1110,9 +1111,9 @@ class CA():
       return (self.inverse() *ca).log().len()
     raise Exception("Invalid non-hyperbolic, non-versor for distance")
 
-  def norm(self):
-    """norm()
-       Normalise - reduces error accumulation. Versors have norm 1."""
+  def normalise(self):
+    """normalise()
+       Reduces error accumulation. Versors have len 1."""
     precision = Common._getPrecision()
     n = self.len()
     if n < precision:
@@ -1235,15 +1236,15 @@ class CA():
         raise Exception("Illegal versor for euler")
     if abs(l2 -1.0) >= Common._getPrecision():
       if not noError:
-        raise Exception("Illegal versor norm for euler")
-      tmp = tmp.norm()
+        raise Exception("Illegal versor len for euler")
+      tmp = tmp.normalise()
     if n2 < Common._getPrecision():
       return Euler()
     dims = self.__vectorSizes()
     xyz = CA.VersorArgs(*dims, rotate=True)
     cnt = len(xyz)
     angles = [0] *cnt
-    for rank in reversed(range(4, dims[0] +1)):
+    for rank in reversed(range(4, dims[0] +1)): # For dims > 3
       base = CA(**{"e%X" %rank: 1})
       mul = tmp.rotate(base)
       cnt -= rank -1
@@ -1265,7 +1266,7 @@ class CA():
         s,c = Common._sincos(val *0.5)
         mul *=  CA(c, **{xyz[idx]: -s})
       tmp = mul *tmp
-    args = [0] *3
+    args = [0] *3   # Now only 3 dims left for angles
     xyz = CA.VersorArgs(3)
     for grade in tmp.__g:
       eStr,iStr = grade.strs()
@@ -1304,7 +1305,7 @@ class CA():
        where (g,f)=e tan(U/2) as a Rodrigues vector, unit e. n, m & e
        form a spherical triangle with dihedral angles W/2, V/2 & U/2.
        Opposite of Euler.Matrix for default order with CA.Euler. Set
-       noError to norm the versor if not normed."""
+       noError to normalise the versor if not normed."""
     return self.euler(noError).matrix()
 
   def frameMatrix(self):
@@ -1884,7 +1885,7 @@ class CA():
     line = ""
     isQuat = False
     quatKeys = (None, 'i', 'j', 'k')  # based on __QUAT_KEYS
-    signTyp = ""
+    signTyp = state.signVal
     firstCnt = 1 if state.isMults1 else -1
     lastCnt = len(state.store) -1 if state.isMults2 else -1
     for cnt,value in enumerate(state.store):
@@ -1899,9 +1900,9 @@ class CA():
       isMult = (cnt in (firstCnt, lastCnt) and lastCnt != 0)
       if key in kw or isMult:
         if key is None and not isMult:  # Duplicate scalar
-          val = "(%s%s)" %(kw[None], val)
+          val = "+(%s%s)" %(kw[None], val)
         elif isMult and len(kw) == 1 and None in kw:
-          line += signTyp +kw[None]
+          line += kw[None]
           signTyp = "+"
           kw[None] = "0"
         elif isQuat:
@@ -1923,7 +1924,8 @@ class CA():
 
     # Dump the remainder
     if len(kw) == 1 and None in kw:
-      line += signTyp +kw[None] +" "
+      signTyp = kw[None][0] if signTyp or kw[None][0] == "-" else ""
+      line += signTyp +kw[None][1:]
     elif isQuat:
       line += signTyp +"Q(%s)" %",".join( \
               ("%s" %kw[x] if x in kw else '0') for x in quatKeys)
@@ -1934,8 +1936,7 @@ class CA():
         del(kw[None])
       line += signTyp +"CA(%s%s)" %(scalar, ",".join(map(lambda x: \
               ("%s=%s" %(x,kw[x])) if x else str(kw[x]), kw.keys())))
-    if state.isNewLine:
-      line += '\n'
+    line += state.aftFill
     state.reset()
     return line
 
@@ -2002,14 +2003,14 @@ if __name__ == '__main__':
        store = (d45+i+j+k).versor().versorMatrix()
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
-       r = d45 +i +j +k; store = r.norm().euler().matrix()
+       r = d45 +i +j +k; store = r.normalise().euler().matrix()
        if CA.IsCalc("Q"):
-         test = r.norm().versorMatrix()
+         test = r.normalise().versorMatrix()
        else:
-         test = r.norm().versorMatrix()
+         test = r.normalise().versorMatrix()
        Calculator.log(store == test, store)""",
     """# Test 9 Euler Matrix is inverse of versorMatrix.
-       test=Matrix(pi/6, pi/4, pi/2)
+       test=Tensor(pi/6, pi/4, pi/2)
        store=Euler.Matrix(CA.Euler(*test).versorMatrix())
        Calculator.log(store == Euler(*test), store)""",
     """# Test 10 Geodetic distance = acos(p.w *d.w -p.dot(d)).
@@ -2019,17 +2020,17 @@ if __name__ == '__main__':
          p = CA.Q(p); d = CA.Q(d)
        else:
          p = CA.Euler(e); d=(d45+e321*c).versor()
-         test = math.acos(p.w *d.w -p.pure(2).sym(d.pure(2)).scalar())
+         test = math.acos(p.w *d.w -p.pure().wedge(d.pure())) # scalar part of even overlap
        store = p.distance(d)
        Calculator.log(abs(store - test) < 3E-5, store)""",
     """# Test 11 Length *2 == dot(self +self).
        store = (c *2).len(); test = math.sqrt((c +c).dot(c +c))
        Calculator.log(abs(store - test) <1E-15, store)""",
-    """# Test 12 Versor *3 /3 == versor.norm
-       Calculator.log(c/c.len() == c.norm(), c.norm())""",
+    """# Test 12 Versor *3 /3 == versor.normalise
+       Calculator.log(c/c.len() == c.normalise(), c.normalise())""",
     """# Test 13 Check Rodriges formula
        def para(a,r,w): return a *a.dot(r)
-       def perp(a,r,w): return r *math.cos(w) +CA(e321=1)*a.asym(r) \\
+       def perp(a,r,w): return r *math.cos(w) +CA(e321=1)*a.wedge(r) \\
                *math.sin(w) -a *a.dot(r) *math.cos(w)
        store = para(e1,e1+e2,d30)+perp(e1,e1+e2,d30)
        if CA.IsCalc("Q"):
@@ -2082,8 +2083,8 @@ if __name__ == '__main__':
        conv = Tensor((-1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
        model = CA.Euler(Euler.Matrix(conv))
        egNED = CA.Euler(Euler(roll, pitch, yaw), order=[3,2,1])
-       model2NED = (egNED * model).norm()
-       ECEF = (CA.NED(lat, lng) * model2NED).norm()
+       model2NED = (egNED * model).normalise()
+       ECEF = (CA.NED(lat, lng) * model2NED).normalise()
        store = ECEF.versorMatrix()
        test = Tensor(\
          ( 0.552107290714106247, 0.63168203529742073, -0.544201567273411735),\
@@ -2091,7 +2092,7 @@ if __name__ == '__main__':
          (-0.760811975866937606, 0.648697425324424537,-0.0188888261919459843))
        Calculator.log(store == test, store)""",
     """# Test 21 CA.Euler.euler 7-D is same as Euler.
-       test = Matrix(list((x *0.01 for x in range(1,22))))
+       test = Tensor(list((x *0.01 for x in range(1,22))))
        store = CA.Euler(*test).euler()
        Calculator.log(Matrix(store) == test, store)""",
     """# Test 22 Euler Matrix 7-D Matrix is inverse of Euler.matrix.

@@ -8,15 +8,15 @@
 # Q==Q0 [verified for fixQ(.5,.7,1,d=2.0) then load again]
 # [verified Q[1:3][1:3] = Q.Euler(.5,.7,1).eulerMatrix()]
 
-L = Matrix((w,-x,-y,-z),(x,w,-z,y),(y,z,w,-x),(z,-y,x,w))
-R = Matrix((w,x,y,z),(-x,w,-z,y),(-y,z,w,-x),(-z,-y,x,w))
+L = Tensor((w,-x,-y,-z),(x,w,-z,y),(y,z,w,-x),(z,-y,x,w))
+R = Tensor((w,x,y,z),(-x,w,-z,y),(-y,z,w,-x),(-z,-y,x,w))
 Q = R * L # = R(q)*L(q^-1)
-Lx = Matrix((cx,-sx,0,0),(sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx))
-Rx = Matrix((cx,sx,0,0),(-sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx)) # e23
-Ly = Matrix((cy,0,-sy,0),(0,cy,0,sy),(sy,0,cy,0),(0,-sy,0,cy))
-Ry = Matrix((cy,0,sy,0),(0,cy,0,sy),(-sy,0,cy,0),(0,-sy,0,cy)) # e13
-Lz = Matrix((cz,0,0,-sz),(0,cz,-sz,0),(0,sz,cz,0),(sz,0,0,cz))
-Rz = Matrix((cz,0,0,sz),(0,cz,-sz,0),(0,sz,cz,0),(-sz,0,0,cz)) # e12
+Lx = Tensor((cx,-sx,0,0),(sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx))
+Rx = Tensor((cx,sx,0,0),(-sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx)) # e23
+Ly = Tensor((cy,0,-sy,0),(0,cy,0,sy),(sy,0,cy,0),(0,-sy,0,cy))
+Ry = Tensor((cy,0,sy,0),(0,cy,0,sy),(-sy,0,cy,0),(0,-sy,0,cy)) # e13
+Lz = Tensor((cz,0,0,-sz),(0,cz,-sz,0),(0,sz,cz,0),(sz,0,0,cz))
+Rz = Tensor((cz,0,0,sz),(0,cz,-sz,0),(0,sz,cz,0),(-sz,0,0,cz)) # e12
 Qx = Rx * Lx
 Qy = Ry * Ly
 Qz = Rz * Lz
@@ -76,7 +76,7 @@ def fixE():
   s54,c54=Common.sincos(.17)
 
 def matE(dim, idx1, idx2):
-  m = Matrix.Trace([1] *dim)
+  m = Tensor.Diag([1] *dim)
   m[idx1 -1][idx1 -1] = S("c%d%d" %(idx1, idx2))
   m[idx1 -1][idx2 -1] = S("s%d%d" %(idx1, idx2))
   m[idx2 -1][idx1 -1] = S("-s%d%d" %(idx1, idx2))
@@ -84,7 +84,7 @@ def matE(dim, idx1, idx2):
   return m
 
 def matQ(dim, QQ):
-  m = Matrix.Trace([1] *dim)
+  m = Tensor.Diag([1] *dim)
   siz = len(QQ)
   for ii in range(siz):
     for jj in range(siz):
@@ -95,15 +95,15 @@ def lastCol(QQ):
   siz = len(QQ)
   return map(lambda x: x[S(siz) -1], QQ)
 
-Ex = Matrix((1,0,0,0),(0,cx,-sx,0),(0,sx,cx,0),(0,0,0,1))
-Ey = Matrix((cy,0,sy,0),(0,1,0,0),(-sy,0,cy,0),(0,0,0,1))
-Ez = Matrix((cz,-sz,0,0),(sz,cz,0,0),(0,0,1,0),(0,0,0,1))
-E14 = Matrix((c14,0,0,s14),(0,1,0,0),(0,0,1,0),(-s14,0,0,c14))
-E24 = Matrix((1,0,0,0),(0,c24,0,s24),(0,0,1,0),(0,-s24,0,c24))
-E34 = Matrix((1,0,0,0),(0,1,0,0),(0,0,c34,s34),(0,0,-s34,c34))
-I14 = Matrix((c14,0,0,-s14),(0,1,0,0),(0,0,1,0),(s14,0,0,c14))
-I24 = Matrix((1,0,0,0),(0,c24,0,-s24),(0,0,1,0),(0,s24,0,c24))
-I34 = Matrix((1,0,0,0),(0,1,0,0),(0,0,c34,-s34),(0,0,s34,c34))
+Ex = Tensor((1,0,0,0),(0,cx,-sx,0),(0,sx,cx,0),(0,0,0,1))
+Ey = Tensor((cy,0,sy,0),(0,1,0,0),(-sy,0,cy,0),(0,0,0,1))
+Ez = Tensor((cz,-sz,0,0),(sz,cz,0,0),(0,0,1,0),(0,0,0,1))
+E14 = Tensor((c14,0,0,s14),(0,1,0,0),(0,0,1,0),(-s14,0,0,c14))
+E24 = Tensor((1,0,0,0),(0,c24,0,s24),(0,0,1,0),(0,-s24,0,c24))
+E34 = Tensor((1,0,0,0),(0,1,0,0),(0,0,c34,s34),(0,0,-s34,c34))
+I14 = Tensor((c14,0,0,-s14),(0,1,0,0),(0,0,1,0),(s14,0,0,c14))
+I24 = Tensor((1,0,0,0),(0,c24,0,-s24),(0,0,1,0),(0,s24,0,c24))
+I34 = Tensor((1,0,0,0),(0,1,0,0),(0,0,c34,-s34),(0,0,s34,c34))
 I = I14 * I24 *I34
 Q3 = Ez *Ey *Ex
 Q4 = matQ(4, Q3)

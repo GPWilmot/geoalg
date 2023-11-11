@@ -31,6 +31,7 @@ from calcCommon import *
 ################################################################################
 class P(list):
   """Class to develop Cayley-Dickson product."""
+  _posSigs = []  # Change these indicies into Positive Signature
   def __init__(self, n, lhs, rhs=0):
     """Define lhs as binary tree (level n>=0) or multiply lhs * rhs (n<0)."""
     if n >= 0:
@@ -97,7 +98,12 @@ class P(list):
     if n == 0:
       return self[1] * p[1]
     if n == 1:
-       return P(-1, self[1] *p[1] -p[2] *self[2], self[1] *p[2] +p[1] *self[2])
+      if n in P._posSigs:
+        return P(-1, self[1] *p[1] +p[2] *self[2], self[1]*p[2] +p[1] *self[2])
+      return P(-1, self[1] *p[1] -p[2] *self[2], self[1] *p[2] +p[1] *self[2])
+    if n in P._posSigs:
+      return P(-1, self[1] *p[1] +p[2] *self[2].__conj(n-1),
+                   self[1].__conj(n-1) *p[2] +p[1] *self[2])
     return P(-1, self[1] *p[1] -p[2] *self[2].__conj(n-1),
                  self[1].__conj(n-1) *p[2] +p[1] *self[2])
   def __add__(self, p):
@@ -468,20 +474,20 @@ class S():
        Convert to Q(...) if basis is i, j, k and __useQuat.
        The state is a ParseState from Calculator.processTokens()."""
     line = ""
-    signTyp = state.signTyp
+    signTyp = state.signVal
     for vals in state.store:
       scale,val = vals
       isAttribute = False
       isText = False
       excess = ""
       if val:
-        if scale == "1":
+        if scale in ("-1", "+1"):
+          if scale == "-1" and not signTyp:
+            signTyp = scale[0] 
           scale = ""
-        elif scale in ("-1", "+1"):
-          signTyp = scale[0] 
-          scale = ""
-        elif scale and scale[0] in ("-", "+"):
-          signTyp = scale[0]
+        else:
+          if scale[0] == "-" and not signTyp:
+            signTyp = scale[0]
           if len(scale) > 1:
             scale = scale[1:] + "*"
           else:
@@ -498,7 +504,9 @@ class S():
           isText = not state.startLine
       else:
         val = ""
-        if scale[0] in ('+', '-'):
+        if scale[0] == "+" and not signTyp:
+          scale = scale[1:]
+        else:
           signTyp = scale[0] 
           scale = scale[1:]
       if isAttribute:
@@ -506,10 +514,9 @@ class S():
       elif isText:
         line += signTyp +"%sS('%s',locals()).val()%s" %(scale, val, excess)
       else:
-        line += signTyp +"%s " %(scale +val)
+        line += signTyp +"%s" %(scale +val)
       signTyp = "+"
-    if state.isNewLine:
-      line += '\n'
+    line += state.aftFill
     state.reset()
     return line
 

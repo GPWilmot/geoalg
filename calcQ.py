@@ -68,6 +68,10 @@ class Q():
         Common._checkType(params[key], (int, float), "Q")
     self.w,self.x,self.y,self.z = (w, x, y, z)
 
+  def __float__(self):
+    return float(self.w)
+  def __int__(self):
+    return trunc(self.w)
   def __str__(self):
     """Overload standard string output. Print each member if non-zero as int
        or double taking resolution into account and add vector axis (i,j,k).
@@ -387,15 +391,15 @@ class Q():
     Common._checkType(q, Q, "distance")
     return (self.inverse() *q).log().len()
 
-  def norm(self, noError=False):
-    """norm([noError])
+  def normalise(self, noError=False):
+    """normalise([noError])
        Return normalised self - reduces versor error accumulation.
        Raise an error on failure or return 0 if noError."""
     l1 = self.len()
     if l1 < Common._getPrecision():
       if noError:
         return Q(0)
-      raise Exception("Illegal length for norm()")
+      raise Exception("Illegal length for normalise()")
     return Q(self.w/l1, self.x/l1, self.y/l1, self.z/l1)
 
   def unit(self):
@@ -409,7 +413,7 @@ class Q():
   def frame(self):
     """frame()
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w). See versor."""
-    q = self.norm()
+    q = self.normalise()
     l1 = q.vectorLen()
     l0 = 0
     if l1 >= Common._getPrecision():
@@ -419,7 +423,7 @@ class Q():
 
   def versor(self):
     """versor()
-       Return self=frame as a versor loosing magnitude. See frame & norm."""
+       Return self=frame as a versor no magnitude. See frame & normalise."""
     n1 = self.vectorLen()
     if n1 < Common._getPrecision():
       return Q(1)
@@ -532,7 +536,7 @@ class Q():
     if not self.isVersor():
       if not noError:
         raise Exception("Illegal versor norm for versorMatrix()")
-      tmp = self.norm()
+      tmp = self.normalise()
     disc = tmp.w *tmp.y - tmp.x *tmp.z
     if abs(abs(disc) -0.5) < Common._getPrecision():
       sgn = 2.0 if disc < 0 else -2.0
@@ -567,7 +571,7 @@ class Q():
     if not self.isVersor():
       if not noError:
         raise Exception("Illegal versor norm for versorMatrix()")
-      tmp = self.norm()
+      tmp = self.normalise()
     wx = tmp.w *tmp.x
     wy = tmp.w *tmp.y
     wz = tmp.w *tmp.z
@@ -854,7 +858,7 @@ class Q():
        set then double up since MULTS are higher priority then SIGNS.
        The state is a ParseState from Calculator.processTokens()."""
     q = ["0"]*4
-    signTyp = ""
+    signTyp = state.signVal
     firstCnt = 1 if state.isMults1 else -1
     lastCnt = len(state.store) -1 if state.isMults2 else -1
     line = ""
@@ -866,9 +870,9 @@ class Q():
       idx = 0 if key is None else cls.__BASE_CHARS.index(key) +1
       if q[idx] != "0" or isMult:
         if idx == 0 and not isMult:  # Duplicate scalar
-          val = "(%s%s)" %(q[0], val)
+          val = "+(%s%s)" %(q[0], val)
         elif isMult and q[1:] == ['0']*3:  # Scalar only
-          line += signTyp +q[0]
+          line += q[0]
           signTyp = '+'
           q[0] = "0"
         else:
@@ -879,11 +883,11 @@ class Q():
 
     # Dump the remainder
     if q[1:] == ['0']*3:  # Scalar only
-      line += signTyp +q[0]
+      signTyp = q[0][0] if signTyp or q[0][0] == "-" else ""
+      line += signTyp +q[0][1:]
     else:
       line += signTyp +"Q(%s)" %(",".join(q))
-    if state.isNewLine:
-      line += '\n'
+    line += state.aftFill
     state.reset()
     return line
 
@@ -956,8 +960,8 @@ if __name__ == '__main__':
     """# Test 11 Length *2 == dot(self +self).
        store = (q *2).len(); test = math.sqrt(-(q +q).dot(q +q))
        Calculator.log(store == test, store)""",
-    """# Test 12 Versor *3 /3 == versor.norm
-       Calculator.log(q/q.len() == q.norm(), q.norm())""",
+    """# Test 12 Versor *3 /3 == versor.normalise
+       Calculator.log(q/q.len() == q.normalise(), q.normalise())""",
     """# Test 13 Check Rodriges formula
        def para(a,r,w): return -a *a.dot(r)
        def perp(a,r,w): return r *math.cos(w) +a.cross(r) *math.sin(w)\\
@@ -987,8 +991,8 @@ if __name__ == '__main__':
        conv = Tensor((-1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0))
        model = Q.Euler(Euler.Matrix(conv))
        egNED = Q.Euler(Euler(roll, pitch, yaw), order=[3,2,1])
-       model2NED = (egNED * model).norm()
-       ECEF = (Q.NED(lat, lng) * model2NED).norm()
+       model2NED = (egNED * model).normalise()
+       ECEF = (Q.NED(lat, lng) * model2NED).normalise()
        store = ECEF.versorMatrix()
        test = Tensor(\
          ( 0.552107290714106247, 0.63168203529742073, -0.544201567273411735),\

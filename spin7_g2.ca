@@ -501,7 +501,7 @@ TableG2 = Tensor( \
 # ==triads7all(y,1 if y in (10, 19) else 0), x[1].reflect(triads7all(0).swap(x[0])))
 # for x in range(30): print(x, tableG2(*makeG2(x))==TableG2)
 # for x in range(30): print(x, mapG2(x, g2=makeG2(x)[0]))
-# Use C1.asym(E1)=-2F1 or [C2,E2]=-2F2
+# Use C1.asym(E1)/2=-2F1 or [C2,E2]=-2F2
 A1,A2 = +e23-e45, (+e23-e45)//2   # 4~comb=0-+
 B1,B2 = -e13-e46, (-e13-e46)//2   # 2~comb=0++
 C1,C2 = +e12+e47, (+e12+e47)//2   # 0~comb=0--

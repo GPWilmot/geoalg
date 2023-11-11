@@ -103,29 +103,29 @@ class ParseState:
   def __init__(self):
     self.token = None
     self.lastTyp = ""
-    self.lastVal = None    # only if lastTyp == SIGNS
     self.startLine = True
     self.extendLine = False
     self.reset()
   def reset(self):
     self.store = []        # pairs of (value, basis)
-    self.signTyp = ""
+    self.signVal = ""      # only if lastTyp == SIGNS
+    self.aftFill = ""
     self.lastBasis = 0
-    self.isNewLine = False
     self.isMults1 = False
     self.isMults2 = False
+    self.multVal = ""      # For Python2 turn / into /float
   def __repr__(self):
-    sgn = self.lastVal if self.lastTyp in ("SIGNS", "MULTS") else "None"
-    mul1 = "|" if self.isMults1 else ""
-    mul2 = "|" if self.isMults2 else ""
-    return "State:%s%s%s LastType:%s Basis:%s" %(mul1, self.store, mul2,
-                                                 sgn, self.lastBasis)
+    mul1 = self.multVal if self.isMults1 else ""
+    mul2 = self.multVal if self.isMults2 else ""
+    return "Basis:%s %sState:%s%s%s" %(self.lastBasis, self.signVal,
+                                       mul1, self.store, mul2)
 
 ###############################################################################
 class CommonTest():
   """Class to provide common test processing and logging code."""
   __inTests    = None          # Test strings for running
   __testIndent = 7             # Test string indents
+  __testRng    = []            # Array of running test numbers
   __testCnt    = 0             # Counter for running tests
   __testPass   = False         # Status for running tests
 
@@ -135,8 +135,8 @@ class CommonTest():
     if CommonTest.__inTests:
       if not test:
         CommonTest.__testPass = False
-      sys.stdout.write("Test%d: %s\n" %(CommonTest.__testCnt,
-                       "PASS" if test else "FAIL"))
+      tst = CommonTest.__testRng[CommonTest.__testCnt]
+      sys.stdout.write("Test%d: %s\n" %(tst, "PASS" if test else "FAIL"))
       CommonTest.__testCnt += 1
       if Common._isVerbose() and store is not None:
         sys.stdout.write(str(store) +'\n')
@@ -162,14 +162,17 @@ class CommonTest():
         CommonTest.__testIndent = indent
 
   @staticmethod
-  def __initTestExec(case):
+  def __initTestExec(nummbers, firstTest):
     """Initialise testing cases from Calculator."""
     if CommonTest.__inTests:
       CommonTest.__testPass = True
-      CommonTest.__testCnt = case
+      if firstTest:
+        CommonTest.__testCnt = 0
+        CommonTest.__testRng = []
+      CommonTest.__testRng += nummbers
 
   @staticmethod
-  def getTestLines(number=None):
+  def getTestLines(number, firstTest):
     """Return exec lines for __inTests assuming this has at least 2 fields.
        number is blank to run all tests or the str(test number). Expect 
        Common.log to be included at the end of each test and runtest[0] is
@@ -180,10 +183,10 @@ class CommonTest():
     Common.precision(1E-15)  # Reset precision in case a test changed it
     if not number:
       first,last = (1, len(CommonTest.__inTests))
-      CommonTest.__initTestExec(1)
+      CommonTest.__initTestExec(range(first,last), firstTest)
     elif number.isdigit() and int(number) in range(1,len(CommonTest.__inTests)):
       first,last = (int(number), int(number) +1)
-      CommonTest.__initTestExec(first)
+      CommonTest.__initTestExec([first], firstTest)
     else:
       raise Exception("Test argument should be in range 1..%d" \
                                %CommonTest.testCnt())
@@ -308,14 +311,15 @@ class Calculator:
     CommonTest.logResults()
 
   @staticmethod
-  def test(number=None):
+  def test(number, firstTest):
     """Run test number or all tests."""
     name = Calculator.__firstCls.__name__
     name = "R" if name == "Real" else name
     if Calculator.__prompt not in Calculator.__promptList +[name]:
       raise Exception("Invalid calculator for %s tests" %name)
-    Calculator.__lastCmd = "test(%s)" %number.strip() if number else ""
-    return CommonTest.getTestLines(number.strip() if number else None)
+    tst = number.strip() if number else ""
+    Calculator.__lastCmd = "test(%s)" %tst
+    return CommonTest.getTestLines(tst, firstTest)
 
   class ExecError(Exception):
     """Don't report exceptions outside exec() if already reported inside.
@@ -337,19 +341,21 @@ class Calculator:
       sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") +'\n')
 
   @staticmethod
-  def load(filename=None):
+  def load(filename=None, noError=False):
     """Load filename or default file and add to history."""
     if not filename:
       raise Exception("No filename entered")
     code = Common.readText(filename)
     if not code:
-      raise Exception("File empty")
-    for line in code.splitlines():
-      Calculator.__history.append(line)
-    if Common._isVerbose():
-      if readline:
-        readline.read_history_file(filename)
-      Calculator.__lastCmd = "load(%s)" %filename
+      if not noError:
+        raise Exception("File empty")
+    else:
+      for line in code.splitlines():
+        Calculator.__history.append(line)
+      if Common._isVerbose():
+        if readline:
+          readline.read_history_file(filename)
+        Calculator.__lastCmd = "load(%s)" %filename
     return code
 
   @staticmethod
@@ -542,6 +548,8 @@ class Calculator:
        for exec() or exception. Return "" if quitting. USEFUL_CMDS return the
        code to run using lex which is not nested so is added after expansion."""
     code = ""
+    doFirstLoad = False
+    firstTest = True
     for sline in line.split(';'):
       if firstWord and sline.find(firstWord) >= 0:
         word = firstWord
@@ -569,6 +577,9 @@ class Calculator:
              param[0] == "'" and param[-1] == "'":
             param = param[1:-1]
         if word in self.__USEFUL_FILE:  # File cmds can use default filename
+          if word == "load" and param == "noError=True":
+            param = ""
+            doFirstLoad = True
           if param:                     # Maybe use default filename extension
             if not os.path.splitext(param)[1]:
               param += os.path.splitext(Calculator.__default)[1]
@@ -594,9 +605,11 @@ class Calculator:
             pline = "(path='%s/*%s')" %(path, ext)
         if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
           if word == "load":
-            line = Calculator.load(param)
+            line = Calculator.load(param, noError=doFirstLoad)
+            doFirstLoad = False
           elif word == "test":
-            line = Calculator.test(param)
+            line = Calculator.test(param, firstTest)
+            firstTest = False
           else:    # version - ignore parameters
             pline = "'R',%s" %__version__
             for mod in Calculator.__moduleList:
@@ -604,14 +617,15 @@ class Calculator:
                 pline += ",'%s',%s.version()" %(mod, mod)
             line = "Calculator." +word +"(%s)" %pline
           self.__lexer.reset(line)
-          isAns,code = self.__parseTokens(True) # No usefulwords in scripts
+          isAns,tmp = self.__parseTokens(True,isAns) # No usefulwords in scripts
+          code += tmp
         else:
           code += "Calculator." +word +(pline if pline else "()")
         if len(code) > 0 and code[-1] != '\n':
           code += ';'
     return isAns,code[:-1]
 
-  def __parseTokens(self, noUsefulWord=False):
+  def __parseTokens(self, noUsefulWord=False, isAns=True):
     """Not a full parser because it outputs code for python to parse. It only
        changes numbers with names recognised by _validBasis() and appends these
        to a stored number array which is changed into code by _processStore().
@@ -625,7 +639,6 @@ class Calculator:
        """
     SpaceChars = (' ', '\t', "NEWLINE")
     code = ""               # Output line
-    isAns = True            # Use eval instead of exec
     doUsefulWord = ""       # Process this special word
     doLineExpand = True     # Do expand if not special word or function
     noBrackExpand = 0       # Don't expand basis inside calc class
@@ -635,35 +648,36 @@ class Calculator:
     quotesCnt = 0           # Ignore inside triple double quotes only
     bracketCnt = 0          # Ignore inside brackets if noBrackExpand
     checkStore = False      # Process the state immediately
+    signVal = ""            # Current sign for number or name
     for token in self.__lexer.process():
       #print(token, state, noBrackExpand, "->", code[-20:])
-      if token.type == "NEWLINE" and quotesCnt %2 == 0:
+      if token.type == "NEWLINE" and not quotesCnt:
+        isComment = False
+        checkStore = True
         if state.extendLine:
-          quoteCnt = 0
           if state.store:
             token.value = ""
         else:
-          checkStore = True
-          isComment = False
           doLineExpand = True
           state.startLine = True
           if state.store:
-            state.isNewLine = True
+            state.aftFill += "\n"
             token.value = ""
       elif isComment:
         pass
-      elif (token.type == "COMMENT" and quotesCnt %2 == 0):
+      elif (token.type == "COMMENT" and not quotesCnt):
         isComment = True
+        checkStore = True
         isAns = False
-        checkStore = True
       elif token.type == "QUOTES":
-        quotesCnt += 1
+        quotesCnt = 1 - quotesCnt
         quoteCnt = 0
-        checkStore = True
+        checkStore = quotesCnt
       elif token.type == '"':
-        quoteCnt += 1
-        checkStore = True
-      elif quoteCnt %2 == 1 or quotesCnt %2 == 1:
+        if not quotesCnt:
+          quoteCnt = 1 - quoteCnt
+          checkStore = quoteCnt
+      elif quoteCnt or quotesCnt:
         pass
       elif token.type == "BRACKS":
         if token.value == '(':
@@ -676,37 +690,37 @@ class Calculator:
       elif token.type == "EQUALS":
         checkStore = True
       elif token.type == "SIGNS":
-        if state.lastTyp == "SIGNS":
-          code += state.lastVal
-        state.lastVal = token.value
+        code += signVal
+        signVal = token.value
         token.value = ""
       elif token.type == "MULTS":
         if state.store:
-          if sys.version_info.major == 2: # Upgrade Python v2 to v3
+          if sys.version_info.major == 2: # Upgrade Python2 to v3
             if token.value == "/" and state.store[-1][0].find(".") < 0 \
               and state.store[-1][0].find("E") < 0:
               state.store[-1][0] += ".0"  # 1/3 is 0 in v2
           state.isMults2 = True
           code += Calculator.__inCls._processStore(state)
-        if state.lastTyp == "SIGNS":
-          code += state.lastVal
-        state.lastVal = token.value
+        else:
+          code += state.signVal
+          state.signVal = ""
+        state.multVal = token.value
       elif token.type == "NUMBER":
-        sgn = state.lastVal if state.lastTyp == "SIGNS" else ""
-        if state.store and not sgn:
-          sgn = '+'
+        sgn = signVal if signVal else "+"
+        if not state.store:
+          state.signVal = "+" if signVal else ""
         if state.lastTyp == "MULTS":
           state.isMults1 = True
-        if sys.version_info.major == 2 and state.lastVal == "/":
-          if token.value.find(".") < 0 and token.value.find("E") < 0:
-            token.value += ".0"
+          if sys.version_info.major == 2 and state.multVal == "/":
+            if token.value.find(".") < 0 and token.value.find("E") < 0:
+              token.value += ".0"
         state.store.append([sgn +token.value, None])
         token.value = ""
+        signVal = ""
       elif token.type == "NAME":
         validBasis = Calculator.__inCls._validBasis(token.value)
-        if validBasis and doLineExpand and not noBrackExpand:
-          sgn = "-1" if state.lastTyp == "SIGNS" and state.lastVal == "-" \
-                     else "+1"
+        if validBasis and doLineExpand:
+          sgn = "-1" if signVal == "-" else "+1"
           if state.store:
             if state.lastTyp == "NAME":
               if token.value[0] != ".":
@@ -720,29 +734,28 @@ class Calculator:
             else:
               state.store.append([sgn, token.value])
           else:
+            state.signVal = "+" if signVal else ""
             if state.lastTyp == "MULTS":
               state.isMults1 = True
-            elif state.lastTyp == "SIGNS":
-              code += "+"
             state.store.append([sgn, token.value])
           token.value = ""
+          signVal = ""
           state.lastBasis = validBasis
         else:
           if state.store:
             code += Calculator.__inCls._processStore(state)
-          if state.lastTyp == "SIGNS":
-            code += state.lastVal
+          code += signVal
+          signVal = ""
           if token.value in Calculator.__moduleList:
-            noBrackExpand = bracketCnt +1 # Don't expand basis inside calc class
+            noBrackExpand = bracketCnt +1
           elif token.value in self.__PYTHON_STARTS:
             state.startLine = True
           elif state.startLine:
             if token.value in self.__USEFUL_WORDS:
-              if noUsefulWord:
-                raise Exception("Multiple commands are not allowed")
-              doUsefulWord = token.value
-              noUsefulWord = True
-              doLineExpand = False
+              if not noUsefulWord:
+                #raise Exception("Multiple commands are not allowed")
+                doUsefulWord = token.value
+                doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
               isAns = False
             elif token.value in self.__PYTHON_FUNCS:
@@ -750,29 +763,33 @@ class Calculator:
               isAns = False
       else:  # All OTHER tokens
         if token.type == '=':
-          doLineExpand = True
+          if noBrackExpand and len(state.store) == 1 \
+                           and state.store[0][0] == "+1":
+            code += state.store[0][1]
+            state.reset()
+          else:
+            doLineExpand = True
           if bracketCnt == 0 and state.lastTyp not in ("<", ">"):
             isAns = False
         if token.type in SpaceChars:
-          if state.store or state.lastTyp == "SIGNS":
+          if state.store:
+            state.aftFill += " "
             token.value = ""
         elif token.type == "\\":
           if state.store:
             token.value = ""
-          elif state.lastTyp == "SIGNS":
-            code += state.lastVal
+          code += signVal
+          signVal = ""
         else:
           checkStore = True
       if checkStore:
         checkStore = False
         if state.store:
           code += Calculator.__inCls._processStore(state)
-        if state.lastTyp == "SIGNS":
-          code += state.lastVal
-        state.lastVal = ""
+        code += signVal
+        signVal = ""
       code += token.value
-      if not (token.type in SpaceChars or isComment or \
-                  quoteCnt %2 != 0 or quotesCnt %2 != 0):
+      if not (token.type in SpaceChars or isComment or quoteCnt or quotesCnt):
         state.extendLine = (token.type == "\\")
         state.lastTyp = token.type
         if token.type in (':', ';'):
@@ -797,7 +814,7 @@ class Calculator:
        If lastLine then a backslash was entered as the last char of the 
        previous input and lines should be accumulated with the backslash
        replaced by a new line character and isAns is set False."""
-    isAns,code = False,None
+    isAns,code = True,None   # Use eval instead of exec & run string
     prompt = "calc%s> " %Calculator.__prompt
     if runExec:
       line = runExec
@@ -841,7 +858,8 @@ class Calculator:
             code += "  sys.stdout.write(str(exception) +'\\n')\n"
           code += "  raise Calculator.ExecError(exception)\n"
       except Exception as e:
-        isAns,code = False, 'sys.stdout.write("Error: %s\\n")' %e
+        tmp = str(e).replace('"', '\\"')
+        isAns,code = False, 'sys.stdout.write("Error: %s\\n")' %tmp
         if Common._isVerbose():
           traceback.print_exc()
     elif line:
@@ -891,7 +909,7 @@ class Calculator:
             doCalc = True
           elif ch != '-':
             raise Exception("Invalid option: %s" %opt)
-      doCmd = "load" if doLoad else ""
+      doCmd = "load(noError=True)" if doLoad else ""
       if calcCmd:
         doCmd += "%scalc(%s)" %(";" if doCmd else "", ",".join(calcCmd))
       while True:
@@ -961,6 +979,10 @@ class Real(float):
      modified. It has no methods, use math methods instead eg sin(pi) but change
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
+  def __float__(self):
+    return float(self)
+  def __int__(self):
+    return trunc(self)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
     return Common.getResolNum(self)
@@ -994,7 +1016,8 @@ class Real(float):
     """Divide 2 floats & return a Real."""
     Common._checkType(q, (int, float), "div")
     return Real(float.__div__(self, q))
-  __rdiv__ = __div__
+  def __rdiv__(self, q):
+    return Real(float.__div__(float(q), self))
   def __mod__(self, q):
     """Modulo % operator for Real."""
     Common._checkType(q, (int, float), "mod")
@@ -1057,12 +1080,17 @@ class Real(float):
   @classmethod
   def _processStore(cls, state):
     """No convertion needed as there are no basis chars."""
-    line = "+".join("Real(%s)" %x[0] for x in state.store)
-    if line.find(".") < 0:  # Don't convert int to Real
-      line = (" ".join(x[0] for x in state.store))
-    if state.isNewLine:
-      line += '\n'
+    line = ""
+    signTyp = state.signVal
+    for num,bas in state.store:
+      if num.find(".") < 0:  # Don't convert int to Real
+        line += num
+      else:
+        line += "Real(%s)" %num
+    line += state.aftFill
     state.reset()
+    if line[0] == "+" and not signTyp:
+      return line[1:]
     return line
 
   @staticmethod
@@ -1125,7 +1153,7 @@ if __name__ == '__main__':
   calc = Calculator(Real, Tests)
   calc.processInput(sys.argv)
 
-elif sys.version_info.major != 2:  # Python 3
+elif sys.version_info.major != 2:  # Python3
   def execfile(fName):
     """To match Python2's execfile need: from pathlib import Path
        exec(Path(fName).read_text())."""
