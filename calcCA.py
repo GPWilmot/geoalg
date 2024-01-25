@@ -324,14 +324,14 @@ class CA():
   def __add__(self, ca):
     """Add 2 CAs or a scalar from w."""
     if isinstance(ca, CA):
-      out = self.copy(self.w +ca.w)
+      out = self.dup(self.w +ca.w)
       for grade in ca.__g:
         out.__add(grade)
     elif isinstance(ca, Tensor):
       out = ca.__add__(self)
     else:
       Common._checkType(ca, (int, float), "add")
-      out = self.copy(self.w +ca)
+      out = self.dup(self.w +ca)
     return out
   __radd__ = __add__
 
@@ -349,7 +349,7 @@ class CA():
     if isinstance(ca, Tensor):
       return ca.__add__(-self)
     Common._checkType(ca, (int, float), "sub")
-    out = self.copy(self.w -ca)
+    out = self.dup(self.w -ca)
     return out
   def __rsub__(self, sa):
     """Subtract CA from scalar with CA output."""
@@ -357,7 +357,7 @@ class CA():
 
   def __neg__(self):
     """Unitary - operator for CA."""
-    out = self.copy(-self.w)
+    out = self.dup(-self.w)
     for grade in out.__g:
       grade.value = -grade.value
     return out
@@ -366,7 +366,7 @@ class CA():
     return self
   def __abs__(self):
     """Unitary abs operator for CA."""
-    out = self.copy(abs(self.w))
+    out = self.dup(abs(self.w))
     for grade in out.__g:
       grade.value = abs(grade.value)
     return out
@@ -435,7 +435,6 @@ class CA():
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""
     if isinstance(cf, (int, float)):
-      dims = self.grades()
       if not self.__g:
         return oper(self.w, cf)
       for g in self.__g:
@@ -507,15 +506,6 @@ class CA():
     for grade in self.__g:
       eStr,iStr = grade.strs()
       v["%s%s" %(eStr, iStr)] = grade.value
-    return v
-
-  def copyTerms(self):
-    """copyTerms()
-       Return terms as a list of pairs of (term, factor). Cf CA(**dict(...))."""
-    v = [("", self.w)] if self.w else []
-    for grade in self.__g:
-      eStr,iStr = grade.strs()
-      v.append(("%s%s" %(eStr, iStr), grade.value))
     return v
 
   def _copyGrades(self):
@@ -681,6 +671,16 @@ class CA():
       self.w = w
     return self.w
 
+  def dup(self, w=None):
+    """dup([scalar])
+       Fast copy with optional scalar only."""
+    out = CA()
+    if w:
+      Common._checkType(w, (int, float), "dup")
+      out.w = w
+    out.__g = self._copyGrades()
+    return out
+
   def copy(self, *args, **kwargs):
     """copy([scalar, e1 multiplier, ...][basis=multiplier, ...])
        Return clone with optional new basis values."""
@@ -691,6 +691,32 @@ class CA():
     out = CA(*args, **kw)
     out.__entered0 = self.__entered0
     return out
+
+  def copyTerms(self):
+    """copyTerms()
+       Return terms as a list of pairs of (term, factor). Cf CA(**dict(...))."""
+    v = [("", self.w)] if self.w else []
+    for grade in self.__g:
+      eStr,iStr = grade.strs()
+      v.append(("%s%s" %(eStr, iStr), grade.value))
+    return v
+
+  def basisTerms(self):
+    """basisTerms()
+       Return self as 3 lists = a list of e-basis indicies, values & i-basis."""
+    out1,out2,out3 = [],[],[]
+    for grade in self.__g:
+      eBase,iBase = grade.bases()
+      basis = []
+      for ch in eBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out1.append(basis)
+      out2.append(grade.value)
+      basis = []
+      for ch in iBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out3.append(basis)
+    return out1,out2,out3
 
   def trim(self, precision=None):
     """trim([precision])
@@ -713,12 +739,10 @@ class CA():
     Common._checkType(dim, (int, tuple, list), "pure")
     Common._checkType(even, (bool), "pure")
     Common._checkType(odd, (bool), "pure")
-    useDim = (not (even or odd) and isinstance(dim, int))
-    maxDim = 0
     if not (dim or even or odd):
-      tmp = self.copy()
-      tmp.w = 0
-      return tmp
+      return self.dup(0)
+    maxDim = 0
+    useDim = (not (even or odd) and isinstance(dim, int))
     if not isinstance(dim, (list, tuple)):
       dim = [dim]
     for i in dim:
@@ -834,7 +858,7 @@ class CA():
   def conjugate(self, split=False):
     """conjugate([split])
        Return copy of self with imaginary (all if split) parts negated."""
-    out = self.copy(self.w)
+    out = self.dup(self.w)
     out.__entered0 = self.__entered0
     if split:
       for grade in out.__g:
@@ -935,12 +959,13 @@ class CA():
     out.__entered0 = self.__entered0
     return out
  
-  def assoc(self, p, q):
-    """assoc(p,q)
+  def associator(self, p, q):
+    """associator(p,q)
        Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
     out = (self * p) *q - self *(p * q)
     out.__entered0 = self.__entered0
     return out
+  assoc = associator
 
   def projects(self, ca):
     """projects(ca)
@@ -1000,7 +1025,7 @@ class CA():
       if inv == 0:
         raise Exception("Illegal versor for rotate")
     if n2 < precision:
-      return ca.copy()
+      return ca.dup()
     if abs(l2 -1.0) < precision:
       l2 = 1.0
     return self *ca *inv /l2
@@ -1046,12 +1071,12 @@ class CA():
       w = abs(self.w)
       if w < 1.0:
         raise Exception("Invalid hyperbolic frame angle")
-      out = self.copy(math.acosh(w))
+      out = self.dup(math.acosh(w))
       if self.w < 0:
         out.w *= -1
     else:
       w = (self.w +1.0) %2.0 -1.0
-      out = self.copy(math.acos(w) *2)
+      out = self.dup(math.acos(w) *2)
     p1 = math.sqrt(n2)
     if n1 >= precision:
       p0 = 1.0 /p1
@@ -1083,7 +1108,7 @@ class CA():
     else:
       sw,cw = Common._sincos(self.w /2.0)
     sw /= math.sqrt(n2)
-    out = self.copy(cw)
+    out = self.dup(cw)
     for base in out.__g:
       base.value *= sw
     return out
@@ -1091,7 +1116,7 @@ class CA():
   def unit(self):
     """unit()
        Return self with graded parts normalised to length one."""
-    out = self.copy()
+    out = self.dup()
     n2 = 0
     for base in out.__g:
       n2 += base.value *base.value
@@ -1118,7 +1143,7 @@ class CA():
     n = self.len()
     if n < precision:
       return CA(1.0)
-    out = self.copy(self.w /n)
+    out = self.dup(self.w /n)
     for base in out.__g:
       base.value /= n
     return out
@@ -1315,23 +1340,6 @@ class CA():
        3-D. Converts self to versor then applies each even part."""
     return self.versor().euler().matrix()
 
-  def basisTerms(self):
-    """basisTerms()
-       Return self as 3 lists = a list of e-basis indicies, values & i-basis."""
-    out1,out2,out3 = [],[],[]
-    for grade in self.__g:
-      eBase,iBase = grade.bases()
-      basis = []
-      for ch in eBase:
-        basis.append(int(ch, self.__HEX_BASIS +1))
-      out1.append(basis)
-      out2.append(grade.value)
-      basis = []
-      for ch in iBase:
-        basis.append(int(ch, self.__HEX_BASIS +1))
-      out3.append(basis)
-    return out1,out2,out3
-
   def perm(self, cycle):
     perms = list(x+1 for x in range(7))
     for idx,val in enumerate(cycle):
@@ -1366,7 +1374,7 @@ class CA():
       signTerms = signTerms +[1] *(len(basisTerms) -len(signTerms))
     Common._checkType(basisTerms, (list, tuple), "swap")
     if len(basisTerms) == 0:
-      out = self.copy() 
+      out = self.dup() 
     else:
       out = CA(self.w)
       out.__entered0 = self.__entered0
@@ -1691,7 +1699,7 @@ class CA():
       s,c = Common._sincos(ang *0.5)
       rot = CA(c, **{xyz[key -1]: s})
       if implicit:
-        tmpRot = rot.copy()
+        tmpRot = rot.dup()
         rot.rotation(implicitRot)
         implicitRot *= tmpRot
       else:

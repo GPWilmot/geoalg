@@ -85,13 +85,12 @@ class P(list):
     return out
   def __repr__(self):
     """Overwrite object output using __str__ for print if !verbose."""
-    if Common._isVerbose():
-      return "P(%s, %s)" %(repr(self[1]), repr(self[2]))
-    return str(self)
+    return "P(%d: %s, %s)" %(self[0],repr(self[1]), repr(self[2]))
 
   def __mul__(self, p):
-    """Product n => (a,b)(c,d) = (ac-db*, a*dcb) for conjugate level n-1."""
+    """Product n => (a,b)(c,d) = (ac-d*b, da+bc*) for conjugate level n-1."""
     Common._checkType(p, P, "mul")
+    print(repr(self), "*", repr(p))
     n = self[0]
     if n != p[0]:
       raise Exception("Invalid P to multiply: %s * %s" %(self, p))
@@ -100,12 +99,12 @@ class P(list):
     if n == 1:
       if n in P._posSigs:
         return P(-1, self[1] *p[1] +p[2] *self[2], self[1]*p[2] +p[1] *self[2])
-      return P(-1, self[1] *p[1] -p[2] *self[2], self[1] *p[2] +p[1] *self[2])
+      return P(-1, self[1] *p[1] -p[2] *self[2], p[2] *self[1] +self[2] *p[1])
     if n in P._posSigs:
-      return P(-1, self[1] *p[1] +p[2] *self[2].__conj(n-1),
-                   self[1].__conj(n-1) *p[2] +p[1] *self[2])
-    return P(-1, self[1] *p[1] -p[2] *self[2].__conj(n-1),
-                 self[1].__conj(n-1) *p[2] +p[1] *self[2])
+      return P(-1, self[1] *p[1] +p[2].__conj(n-1) *self[2],
+                   p[2] *self[1] +self[2] *p[1].__conj(n-1))
+    return P(-1, self[1] *p[1] -p[2].__conj(n-1) *self[2],
+                 p[2] *self[1] +self[2] *p[1].__conj(n-1))
   def __add__(self, p):
     """Return new Product adding tree recursively."""
     return P(-1, self[1] +p[1], self[2] +p[2])
@@ -117,11 +116,11 @@ class P(list):
     return P(-1, -self[1], -self[2])
   def __conj(self, n):
     """Conjugate level n => (a,b)*n = (a*(n-1), -b) recursive."""
-    if self[0] == n:
-      if n > 1:
-        return P(-1, self[1].__conj(n -1), -self[2])
-      return P(-1, self[1], -self[2])
-    return self
+    if self[0] != n:
+      raise Exception("Invalid P to conjugate at %d: %s" %(n, self))
+    if n > 1:
+      return P(-1, self[1].__conj(n -1), -self[2])
+    return P(-1, self[1], -self[2])
 
   @staticmethod
   def Table(dim):
@@ -155,6 +154,28 @@ class P(list):
       x[idx] = 0
     return basis
 
+  @staticmethod
+  def Multiply(dim, digits=False):
+    """Multiply(dim, [digits,rep])
+       Return product of (A+Bo1+Co2+..)(a+bo1+co2+...) or A1... if digits."""
+    b = P.Basis(dim)
+    n = int(pow(2,dim))
+    x = [0] *n
+    y = [0] *n
+    if dim > 4:
+      digits = True
+    if digits:
+      for idx in range(n//2):
+        x[idx*2] = S(chr(idx +65)+"1")
+        x[idx*2 +1] = S(chr(idx +65)+"2")
+        y[idx*2] = S(chr(idx +97)+"1")
+        y[idx*2 +1] = S(chr(idx +97)+"2")
+    else:
+      for idx in range(n):
+        x[idx] = S(chr(idx +65))
+        y[idx] = S(chr(idx +97))
+    print("%s * %s =" %(P(dim,x), P(dim,y)))
+    return P(dim,x)*P(dim,y)
 
 ################################################################################
 class S():

@@ -271,7 +271,7 @@ class Calculator:
   @staticmethod
   def verbose(verbosity=None):
     """Toggle or set verbosity for traceback reporting."""
-    Common.verbose(verbosity)
+    return "on" if Common.verbose(verbosity) else "off"
 
   @staticmethod
   def precision(precise=None):
@@ -827,7 +827,8 @@ class Calculator:
           else:
             line += input(prompt) 
           if line and line[-1] == '\\':
-            line += '\n'
+            if len(line.strip()) > 1:
+              line += '\n'
           else:
             break
       except EOFError:
@@ -849,21 +850,21 @@ class Calculator:
           tmp = "try:\n"
           if Common._isVerbose():
             tmp += "  import traceback\n"
+          elif line.strip()[0] == "#":
+            tmp += "  None\n"
           for line in code.splitlines():
             tmp += "  %s\n" %line
-          code = tmp +"except Exception as exception:\n"
+          code = tmp +"except Exception as e:\n"
           if Common._isVerbose():
             code += "  traceback.print_exc()\n"
           else:
-            code += "  sys.stdout.write(str(exception) +'\\n')\n"
-          code += "  raise Calculator.ExecError(exception)\n"
+            code += "  sys.stdout.write('%s: %s\\n' %(type(e).__name__, e))\n"
+          code += "  raise Calculator.ExecError(e)\n"
       except Exception as e:
         tmp = str(e).replace('"', '\\"')
         isAns,code = False, 'sys.stdout.write("Error: %s\\n")' %tmp
         if Common._isVerbose():
           traceback.print_exc()
-    elif line:
-      code = line
     return isAns,code
 
   def processInput(self, args):
@@ -935,7 +936,7 @@ class Calculator:
             for line in self.__lines.splitlines():
               Calculator.__history.append(line)
             self.__lines = ""
-        except Calculator.ExecError:
+        except Calculator.ExecError as e:
           pass  # Already reported
         except KeyboardInterrupt:
           if Common._isVerbose():
@@ -944,7 +945,7 @@ class Calculator:
           if Common._isVerbose():
             traceback.print_exc()
           else:
-            sys.stdout.write(str(e) +'\n')
+            sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
         if Calculator.__lastCmd:
           if readline:
             readline.add_history(Calculator.__lastCmd)

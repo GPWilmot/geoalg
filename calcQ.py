@@ -283,6 +283,32 @@ class Q():
         setattr(quat, key, params[key])
     return quat
 
+  def copyTerms(self):
+    """copyTerms()
+       Return terms as a list of pairs of (term, factor). Cf CA(**dict(...))."""
+    v = [("", self.w)] if self.w else []
+    for grade in self.__g:
+      eStr,iStr = grade.strs()
+      v.append(("%s%s" %(eStr, iStr), grade.value))
+    return v
+
+  def basisTerms(self):
+    """basisTerms()
+       Return self as 3 lists = a list of e-basis indicies, values & i-basis."""
+    out1,out2,out3 = [],[],[]
+    for grade in self.__g:
+      eBase,iBase = grade.bases()
+      basis = []
+      for ch in eBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out1.append(basis)
+      out2.append(grade.value)
+      basis = []
+      for ch in iBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out3.append(basis)
+    return out1,out2,out3
+
   def trim(self, precision=None):
     """trim([precision])
        Return copy with elements smaller than precision removed."""
@@ -369,6 +395,14 @@ class Q():
        Return anti-symmetric product of two QAs. This is the wedge product."""
     Common._checkType(q, Q, "asym")
     return (self *q -q *self) *0.5 
+ 
+  def associator(self, p, q):
+    """associator(p,q)
+       Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
+    out = (self * p) *q - self *(p * q)
+    out.__entered0 = self.__entered0
+    return out
+  assoc = associator
 
   def projects(self, q):
     """projects(q)

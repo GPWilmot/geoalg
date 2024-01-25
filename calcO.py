@@ -15,7 +15,7 @@
 ## GeoAlg. If not, see <https://www.gnu.org/licenses/>.
 ## -----------------------------------------------------------------------------
 ## CalcO is a commnd line calculator that converts basis numbers into
-## Octonions, Sedonions, Quaternions, Versors and Euler Angle rotations.
+## Octonions, Sedenions, Quaternions, Versors and Euler Angle rotations.
 ## CA numbers and Quaternions can also be included and processed separately
 ## which allows Dixon Algebra to be defined using the Tensor class. 
 ##
@@ -26,7 +26,7 @@
 ## s.t. _v_*_v_ >= 0 and w is a scalar. A pure quaternion has w==0.
 ## A unit quaternion has _n_*_n_ = -1. A versor has norm = 1 which means
 ## r = cos(a) + sin(a) * _n_ where _n_ in a unit. This is extended to
-## Octonians for basis number 3 and Sedonians for numbers 4 and above.
+## Octonians for basis number 3 and Sedenians for numbers 4 and above.
 ## The calc(Q) command interprets i, j, k using Q class and the calc(CA)
 ## command interprets CA numbers via CA class. Need to avoid name conflicts
 ## in loaded files in the later case.
@@ -45,7 +45,7 @@ class O():
 
      The notation is the same as for CA so o1*o2=-o12 but the basis is ungraded
      so o12 is a single imaginary entity and o21 or o1o2 becomes o12. u1o2u3o4
-     becomes o24u13. This allows easy extension to arbitray Sedonian Algebras
+     becomes o24u13. This allows easy extension to arbitray Sedenian Algebras
      (O(q) with q>4) and split octonian and sedenions. The o and u basis hex
      numbers can be entered in any order but must be unique.
 
@@ -72,7 +72,7 @@ class O():
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
   __basisCache  = []                     # Cache partial multiplication table
-  __wikiMulRule = False                  # Change Cayley-Dickson multiply rule
+  __baezMulRule = False                  # Change Cayley-Dickson multiply rule
   dumpRepr      = False                  # Repr defaults to str
 
   class Product(list):
@@ -111,19 +111,19 @@ class O():
       return "P(%s,%s:%d)" %(self[1], self[2], self[0])
     __repr__ = __str__
     def __mul__(self, p):
-      """Product n => (a,b)(c,d) = (ac-db*, a*d+cb) for conjugate level n-1.
-         This is baezRule - for wikiRule see _mulWiki."""
+      """Product n => (a,b)(c,d) = (ac-d*b, da+bc*) for conjugate level n-1.
+         This is wikiRule - for baezRule see _mulBaez."""
       n = self[0]
       if not isinstance(p, O.Product) or n != p[0]:
         raise Exception("Invalid Product to multiply: %s * %s" %(self, p))
       if n == 0:
         return self[1] * p[1]
-      # (p,q)*(r,s) = (pr -sq*, p*s +rq) [baezRule]."""
       if n == 1:
+      # (p,q)*(r,s) = (pr -s*q, sp +qr*) [wikiRule]
         return O.Product(-1, self[1] *p[1] -p[2] *self[2],
-                             self[1] *p[2] +p[1] *self[2])
-      return O.Product(-1, self[1] *p[1] -p[2] *self[2].__conj(n-1),
-                           self[1].__conj(n-1) *p[2] +p[1] *self[2])
+                             p[2] *self[1] +self[2] *p[1])
+      return O.Product(-1, self[1] *p[1] -p[2].__conj(n-1) *self[2],
+                           p[2] *self[1] +self[2] *p[1].__conj(n-1))
     def __add__(self, p):
       """Return new Product adding tree recursively."""
       return O.Product(-1, self[1] +p[1], self[2] +p[2])
@@ -140,21 +140,21 @@ class O():
           return O.Product(-1, self[1].__conj(n -1), -self[2])
         return O.Product(-1, self[1], -self[2])
       return self
-    def _mulWiki(self, p):
-      """Product n => (a,b)(c,d) = (ac-d*b, da+bc*) for conjugate level n-1.
-         This is wikiRule - for baezRule see __mul__."""
+    def _mulBaez(self, p):
+      """Product n => (a,b)(c,d) = (ac-db*, a*d+cb) for conjugate level n-1.
+         This is baezRule - for wikiRule see __mul__."""
       n = self[0]
       if not isinstance(p, O.Product) or n != p[0]:
         raise Exception("Invalid Product to multiply: %s * %s" %(self, p))
       if n == 0:
-        return self[1]._mulWiki(p[1])
-      # (p,q)*(r,s) = (pr -s*q, sp +qr*) [wikiRule]
+        return self[1]._mulBaez(p[1])
+      # (p,q)*(r,s) = (pr -sq*, p*s +rq) [baezRule]."""
       if n == 1:
         return O.Product(-1, self[1] *p[1] -p[2] *self[2],
-                             p[2] *self[1] +self[2] *p[1])
+                             self[1] *p[2] +p[1] *self[2])
       return O.Product(-1,
-                     self[1]._mulWiki(p[1]) -p[2].__conj(n-1)._mulWiki(self[2]),
-                     p[2]._mulWiki(self[1]) +self[2]._mulWiki(p[1].__conj(n-1)))
+                     self[1]._mulBaez(p[1]) -p[2]._mulBaez(self[2].__conj(n-1)),
+                     self[1].__conj(n-1)._mulBaez(p[2]) +p[1]._mulBaez(self[2]))
     def walk(self, array, idx=0):
       """Walk through tree filling array with index values."""
       if isinstance(self[1], O.Product):
@@ -218,7 +218,7 @@ class O():
 
     def copy(self, value=None):
       return O.Grade(self.value if value is None else value,
-                    (self.__pBase, self.__oBase, self.__uBase))
+                    (self.__pBase, self.__oBase[:], self.__uBase[:]))
 
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
@@ -257,14 +257,14 @@ class O():
       hasU = lhs[2] or rhs[2]
       row = O._basisCache(lBase)
       if not row or len(row) <= max(lBase, rBase):
-        xyz, maxDim, wikiMul = O._basisArray()
+        xyz, maxDim, baezMul = O._basisArray()
         lp = [0] *len(xyz)
         rp = list((x for x in range(len(xyz))))
         lp[lBase] = 1
         walk = [0] *len(xyz)
         row = [0] *len(xyz)
-        if wikiMul:
-          prod = O.Product(maxDim, lp)._mulWiki(O.Product(maxDim, rp))
+        if baezMul:
+          prod = O.Product(maxDim, lp)._mulBaez(O.Product(maxDim, rp))
         else:
           prod = O.Product(maxDim, lp) * O.Product(maxDim, rp)
         prod.walk(walk)
@@ -430,14 +430,14 @@ class O():
   def __add__(self, q):
     """Add 2 Os or a scalar from w."""
     if isinstance(q, O):
-      out = self.copy(self.w +q.w)
+      out = self.dup(self.w +q.w)
       for grade in q.__g:
         out.__add(grade)
     elif isinstance(q, Tensor):
       out = q.__add__(self)
     else:
       Common._checkType(q, (int, float), "add")
-      out = self.copy(self.w +q)
+      out = self.dup(self.w +q)
     return out
   __radd__ = __add__
 
@@ -455,7 +455,7 @@ class O():
     if isinstance(q, Tensor):
       return q.__add__(-self)
     Common._checkType(q, (int, float), "sub")
-    out = self.copy(self.w -q)
+    out = self.dup(self.w -q)
     return out
   def __rsub__(self, q):
     """Subtract Q from scalar with Q output."""
@@ -463,7 +463,7 @@ class O():
 
   def __neg__(self):
     """Unitary - operator for O."""
-    out = self.copy(-self.w)
+    out = self.dup(-self.w)
     for grade in out.__g:
       grade.value = -grade.value
     return out
@@ -472,7 +472,7 @@ class O():
     return self
   def __abs__(self):
     """Unitary abs operator for O."""
-    out = self.copy(abs(self.w))
+    out = self.dup(abs(self.w))
     for grade in out.__g:
       grade.value = abs(grade.value)
     return out
@@ -531,7 +531,12 @@ class O():
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""
     if isinstance(cf, (int, float)):
-      return oper(self.w, cf)
+      if not self.__g:
+        return oper(self.w, cf)
+      for g in self.__g:
+        if oper(g.value, cf):
+          return True
+      return False
     elif not isinstance(cf, O):
       return False
     cfIdx = 0
@@ -549,11 +554,11 @@ class O():
           return False
         idx += 1
       elif order > 0 or not cfBase:
-        if not oper(cfBase.value, 0.0):
+        if not oper(base.value, 0.0):
           return False
         cfIdx += 1
       else:
-        if not oper(bas.value, cfBase.value):
+        if not oper(base.value, cfBase.value):
           return False
         idx += 1
         cfIdx += 1
@@ -693,7 +698,7 @@ class O():
       O.__basisDim = dim
     else:
       out = O.__basisXyz
-    return out, O.__basisDim, O.__wikiMulRule
+    return out, O.__basisDim, O.__baezMulRule
 
   @staticmethod
   def _basisCache(idx, row=None):
@@ -745,6 +750,16 @@ class O():
       self.w = w
     return self.w
 
+  def dup(self, w=None):
+    """dup([scalar])
+       Fast copy with optional scalar only."""
+    out = O()
+    if w:
+      Common._checkType(w, (int, float), "dup")
+      out.w = w
+    out.__g = self._copyGrades()
+    return out
+
   def copy(self, *args, **kwargs):
     """copy([scalar, e1 multiplier, ...][basis=multiplier, ...])
        Return clone with optional new basis values."""
@@ -754,6 +769,32 @@ class O():
       args = [self.w]
     out = O(*args, **kw)
     return out
+
+  def copyTerms(self):
+    """copyTerms()
+       Return terms as a list of pairs of (term, factor). Cf O(**dict(...))."""
+    v = [("", self.w)] if self.w else []
+    for grade in self.__g:
+      oStr,uStr = grade.strs()
+      v.append(("%s%s" %(oStr, uStr), grade.value))
+    return v
+
+  def basisTerms(self):
+    """basisTerms()
+       Return self as 3 lists = a list of o-basis indicies, values & u-basis."""
+    out1,out2,out3 = [],[],[]
+    for grade in self.__g:
+      pBasis,oBase,uBase = grade.bases()
+      basis = []
+      for ch in oBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out1.append(basis)
+      out2.append(grade.value)
+      basis = []
+      for ch in uBase:
+        basis.append(int(ch, self.__HEX_BASIS +1))
+      out3.append(basis)
+    return out1,out2,out3
 
   def trim(self, precision=None):
     """trim([precision])
@@ -771,10 +812,7 @@ class O():
   def pure(self):
     """pure()
        Return the pure imaginary part of self."""
-    out = O()
-    for grade in self.__g:
-      out.__g.append(self.Grade(grade.value, grade.bases()))
-    return out
+    return self.dup(0)
 
   def vector(self):
     """vector()
@@ -907,27 +945,20 @@ class O():
       grade.value /= l2
     return out
 
-  def dot(self, q):
-    """dot(q)
-       Return dot product of pure part and using sym product."""
-    Common._checkType(q, O, "cross")
-    x = self.pure()
-    y = q.pure()
-    out = (x *y +y *x) *0.5 
-    return out
-
   def cross(self, q):
     """cross(q)
-       Return cross product of pure part and using asym product."""
+       Return half asym product of pure parts."""
     Common._checkType(q, O, "cross")
-    x = self.pure()
-    y = q.pure()
+    x = O()
+    x.__g = self.__g    # Shallow copies
+    y = O()
+    y.__g = q.__g
     out = (x *y -y *x) *0.5 
     return out
 
   def sym(self, q):
     """sym(q)
-       Return symmetric product of two Os. The dot product is the pure part."""
+       Return symmetric product of two Os. The pure part is always zero."""
     Common._checkType(q, O, "sym")
     out = (self *q +q *self)
     return out
@@ -938,15 +969,16 @@ class O():
     Common._checkType(q, O, "asym")
     return (self *q -q *self)
  
-  def assoc(self, p, q, nonAlternate=False, nonPower=False):
-    """assoc(p,q, [nonAlternate,nonPower])
+  def associator(self, p, q, nonAlternate=False, nonPower=False):
+    """assoc[iator](p,q, [nonAlternate,nonPower])
        Return the associator [self,p,q] = (self * p) *q - self *(p * q) or
        the first non-alternate or non-power if non-associative where alternate
-       if assoc(x,x,y)==0 and power if assoc(x,x,x)==0 for any input x."""
-    Common._checkType(p, (O), "assoc")
-    Common._checkType(q, (O), "assoc")
-    Common._checkType(nonAlternate, bool, "assocCycles")
-    Common._checkType(nonPower, bool, "assocCycles")
+       if assoc(x,x,y)==0 and power if assoc(x,x,x)==0 for any input x. Of
+       course, nonPower is always empty as x*x is a scalar."""
+    Common._checkType(p, (O), "associator")
+    Common._checkType(q, (O), "associator")
+    Common._checkType(nonAlternate, bool, "associator")
+    Common._checkType(nonPower, bool, "associator")
     if nonAlternate and nonPower:
       raise Exception("Invalid number of options in assoc")
     accum = []
@@ -963,14 +995,15 @@ class O():
         if out:
           break
     return out
+  assoc = associator
 
   def moufang(self, p, q, number=0):
     """moufang(p,q,[number])
        Return differences sum of all four Moufang tests for power-associate or
        just one if number is set (0=all)."""
-    Common._checkType(p, (O), "moufang")
-    Common._checkType(q, (O), "moufang")
-    Common._checkType(number, (int), "moufang")
+    Common._checkType(p, O, "moufang")
+    Common._checkType(q, O, "moufang")
+    Common._checkType(number, int, "moufang")
     if number == 1:   out = q*(self *(q*p)) -((q*self) *q) *p
     elif number == 2: out = self *(q* (p*q)) -((self*q) *p) *q
     elif number == 3: out = (q*self) *(p*q) -(q *(self*p)) *q
@@ -1276,14 +1309,16 @@ class O():
   ## Other creators and source inverters
   ##############################################################################
   @staticmethod
-  def CayleyDicksonRule(wiki=True):
-    """cayleyDicksonRule([wiki])
-       Change Cayley-Dickson multiplication from Baez to Wikipedia (or back if
-       wiki is False). (a,b)*(c,d) = (a*c-d.conj*b, d*a +b*c.conj) [Wikipedia] or 
+  def CayleyDicksonRule(baez=None):
+    """cayleyDicksonRule([baez])
+       Change Cayley-Dickson multiplication from Wikipedia to Baez (or back if
+       baez is False). (a,b)*(c,d) = (a*c-d.conj*b, d*a +b*c.conj) [Wikipedia] or 
        (a,b)*(c,d) = (a*c-d*b.conj, a.conj*d +c*b) [J.C.Baez]."""
-    Common._checkType(wiki, bool, "cayleyDicksonRule")
-    O.__basisCache  = []
-    O.__wikiMulRule = wiki
+    if baez is not None:
+      Common._checkType(baez, bool, "cayleyDicksonRule")
+      O.__basisCache  = []
+      O.__baezMulRule = baez
+    return "baez" if O.__baezMulRule else "wiki"
 
   @staticmethod
   def Basis(oDim, uDim=0):
@@ -1403,6 +1438,43 @@ class O():
     return out
 
   @staticmethod
+  def ZeroDivisors(pDim, nDim=0, dump=False):
+    """ZeroDivisors(dim,[nDim=0,dump=False])
+       Return all zero divisors (a+b)(c+d) as [[b,c,d,d1...]...] a=bcd at level
+       pDim. Dump logs progress and checks memory and aborts if too small."""
+    Common._checkType(pDim, int, "ZeroDivisors")
+    Common._checkType(nDim, int, "ZeroDivisors")
+    Common._checkType(dump, bool, "ZeroDivisors")
+    out = []
+    rng = O.Basis(pDim, nDim)
+    lr = len(rng)
+    cnt = 0
+    Common.procTime()
+    for b in range(lr):
+      if dump and b %10 == 0:
+        sys.stdout.write("%s (%ds) %d: total=%d %dMB\n" %(Common.date(True),
+                       int(Common.procTime()), b, len(out), Common.freeMemMB()))
+        if Common.freeMemMB() < Common._memLimitMB:
+          sys.stdout.write("ABORT: Memory limit reached\n")
+          break
+      for c in range(b +1, lr):
+        bb,cc = rng[b], rng[c]
+        buf = [bb,cc]
+        for d in range(c +1, lr):
+          dd = rng[d]
+          aa = bb *cc *dd
+          if not aa.isScalar():
+            if (aa+bb)*(cc+dd)==0:
+              buf.append(dd)
+              cnt += 1
+        if len(buf) > 2:
+          out.append(tuple(buf))
+    if dump:
+      sys.stdout.write("%s (%ds) total=%d\n" %(Common.date(True),
+                       int(Common.procTime()), cnt))
+    return out
+
+  @staticmethod
   def Q(*args):
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, o1, o2, -o12) with up to 4
@@ -1435,7 +1507,7 @@ class O():
   @staticmethod
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for O."""
-    calcHelp = """Octonian/Sedonian Calculator - Process 30-dimensional basis
+    calcHelp = """Octonian/Sedenian Calculator - Process 30-dimensional basis
           numbers (o1..F or u1..F) and multiples."""
     return (("O", "CA", "Q", "R"), ("O", "math"), "default.oct", calcHelp, "")
 

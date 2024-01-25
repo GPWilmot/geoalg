@@ -97,6 +97,8 @@ FF15 = (e12345689ADEF, e12345689BCEF, e1234568ABCDF, e1234569ABCDE, e12345789ACE
 FFF1520 = (-e1357, -e139B, -e13DF, e148D, e149C, e158C, -e159D, -e15BF, -e179F, -e17BD, e248E, e24AC, e268C, -e26AE, -e26BF, -e27AF, -e27BE, e348F, e34BC, -e36AF, -e36BE, e378C, -e37AE, -e37BF, e4589, e45CD, e468A, e46CE, e478B, e47CF, e89CD, e8ACE, e8BCF)
 FFFF1520 = (-e1357, -e139B, -e13DF, -e15BF, -e179F, -e17BD, -e37BF, +e579B)
 FFFFF1520 = (e1247, e1256, e128B, e129A, e12CF, e12DE, e1346, e138A, e13CE, e14AF, e14BE, e15AE, e168F, e169E, e16AD, e16BC, e178E, e17AC, e2345, e2367, e2389, e23AB, e23CD, e23EF, e249F, e24BD, e258F, e259E, e25AD, e25BC, e269D, e278D, e279C, e349E, e34AD, e358E, e359F, e35AC, e35BD, e368D, e369C, e379D, e4567, e45AB, e45EF, e469B, e46DF, e479A, e47DE, e568B, e569A, e56CF, e56DE, e578A, e579B, e57CE, e57DF, e6789, e67AB, e67CD, e67EF, e89AB, e89EF, e8ADF, e8BDE, e9ACF, e9ADE, e9BCE, e9BDF, eABCD, eABEF, eCDEF)
+
+# Tensor.Table(O.Basis(4)).morph(O.Basis(4),f15Basis).dump(f15Basis)
 SE15 = Tensor( \
  ("-1","-f3", "f2","-f5", "f4", "f7","-f6","-f9", "f8", "fB","-fA", "fD","-fC","-fF", "fE"),
  ( "f3", "-1","-f1","-f6","-f7", "f4", "f5","-fA","-fB", "f8", "f9", "fE", "fF","-fC","-fD"),
@@ -162,7 +164,7 @@ def Lie(x):
   """Asym multiply x with all of G2."""
   aa = makeG2(0)
   for a in aa[0] +aa[1]:
-    print(_findG2(a,aa[0] +aa[1]),"^",_findG2(x,aa[0] +aa[1]),_findG2(a.asym(x),aa[0] +aa[1]),a.asym(x))
+    print(_findG2(a,aa[0] +aa[1]),"^",_findG2(x,aa[0] +aa[1]),_findG2(a.asym(x)/2,aa[0] +aa[1]),a.asym(x)/2)
 
 phi15 = e123 +e145 +e167 +e189 +e1AB +e1CD +e1EF +e246 +e257 +e28A +e29B +e2CE +e2DF +e347 +e356 +e38B +e39A \
        +e3CF +e3DE -e48C +e49D +e4AE +e4BF +e58D +e59C +e5AF +e5BE +e68E +e69F +e6AC +e6BD +e78F +e79E +e7AD +e7BC
@@ -174,7 +176,7 @@ def subalgebra15():
   for x in p8.basisTerms()[0]:
     acc2 = []
     for y in p4.basisTerms()[0]:
-      acc2.append(CA.Eval(x).asym(CA.Eval(y)))
+      acc2.append(CA.Eval(x).asym(CA.Eval(y))/2)
     if sum(acc2) == 0:
       acc1.append(CA.Eval(x))
   return acc1
@@ -252,3 +254,4 @@ def split2(form8):
     #sgn = -sgn
     acc.append(g4)
   return acc
+
