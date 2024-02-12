@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.1"
+__version__ = "0.2"
 import math
 from calcCommon import *
 

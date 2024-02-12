@@ -21,7 +21,8 @@
 ##
 ## O multivectors are of the form p = w +p o1..F u1..F +....
 ## A quaternion maps as i->o1, j->o2, k->-o12. u basis has the same 
-## multiplication table as o basis except the squares are positive unity.
+## multiplication table as o basis except the squares are positive unity
+## and define the split algebra.
 ## Quaternions are of the form q = w + _v_ where _v_ is a i,j,k vector
 ## s.t. _v_*_v_ >= 0 and w is a scalar. A pure quaternion has w==0.
 ## A unit quaternion has _n_*_n_ = -1. A versor has norm = 1 which means
@@ -32,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.1"
+__version__ = "0.2"
 import math
 from calcCommon import *
 
@@ -975,8 +976,8 @@ class O():
        the first non-alternate or non-power if non-associative where alternate
        if assoc(x,x,y)==0 and power if assoc(x,x,x)==0 for any input x. Of
        course, nonPower is always empty as x*x is a scalar."""
-    Common._checkType(p, (O), "associator")
-    Common._checkType(q, (O), "associator")
+    Common._checkType(p, O, "associator")
+    Common._checkType(q, O, "associator")
     Common._checkType(nonAlternate, bool, "associator")
     Common._checkType(nonPower, bool, "associator")
     if nonAlternate and nonPower:

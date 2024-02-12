@@ -1,0 +1,327 @@
+# File: sedenions.oct
+
+# With Cayley Dickson Rule set the same as Wikipedia (default)
+# Octonians = A7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3), a7) where
+a7 = ("e1", "e2", "e3", "e4", "e5", "e6", "e7")
+
+# found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(A7),a7,num=-1)
+A7 = (("-1", "e3", "-e2", "e5", "-e4", "-e7", "e6"),
+      ("-e3", "-1", "e1", "e6", "e7", "-e4", "-e5"),
+      ("e2", "-e1", "-1", "e7", "-e6", "e5", "-e4"),
+      ("-e5", "-e6", "-e7", "-1", "e1", "e2", "e3"),
+      ("e4", "-e7", "e6", "-e1", "-1", "-e3", "e2"),
+      ("e7", "e4", "-e5", "-e2", "e3", "-1", "-e1"),
+      ("-e6", "e5", "e4", "-e3", "-e2", "e1", "-1"))
+
+# The Baez Octonion representation: B7 = Tensor.Table(b7).morph(b7,a7) where
+# b7 found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(B7),a7,num=-1)
+# With Baez rule set via O.CayleyDicksonRule(True) then search finds
+# c7 permutation so that Tensor.Table(c7).morph(c7,a7)==B7 under Baez rule.
+# NB: a7 maps to O.Basis(3) directly whereas both b7 and c7 are dis-ordered.
+b7 = Tensor(O.Basis(3)).permute([1, 2, 4, 3, 7, 5, -6], invert=True)
+c7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
+B7 = (("-1", "e4", "e7", "-e2", "e6", "-e5", "-e3"),
+      ("-e4", "-1", "e5", "e1", "-e3", "e7", "-e6"),
+      ("-e7", "-e5", "-1", "e6", "e2", "-e4", "e1"),
+      ("e2", "-e1", "-e6", "-1", "e7", "e3", "-e5"),
+      ("-e6", "e3", "-e2", "-e7", "-1", "e1", "e4"),
+      ("e5", "-e7", "e4", "-e3", "-e1", "-1", "e2"),
+      ("e3", "e6", "-e1", "e5", "-e4", "-e2", "-1"))
+
+# Split Octonions from Wiki = Tensor(SO).dump(so)
+so = ("i",  "j",   "k",   "l",   "li", "lj",  "lk")
+SO = (("-1", "k",  "-j",  "-li", "l",  "-lk", "lj"),
+     ("-k", "-1",  "i",   "-lj", "lk", "l",   "-li"),
+     ("j",  "-i",  "-1",  "-lk", "-lj","li",  "l"),
+     ("li", "lj",  "lk",  "1",   "i",  "j",   "k"),
+     ("-l", "-lk", "lj",  "-i",  "1",  "k",   "-j"),
+     ("lk", "-l",  "-li", "-j",  "-k", "1",   "i"),
+     ("-lj", "li", "-l",  "-k",  "j",  "-i",  "1"))
+# Tensor.Table(O.Basis(2,1)).search(O.Basis(2,1),Tensor(SO),so,num=-1)
+# First match=[-1, 2, 3, 4, -5, 6, 7] -> Tensor.Table(so21).morph(so21,so)==SO if
+so21 = Tensor(O.Basis(2,1)).permute([1, 2, 3, -4, 5, 6, 7], invert=True)
+# Tensor.Table(O.Basis(1,2)).search(O.Basis(1,2),Tensor(SO),so,cycles=False,num=-1)
+# First match=[1, -4, -5, 6, 7, 2, 3] -> Tensor.Table(so12).morph(so12,so)==SO if
+so12 = Tensor(O.Basis(1,2)).permute([-1, 4, 5, 6, 7, 2, 3], invert=True)
+# Tensor.Table(O.Basis(0,3)).search(O.Basis(0,3),Tensor(SO),so,cycles=False,num=-1)
+# First match=[-4, 5, 1, 6, 2, -3, 7] -> Tensor.Table(so03).morph(so03,so)==SO if
+so03 = Tensor(O.Basis(0,3)).permute([-4, 5, 1, 6, 2, -3, 7], invert=True)
+
+# Sedenions from Wikipedia (= Cawagas)
+# Tensor.Table(O.Basis(4)).morph(O.Basis(4), s15)==S15
+s15=("e1","e2","e3","e4","e5","e6","e7","e8","e9","e10","e11","e12","e13","e14","e15")
+S15 = Tensor(
+  ("-1",  "e3",  "-e2", "e5",  "-e4", "-e7", "e6",  "e9", "-e8", "-e11","e10", "-e13","e12", "e15","-e14"),
+  ("-e3", "-1",  "e1",  "e6",  "e7",  "-e4", "-e5", "e10","e11", "-e8", "-e9", "-e14","-e15","e12","e13"),
+  ("e2",  "-e1", "-1",  "e7",  "-e6", "e5",  "-e4", "e11","-e10","e9",  "-e8", "-e15","e14","-e13","e12"),
+  ("-e5", "-e6", "-e7", "-1",  "e1",  "e2",  "e3",  "e12","e13", "e14", "e15", "-e8","-e9", "-e10","-e11"),
+  ("e4",  "-e7", "e6",  "-e1", "-1",  "-e3", "e2",  "e13","-e12","e15", "-e14","e9", "-e8", "e11", "-e10"),
+  ("e7",  "e4",  "-e5", "-e2", "e3",  "-1",  "-e1", "e14","-e15","-e12","e13", "e10","-e11","-e8", "e9"),
+  ("-e6", "e5",  "e4",  "-e3", "-e2", "e1",  "-1",  "e15","e14", "-e13","-e12","e11","e10", "-e9", "-e8"),
+  ("-e9", "-e10","-e11","-e12","-e13","-e14","-e15","-1", "e1",  "e2",  "e3",  "e4", "e5",  "e6",  "e7"),
+  ("e8",  "-e11","e10", "-e13","e12", "e15", "-e14","-e1","-1",  "-e3", "e2",  "-e5","e4",  "e7",  "-e6"),
+  ("e11", "e8",  "-e9", "-e14","-e15","e12", "e13", "-e2","e3",  "-1",  "-e1", "-e6","-e7", "e4",  "e5"),
+  ("-e10","e9",  "e8",  "-e15","e14", "-e13","e12", "-e3","-e2", "e1",  "-1",  "-e7","e6",  "-e5", "e4"),
+  ("e13", "e14", "e15", "e8",  "-e9", "-e10","-e11","-e4","e5",  "e6",  "e7",  "-1", "-e1", "-e2", "-e3"),
+  ("-e12","e15", "-e14","e9",  "e8",  "e11", "-e10","-e5","-e4", "e7",  "-e6", "e1", "-1",  "e3",  "-e2"),
+  ("-e15","-e12","e13", "e10", "-e11","e8",  "e9",  "-e6","-e7", "-e4", "e5",  "e2", "-e3", "-1",  "e1"),
+  ("e14", "-e13","-e12","e11", "e10", "-e9", "e8",  "-e7","e6",  "-e5", "-e4", "e3", "e2",  "-e1", "-1"))
+
+class Cawagas():
+  """for x in Cawagas().deriveZDs(): print((x[0]+x[1])*(x[2]+x[3]))"""
+  # Cawagas Sedenion zero divisors
+  #       0     1     2      3     4      5      6
+  #       1     2     3     12    13     14     15
+  ZD1 = (o1,   o2,  -o12,  o234, o1234, o34,   o134)
+  ZD2 = (o1,   o23,  o123, o134, o34,  -o124,  o24)
+  ZD3 = (o1,   o13,  o3,   o24, -o124,  o1234, o234)
+  ZD4 = (o2,   o23,  o3,   o1234,o134,  o14,  -o124)
+  ZD5 = (o2,   o123, o13, -o124, o14,   o34,   o234)
+  ZD6 = (-o12, o23,  o13,  o34, o1234,  o24,   o14)
+  ZD7 = (-o12, o3,   o123, o14, o24,    o134,  o234)
+
+  def _deriveZDs(self, *x):
+    """Used by deriveZDs."""
+    out = x[5]
+    for y in x[1:3]:
+      a,b,c,d = x[4] *(-1 if x[0][1]=="-" else 1),\
+                x[3], x[1], x[2] *(-1 if x[0][0]=="-" else 1)
+      out.append((a,b,c,d))
+      return
+    for y in x[3:5]:
+      a,b,c,d = x[2] *(-1 if x[0][0]=="-" else 1),\
+                x[1], x[3], x[4] *(-1 if x[0][0]=="-" else 1)
+      out.append((a,b,c,d))
+
+  def deriveZDs(self):
+    """deriveZDs()
+       Return sedenion zero divisors list (a,b,c,d) equivalent to Cawagas."""
+    out = []
+    for x in (self.ZD1, self.ZD2, self.ZD3,self.ZD4,self.ZD5,self.ZD6,self.ZD7):
+      self._deriveZDs("+-", x[0], x[4], x[1], x[5], out,0)
+      self._deriveZDs("++", x[0], x[5], x[1], x[4], out,1)
+      self._deriveZDs("--", x[0], x[3], x[1], x[6], out,2)
+      self._deriveZDs("-+", x[0], x[6], x[1], x[3], out,3)
+      self._deriveZDs("-+", x[1], x[5], x[2], x[6], out,4)
+      self._deriveZDs("+-", x[1], x[4], x[2], x[3], out,5)
+      self._deriveZDs("--", x[1], x[6], x[2], x[5], out,6)
+      self._deriveZDs("++", x[1], x[3], x[2], x[4], out,7)
+      self._deriveZDs("+-", x[2], x[6], x[0], x[4], out,8)
+      self._deriveZDs("--", x[2], x[3], x[0], x[5], out,9)
+      self._deriveZDs("-+", x[2], x[5], x[0], x[3], out,10)
+      self._deriveZDs("++", x[2], x[4], x[0], x[6], out,11)
+    return out
+
+def nonAssocType(b, c, d, code=0):
+  """nonAssocType(b, c, d, code=0)
+     Expand a triad into a string of "ABCs! " (abc non-assoc, scalar, complete
+     non-assoc, repeated elements) if code 0, (a,d,bc(db),db) for code 1, dual
+     /extended strings for code 2, (a,b,c, a',b,bc, a'',c,bc) for cyclic pairs
+     for code 3 and cyclic pair strings for code 4."""
+  if not (hasattr(b, "__sub__") and hasattr(c, "__sub__") and hasattr(d, "__sub__")):
+    raise Exception("Invalid argment for nonAssocType") # Assumed add/mul too
+  if code == 0:
+    input = ((b,c,d),)
+  elif code in (1,2):
+    a = b *c *d
+    db=d *b
+    ab = b *c *db
+    if code == 1:
+      return (a, d, b *c *db, db)
+    input = ((b,c,d), (b,c,-a), (b,c,db), (b,c,-ab))
+  elif code in (3,4):
+    bc = b *c
+    if code == 3:
+      a = b *c *d
+      a1 = b *bc *d
+      a2 = c *bc *d
+      return (a,b,c, a1,b,bc, a2,c,bc)
+    input = ((b,c,d), (b,bc,d), (c,bc,d))
+  else:
+    raise Exception("Invalid code argument for nonAssocType")
+  out = []
+  for triad in input:
+    buf = []
+    b,c,d = triad
+    a = b *c *d
+    if b == c or d in (b,c):
+      cod = "."
+    elif a.isScalar():
+      cod = "s"
+    else:
+      cod = ""
+      if a.assoc(b,c) != 0:
+        cod += "A"
+      if b.assoc(a,c) != 0:
+        cod += "B"
+      if c.assoc(b,d) != 0:
+        cod += "C"
+      if len(cod) == 3:
+        cod = "X"
+    out.append(cod)
+  if code == 0:
+    return out[0]
+  return out
+
+def nonAssocLine(dLine, code=0, triadFn=nonAssocType, key=None):
+  """nonAssocLine(dim,[nDim=0,code=0,triadFn=nonAssocType,all=False])
+     Return triadFn(...,code) for dLine=(b,c,ds,...) or dict if key in
+     which case key is (b,c) and values are (ds,...)[,(ds,...),...]."""
+  Common._checkType(code, int, "nonAssocLine")
+  if key is not None:
+    Common._checkType(key, (list, tuple), "nonAssocLine")
+  if key:
+    Common._checkType(dLine, dict, "nonAssocLine")
+    b,c = key
+    dLine = dLine[key]
+    if isinstance(dLine, (list, tuple)) and len(dLine) > 0:
+      if isinstance(dLine[0], (list, tuple)):
+        dLine = list(Common.chain(*dLine))
+  else:
+    b,c = dLine[:2]
+    dLine = dLine[2:]
+  Common._checkType(dLine, (list, tuple), "nonAssocLine")
+  out = []
+  for d in dLine:
+    out.append(triadFn(b, c, d, code))
+  return out
+
+def malcev(b, c, d):
+  """malcev(b, c, d)
+     Definition of Malcev algebra. Return true if
+     (b*c)*(b*d) == ((b*c)*d)*b +((c*d)*b)*b +((d*b)*b)*c."""
+  return b*c*(b*d) == b*c*d*b +c*d*b*b +d*b*b*c
+
+def triadMalcev(b, c, d, code):
+  """triadMalcev(b, c, d, code)
+     Used as triadFn in nonAssocLine and nonAssocCube."""
+  tmp = nonAssocType(b,c,d,code)
+  if malcev(b,c,d):
+    if tmp == ".":
+      tmp = "@"
+    elif tmp == "s":
+      tmp = "S"
+    return tmp
+  return tmp.lower()
+
+#for x,y in enumerate(nonAssocCube(4,all=True)):print("%2d"%(x//15)," ".join(y))
+
+def nonAssocCube(pDim, nDim=0, code=0, triadFn=nonAssocType, all=True):
+  """nonAssocCube(dim,[nDim=0,code=0,triadFn=nonAssocType,all=False])
+     Return triadFn(...,code) for unique triples, unordered if all."""
+  Common._checkType(pDim, int, "nonAssocCube")
+  Common._checkType(nDim, int, "nonAssocCube")
+  Common._checkType(code, int, "nonAssocCube")
+  Common._checkType(all, bool, "nonAssocCube")
+  size1 = int(pow(2,(pDim +nDim))-1)
+  size2 = size1 *size1 #(size1 -1)
+  out = [None] *size2
+  for idx in range(size2):
+    out[idx] = ['0'] *size1
+  rng = O.Basis(pDim, nDim)
+  lr = len(rng)
+  for b in range(lr):
+    c0 = 0 if all else b +1
+    for c in range(c0, lr):
+      bb,cc = rng[b], rng[c]
+      d0 = 0 if all else c +1
+      for d in range(d0, lr):
+        dd = rng[d]
+        out[b *size1 +c][d] = triadFn(bb, cc, dd, code)
+  return out
+
+def triads(pDim, nDim=0, scalars=False, all=True):
+  """allTriads(dim,[nDim=0,scalars=False,all=False])
+     Return triads ie bcd non-scalar unless scalar, unordered if all."""
+  Common._checkType(pDim, int, "allTriads")
+  Common._checkType(nDim, int, "allTriads")
+  Common._checkType(all, bool, "allTriads")
+  out = []
+  rng = O.Basis(pDim, nDim)
+  lr = len(rng)
+  for b in range(lr):
+    c0 = 0 if all else b +1
+    for c in range(c0, lr):
+      bb,cc = rng[b], rng[c]
+      d0 = 0 if all else c +1
+      for d in range(d0, lr):
+        dd = rng[d]
+        if (bb *cc *dd).isScalar():
+          if scalars:
+            out.append((bb, cc, dd))
+        elif not (all and (b == c or d in (b, c))):
+          out.append((bb, cc, dd))
+  return out
+
+def zeroDivisors(pDim, nDim=0, nod=False, dump=False):
+  """ZeroDivisors(pDim,[nDim=0,nod=False,dump=False])
+     Return zero divisors (a+b)(c+d) for cycles (b,c),(b,bc),(c,bc) as 
+     {(b,c): [d0, ...][d1, ...][d2, ...]} a=bcd. Excludes empty ds unless nod.
+     Dump logs progress and checks memory and abborts if too small."""
+  Common._checkType(pDim, int, "ZeroDivisors")
+  Common._checkType(nDim, int, "ZeroDivisors")
+  Common._checkType(nod, bool, "ZeroDivisors")
+  Common._checkType(dump, bool, "ZeroDivisors")
+  out = {}
+  rng = O.Basis(pDim, nDim)
+  lr = len(rng)
+  cnt = 0
+  if dump:
+    Common.procTime()
+    Common.freeMemMB(init=True)
+  for b in range(lr):
+    if dump and b %10 == 0:
+      sys.stdout.write("%s (%ds) %d: total=%d %dMB\n" %(Common.date(True),
+                     int(Common.procTime()), b, cnt*3, Common.freeMemMB()))
+      if Common.freeMemMB(check=True) < 0:
+        sys.stdout.write("ABORT: Memory limit reached\n")
+        break
+    for c in range(b +1, lr):
+      bb,cc = rng[b], rng[c]
+      pair = (bb,cc)
+      bc = abs(bb *cc)
+      pair1 = tuple(sorted((bb,bc)))
+      if pair1 in out:
+        if bb == pair1[0]:
+          cycle = 1
+        else:
+          cycle = 2
+        bufs = out[pair1]
+        pair = pair1
+      else:
+        cycle = 0
+        bufs = [],[],[]
+      for d in range(c +1, lr):
+        dd = rng[d]
+        aa = bb *cc *dd
+        if not aa.isScalar() and (aa +bb) *(cc +dd) == 0:
+          bufs[cycle].append(dd)
+          cnt += 1
+      if bufs[0] or nod:
+        out[pair] = bufs
+  if dump:
+    sys.stdout.write("%s (%ds) total=%d\n" %(Common.date(True),
+                     int(Common.procTime()), cnt))
+  return out
+
+# p4=list((O.Basis(4)[x[0]-1],O.Basis(4)[x[1]-1]) for x in Common.comb(15,2,True))
+# p3/cycles = ((o1,o2), (o1,o3), (o1,o23), (o2,o13), (o12,o123), (o2,o3), (o12,o13))
+
+# list(x for x in O.ZeroDivisors(5) if len(x)==y)) y=14/10/6 has len 42/63/105
+# 12*42 +8*63 +4*105 = 1428 so y=14 is 21*12*(O +!O) Tables 3 & 4,
+# y=10 is 21*3*(4+2+2) Table5, y=6 is 21*3*4 +42*4 Table 6 +Table 7
+# zd5=zeroDivisors(5,nod=True); len(list(x for x in zd5 if len(zd5[x][0]) == 0)) == 57
+
+
+# O(3)  (A2*o1+B1*o2 +B2*o12+C1*o3 +C2*o13+D1*o23 +D2*o123)
+#     * (c2*o1+d1*o2 +d2*o12+e1*o3 +e2*o13+f1*o23 +f2*o123)
+A2=B1=B2=C1=C2=D1=D2=c2=d1=d2=e1=e2=f1=f2=1; A1=c1=0
+real1=(A1*c1-c2*A2-(d1*B1+B2*d2)-(e1*C1+C2*e2-(-D1*f1-f2*D2))) 
+pure1= (c2*A1+A2*c1-(B2*d1-d2*B1)-(C2*e1-e2*C1-(-f2*D1+D2*f1)))*o1 \
+      +(d1*A1-A2*d2+B1*c1+c2*B2-(D1*e1+e2*D2+-f1*C1-C2*f2))*o2 \
+      +(A2*d1+d2*A1+-c2*B1+B2*c1-(-e2*D1+D2*e1+C2*f1-f2*C1))*o12 \
+      +(e1*A1-A2*e2-(B1*f1+f2*B2)+C1*c1+c2*C2-(-d1*D1-D2*d2))*o3 \
+      +(A2*e1+e2*A1-(f2*B1-B2*f1)+-c2*C1+C2*c1-(-D2*d1+d2*D1))*o13 \
+      +(B1*e1-e2*B2+f1*A1+A2*f2+-d1*C1+C2*d2+D1*c1-c2*D2)*o23 \
+      +(e2*B1+B2*e1+-A2*f1+f2*A1+-C2*d1-d2*C1+c2*D1+D2*c1)*o123 # = 0
+
