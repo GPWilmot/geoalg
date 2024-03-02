@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.2"
+__version__ = "0.3"
 import math
 from calcCommon import *
 
@@ -515,7 +515,7 @@ class CA():
       out.append(grade.copy())
     return out
 
-  def commutes(self, rhs):
+  def _commutes(self, rhs):
     """Return array of booleans for commutes for each term by term expansion."""
     out = ([True] *(len(rhs.__g) +(1 if rhs.w else 0))) if self.w else []
     for lhsBase in self.__g:
@@ -556,7 +556,7 @@ class CA():
       value = grade.value
       n2 += value *value
       if conj:
-        if sgnVal.value < 0:
+        if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
           sgnOut.__g.append(self.Grade(value, grade.bases()))
         else:
@@ -570,15 +570,15 @@ class CA():
         if flat[1] == 0 and scalar:
           simple = True
         elif flat[1] + scalar == 1:
-          commutes = out.commutes(sgnOut)
-          simple = sum(commutes) == len(commutes)
+          commutes = out._commutes(sgnOut)
+          simple = (sum(commutes) == len(commutes))
     return out +sgnOut, simple, even, (flat[1] > 0 and flat[0] == 0), n2
 
   def __versible(self, conj):
     """Try self*conj to see if it generates a single invertible term. Return
        self/this or 0 if not single. This tests for large versors."""
     tmp = (self * conj).trim()   # Could work anyway
-    if sum(tmp.grades()) == 1: # Single term
+    if sum(tmp.grades()) == 1:   # Single term
       if tmp < 0:
         return -conj *(-tmp).inverse(False)
       else:
@@ -640,20 +640,13 @@ class CA():
     return not self.__g
 
   def isVersor(self, nonHyperbolic=False):
-    """isVersor(, nonHyperbolic)
+    """isVersor([nonHyperbolic])
        Return true if invertible (if !nonHyperbolic) and even. See versor."""
     precision = Common._getPrecision()
     conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = float(n2 + self.w *self.w)
-    if l2 < precision or not (simple and even):
-      if l2 >= Common._getPrecision() and conj.w >= 0 and \
-         sum(out.grades()) == 1:
-        return True
-      return (self.__versible(conj) != 0)
-    if nonHyperbolic and hyperbolic:
-      return abs(math.sqrt(n2 +self.w *self.w) -1.0) < precision
-    return not hyperbolic and \
-           abs(math.sqrt(n2 +self.w *self.w) -1.0) < precision
+    return abs(math.sqrt(l2) -1.0) <= precision and (simple or even) \
+       and (not hyperbolic or nonHyperbolic)
 
   def degrees(self, ang=None):
     """degrees(deg, [ang])
@@ -663,21 +656,23 @@ class CA():
       self.w = math.radians(ang)
     return math.degrees(self.w)
 
-  def scalar(self, w=None):
-    """scalar([w])
-       Return or set scalar part. Use float() [automatic] for return."""
-    if w:
-      Common._checkType(w, (int, float), "scalar")
-      self.w = w
+  def scalar(self, scalar=None):
+    """scalar([scalar])
+       Return and/or set scalar part. Use float() [automatic] for return."""
+    if scalar is not None:
+      Common._checkType(scalar, (int, float), "scalar")
+      self.w = scalar
     return self.w
 
-  def dup(self, w=None):
+  def dup(self, scalar=None):
     """dup([scalar])
-       Fast copy with optional scalar only."""
+       Fast copy with optional scalar overwrite."""
     out = CA()
-    if w:
-      Common._checkType(w, (int, float), "dup")
-      out.w = w
+    if scalar is None:
+      out.w = self.w
+    else:
+      Common._checkType(scalar, (int, float), "dup")
+      out.w = scalar
     out.__g = self._copyGrades()
     return out
 
@@ -841,26 +836,36 @@ class CA():
 
   def len(self):
     """len()
-       Return the sqrt of the scalar sum of the product with it's conjugate."""
+       Return the signed scalar square root of the square."""
     n2 = self.w *self.w
     for grade in self.__g:
-      n2 += grade.value *grade.value
+      sgnVal = grade.copy(1)
+      sgnVal = sgnVal.mergeBasis(1, grade.bases())
+      n2 += grade.value *grade.value *sgnVal.value
+    if n2 < 0:
+      return -math.sqrt(-n2)
     return math.sqrt(n2)
 
-  def vectorLen(self):
-    """vectorLen()
-       Return the sqrt of the non-scalar product sum with the conjugate."""
+  def pureLen(self, maxGrade=0):
+    """pureLen([maxGrade])
+       Return the signed len of the pure part only (stopping at maxGrade)."""
     n2 = 0
-    for base in self.__g:
-      n2 += base.value *base.value
+    for grade in self.__g:
+      if maxGrade and sum(grade.lens()) > maxGrade:
+        break
+      sgnVal = grade.copy(1)
+      sgnVal = sgnVal.mergeBasis(1, grade.bases())
+      n2 += grade.value *grade.value *sgnVal.value
+    if n2 < 0:
+      return -math.sqrt(-n2)
     return math.sqrt(n2)
 
-  def conjugate(self, split=False):
-    """conjugate([split])
-       Return copy of self with imaginary (all if split) parts negated."""
-    out = self.dup(self.w)
+  def conjugate(self, unsplit=False):
+    """conjugate([unsplit])
+       Return copy of self with imaginary parts negated (all if unsplit)."""
+    out = self.dup()
     out.__entered0 = self.__entered0
-    if split:
+    if unsplit:
       for grade in out.__g:
         grade.value = -grade.value
     else:
@@ -872,13 +877,11 @@ class CA():
 
   def norm(self):
     """norm()
-       Return the scalar square sum of the product without conjugation."""
+       Return the scalar sqrt of the product with it's conjugate."""
     n2 = self.w *self.w
     for grade in self.__g:
-      sgnVal = grade.copy(1)
-      sgnVal = sgnVal.mergeBasis(1, grade.bases())
-      n2 += grade.value *grade.value *sgnVal.value
-    return n2
+      n2 += grade.value *grade.value
+    return math.sqrt(n2)
 
   def inverse(self, noError=False):
     """inverse([noError])
@@ -889,7 +892,9 @@ class CA():
        If this produces a single term then divide by this term which captures
        examples 3e1234567 +e123 +e145 +e167 +e246 +e257 +e347 +e356 and
        (e0+e1+e2+e12)^2 = 2e012 (ie inverse -e0+e01-e02-e12). If not invertible
-       then raise an exception unless !noError in which case 0 is returned."""
+       then raise an exception unless !noError in which case 0 is returned.
+       NB: Row11,0(paper)*e1234567 = 3 idempotents+2 is invertible but factors
+       aren't eg (1+e1236)(1+e1467)(1+e3567)."""
     out,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = float(n2 +self.w *self.w)
     if l2 < Common._getPrecision() or not simple:
@@ -907,7 +912,7 @@ class CA():
     else:
       if out.w < 0 and not out.__g:
         out = 0
-      else:
+      else: # Rescale
         out.w /= l2
         for grade in out.__g:
           grade.value /= l2
@@ -975,7 +980,7 @@ class CA():
     mix = self.grades()[2] if len(self.grades()) == 3 else 0
     if mix == 0 or self.grades() != [0,0,mix]:
       raise Exception("Can only apply projects to a 2-form")
-    n1 = self.vectorLen()
+    n1 = abs(self.pureLen())
     if n1 < Common._getPrecision():
       raise Exception("Invalid length for projects")
     out = [0, 0]
@@ -1015,20 +1020,20 @@ class CA():
 
   def rotate(self, ca):
     """rotate(q)
-       Rotate ca by self converting to versor first. See rotation."""
+       Rotate ca by self. See rotation."""
     Common._checkType(ca, CA, "rotate")
     precision = Common._getPrecision()
-    inv,simple,even,hyperbolic,n2 = self.__invertible()
+    conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = float(n2 + self.w *self.w)
-    if l2 < precision or not (simple and even):
-      inv = self.__versible(inv)
-      if inv == 0:
+    if l2 <= precision or not (simple or even):
+      conj = self.__versible(conj)
+      if conj == 0:
         raise Exception("Illegal versor for rotate")
-    if n2 < precision:
+    if n2 <= precision:
       return ca.dup()
-    if abs(l2 -1.0) < precision:
+    if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
-    return self *ca *inv /l2
+    return self *ca *conj /l2
 
   def rotation(self, rot):
     """rotation(rot)
@@ -1037,32 +1042,33 @@ class CA():
        For CA vectors this is the same as rot.inverse()*self*rot. See versor."""
     Common._checkType(rot, CA, "rotation")
     precision = Common._getPrecision()
-    inv,simple,even,hyperbolic,n2 = rot.__invertible()
+    conj,simple,even,hyperbolic,n2 = rot.__invertible()
     l2 = float(n2 + rot.w *rot.w)
-    if l2 < precision or not (simple and even):
-      inv = self.__versible(inv)
-      if inv == 0:
+    if l2 <= precision or not (simple or even):
+      conj = self.__versible(conj)
+      if conj == 0:
         raise Exception("Illegal versor for rotation")
-    if n2 < precision:
+    if n2 <= precision:
       return
-    if abs(l2 -1.0) < precision:
+    if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
-    newSelf = rot *self *inv /l2
+    newSelf = rot *self *conj /l2
     self.w = newSelf.w
     self.__g = newSelf.__g
 
-  def frame(self, noError=False):
+  def frame(self, nonHyperbolic=False):
     """frame([noError])
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
-       Ready for frameMatrix. Also handles hyperbolic vector. See versor.
-       Set noError to try an untested solution anyway."""
+       Ready for frameMatrix. Also handles hyperbolic versor. See versor.
+       Set nonHyperbolic=False to try hyperbolic solutions."""
     precision = Common._getPrecision()
     conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = n2 +self.w *self.w
-    if abs(math.sqrt(l2) -1.0) >= precision or not even:
-      if not noError:
-        raise Exception("Illegal versor for frame")
-    if not simple:
+    if abs(math.sqrt(l2) -1.0) > precision:
+      raise Exception("Illegal versor norm for frame")
+    if hyperbolic and nonHyperbolic:
+      raise Exception("Illegal hyperbolic versor for frame")
+    if not (simple or even):
       if self.__versible(conj) == 0:
         raise Exception("Illegal versor for frame")
     if n2 < precision:
@@ -1078,7 +1084,7 @@ class CA():
       w = (self.w +1.0) %2.0 -1.0
       out = self.dup(math.acos(w) *2)
     p1 = math.sqrt(n2)
-    if n1 >= precision:
+    if n1 > precision:
       p0 = 1.0 /p1
       for base in out.__g:
         base.value *= p0
@@ -1086,23 +1092,20 @@ class CA():
     
   def versor(self, nonHyperbolic=False):
     """versor([nonHyperbolic])
-       Return the generalised even parts as unit() and scalar as angle. Opposite
-       of frame. See normalise. Needs even grade and like inverse if more than a
-       simple number of grades then need to try self*conj. Hyperbolic versors
-       use cosh and sinh expansions unless nonHyperbolic is set."""
+       Return a versor of length 1 assuming w is the angle(rad) ready for
+       rotation if of the correct form with even grade or equal mixed signature.
+       Opposite of frame. See normalise. Hyperbolic versors use cosh and sinh
+       expansions unless nonHyperbolic is set."""
     precision = Common._getPrecision()
     conj,simple,even,hyperbolic,n2 = self.__invertible()
     l2 = n2 +self.w *self.w
-    if math.sqrt(l2) < precision or not even:
+    if math.sqrt(l2) <= precision or not (simple or even):
       raise Exception("Illegal versor for versor")
-    if not simple:
-      if self.__versible(conj) == 0:
-        raise Exception("Illegal versor for versor")
-    if n2 < precision:
+    if hyperbolic and nonHyperbolic:
+      raise Exception("Illegal hyperbolic versor for versor")
+    if n2 <= precision:
       return CA(1)
     if hyperbolic:
-      if nonHyperbolic:
-        raise Exception("Illegal hyperbolic versor for versor")
       sw = math.sinh(self.w /2.0)
       cw = math.cosh(self.w /2.0)
     else:
@@ -1120,7 +1123,7 @@ class CA():
     n2 = 0
     for base in out.__g:
       n2 += base.value *base.value
-    if n2 >= Common._getPrecision():
+    if n2 > Common._getPrecision():
       n1 = math.sqrt(n2)
       for base in out.__g:
         base.value /= n1
@@ -1133,15 +1136,15 @@ class CA():
        self & argument ca need to be non-hyperbolic versors."""
     Common._checkType(ca, CA, "distance")
     if self.isVersor(True) and ca.isVersor(True):
-      return (self.inverse() *ca).log().len()
+      return abs((self.inverse() *ca).log().len())
     raise Exception("Invalid non-hyperbolic, non-versor for distance")
 
   def normalise(self):
     """normalise()
        Reduces error accumulation. Versors have len 1."""
     precision = Common._getPrecision()
-    n = self.len()
-    if n < precision:
+    n = self.norm()
+    if n <= precision:
       return CA(1.0)
     out = self.dup(self.w /n)
     for base in out.__g:
@@ -1153,11 +1156,16 @@ class CA():
        For even q=w+v then a=|q|cos(a) & v=n|q|sin(a), n unit."""
     # Look for even, non-hyperbolic form
     Common._checkType(exp, (int, float), "pow")
+    if isinstance(exp, int):
+      out = CA(1.0)
+      for cnt in range(exp):
+        out *= self
+      return out
     tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    if (simple and even) and not hyperbolic:
+    if (simple or even) and not hyperbolic:
       l1 = math.sqrt(n2 +self.w *self.w)
       w = pow(l1, exp)
-      if l1 < Common._getPrecision():
+      if l1 <= Common._getPrecision():
         return CA(w)
       a = math.acos(self.w /l1)
       s,c = Common._sincos(a *exp)
@@ -1168,11 +1176,6 @@ class CA():
         eStr,iStr = grade.strs()
         out += CA(**{eStr +iStr: grade.value *s})
       return out
-    elif isinstance(exp, int):
-      out = CA(1.0)
-      for cnt in range(exp):
-        out *= self
-      return out
     raise Exception("Invalid float exponent for non-hyperbolic, non-versor pow")
   __pow__ = pow
 
@@ -1181,7 +1184,7 @@ class CA():
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
     # Look for even, non-hyperbolic form
     tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    if n2 < Common._getPrecision():
+    if n2 <= Common._getPrecision():
       return CA(self.w)
     if even and not hyperbolic:
       n1 = math.sqrt(n2)
@@ -1201,7 +1204,7 @@ class CA():
        The functional inverse of the even exp()."""
     tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
     l1 = math.sqrt(self.w *self.w +n2)
-    if n2 < Common._getPrecision():
+    if n2 <= Common._getPrecision():
       return CA(math.log(l1))
     if even and not hyperbolic:
       s = math.acos(self.w /l1) /math.sqrt(n2)
@@ -1230,7 +1233,7 @@ class CA():
       lat0 = lat
       sLat,cLat = Common._sincos(lat)
       N = Common.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
-      if p >= precision:
+      if p > precision:
         h = p /cLat -N
         lat = math.atan(x[2] /p /(1 -Common._EARTH_ECCENT2 *N/(N +h)))
       elif lat >= 0.0:
@@ -1239,31 +1242,32 @@ class CA():
       else:
         h = x[2] +Common.EARTH_MINOR_M
         lat = -math.pi *0.5
-      if abs(lat -lat0) < precision:
+      if abs(lat -lat0) <= precision:
         break
     return Matrix(math.degrees(lat),
                   math.degrees(math.atan2(x[1], x[0])), h)
 
-  def euler(self, noError=False):
+  def euler(self, nonHyperbolic=True):
     """euler([noError])
        Versors can be converted to Euler Angles & back uniquely for default
        order. For n-D greater than 3 need to extract sine terms from the last
        basis at each rank and reduce by multiplying by the inverse for each rank
        until 3-D is reached. See Common.Euler.Matrix. Once 3-D is reached the
        quaternion.euler() calculation can be used. Euler parameters are of the
-       form cos(W/2) +n sin(W/2), n pure unit versor. Set noError to return a
-       zero Euler if self is not valid to be a versor. Also signature must be
-       positive as hyperbolic is not implemented."""
+       form cos(W/2) +n sin(W/2), n pure unit versor. Set nonHyperbolic=False to
+       try hyperbolic angles (TBD)."""
+    precision = Common._getPrecision()
     tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
     l2 = n2 +self.w *self.w
-    if hyperbolic or not even:
-      if not noError:
-        raise Exception("Illegal versor for euler")
-    if abs(l2 -1.0) >= Common._getPrecision():
-      if not noError:
-        raise Exception("Illegal versor len for euler")
-      tmp = tmp.normalise()
-    if n2 < Common._getPrecision():
+    if not (simple or even):
+      raise Exception("Illegal versor for euler")
+    if abs(math.sqrt(l2) -1.0) > precision:
+      raise Exception("Illegal versor norm for euler")
+    if hyperbolic and nonHyperbolic:
+      raise Exception("Illegal hyperbolic versor for versor")
+    if (hyperbolic and nonHyperbolic) or not (simple or even):
+      raise Exception("Illegal versor for euler")
+    if n2 <= precision:
       return Euler()
     dims = self.__vectorSizes()
     xyz = CA.VersorArgs(*dims, rotate=True)
@@ -1311,8 +1315,8 @@ class CA():
       angles[2] = math.atan2(2.0 * (z* w + x * y), 1.0 - 2.0 * (y * y + z * z))
     return Euler(*angles)
 
-  def versorMatrix(self, noError=False):
-    """versorMatrix([noError])
+  def versorMatrix(self, nonHyperbolic=True):
+    """versorMatrix([nonHyperbolic])
        This is same as frameMatrix but for a versor with half the angle.
        For 3-D substitute 1-c = (w*w+b*b)-(w*w-b*b)=2b*b in frameMatrix
        where c=cosW=w*w-b*b, w=cos(W/2) and q=w+a*b, b=sin(W/2), a*a=-1.
@@ -1330,28 +1334,16 @@ class CA():
        where (g,f)=e tan(U/2) as a Rodrigues vector, unit e. n, m & e
        form a spherical triangle with dihedral angles W/2, V/2 & U/2.
        Opposite of Euler.Matrix for default order with CA.Euler. Set
-       noError to normalise the versor if not normed."""
-    return self.euler(noError).matrix()
+       nonHyperbolic=False to try hyperbolic angles (TBD)."""
+    return self.euler(nonHyperbolic).matrix()
 
-  def frameMatrix(self):
-    """frameMatrix()
+  def frameMatrix(self, nonHyperbolic=True):
+    """frameMatrix(nonHyperbolic)
        Rodriges for n-D. See https://math.stackexchange.com/questions/1288207/
        extrinsic-and-intrinsic-euler-angles-to-rotation-matrix-and-back for
-       3-D. Converts self to versor then applies each even part."""
-    return self.versor().euler().matrix()
-
-  def perm(self, cycle):
-    perms = list(x+1 for x in range(7))
-    for idx,val in enumerate(cycle):
-      perms[val -1] = cycle[idx +1] if idx < len(cycle) -1 else cycle[0]
-    out = CA(self.w)
-    for term in self._basisTerms()[1]:
-      newTerm = term[:]
-      for idx,per in enumerate(perms):
-        if idx +1 in term:
-          newTerm[term.index(idx +1)] = per
-      out += CA.Eval(newTerm)
-    return out
+       3-D. Converts self to versor then applies each even part. Set
+       nonHyperbolic=False to try hyperbolic angles (TBD)"""
+    return self.versor().euler(nonHyperbolic).matrix()
 
   def swap(self, basisTerms, signTerms=[]):
     """swap(basisTerms,[signTerms])
@@ -1539,7 +1531,7 @@ class CA():
       raise Exception("Too many basis arguments")
     if eDim < 0 or iDim < 0:
       raise Exception("Too few basis arguments")
-    for n in range(1, eDim +iDim +1):
+    for n in range(1, eDim +iDim +1): # Common.additionTree
       if maxGrade > 0 and n > maxGrade:
         break
       for i in range(n +1):
@@ -1699,7 +1691,7 @@ class CA():
       s,c = Common._sincos(ang *0.5)
       rot = CA(c, **{xyz[key -1]: s})
       if implicit:
-        tmpRot = rot.dup()
+        tmpRot = rot.copy()
         rot.rotation(implicitRot)
         implicitRot *= tmpRot
       else:
@@ -1808,15 +1800,6 @@ class CA():
             sgn *= -1
         terms[base] = sgn
     return CA(scalar, **terms)
-
-  @staticmethod
-  def Spin(triList):
-    basis = []
-    for x in triList:
-      basis.append(CA.Eval([x[0:2]]))
-      basis.append(CA.Eval([x[1:3]]))
-      basis.append(CA.Eval([[x[2], x[0]]]))
-    return basis
 
   @staticmethod
   def Q(*args):

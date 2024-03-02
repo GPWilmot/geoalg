@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-###############################################################################
+################################################################################
 ## File: calcCommon.py is the basis for calcR.py and is part of GeoAlg.
 ## Copyright (c) 2021, 2023 G.P.Wilmot
 ##
@@ -26,11 +26,11 @@
 ##   * Tensor - simple 1&2-D matricies used for testing and algebra elements
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
-###############################################################################
-__version__ = "0.2"
+################################################################################
+__version__ = "0.3"
 import math, sys
 
-###############################################################################
+################################################################################
 class Common():
   """Class to provide common resources for basis numbers. Tests are a list of
      strings that can be run in the current calculator with results logged."""
@@ -236,7 +236,7 @@ class Common():
     return sina, cosa if signa > -1.0 else -cosa
   @staticmethod
   def _mergeBasis(arr1, arr2):
-    """Internal utility to merge 2 basis lists."""
+    """Internal utility to merge 2 str basis lists."""
     out = []
     if arr1 and arr2:
       for ii in arr1:
@@ -424,7 +424,7 @@ class Common():
     Common._checkType(dim, int, "additionTree")
     Common._checkType(split, int, "additionTree")
     Common._checkType(maxs, (list, tuple), "additionTree")
-    if dim < 1 or split < 1:
+    if dim < 1 or split < 2:
       raise Exception("additionTree has invalid dim or split size")
     if maxs and len(maxs) != split:
       raise Exception("additionTree has invalid maxs lens")
@@ -433,9 +433,14 @@ class Common():
       if val < 0:
         raise Exception("additionTree has invalid maxs value")
     out = []
-    splits = [0] *split
-    splits[0] = dim
-    Common.__additionTree(splits, out, maxs, 0)
+    if split == 2:
+      for i in range(dim +1):
+        if maxs[0] >= dim-i and maxs[1] >= i:
+          out.append([dim-i, i])
+    else:
+      splits = [0] *split
+      splits[0] = dim
+      Common.__additionTree(splits, out, maxs, 0)
     return out
 
   @staticmethod
@@ -595,10 +600,10 @@ class Common():
                   scnt, mcnt[0], mcnt[1], mcnt[2], mcnt[3]))
     return out
 
-###############################################################################
+################################################################################
 class Tensor(list):
   """Class for development and test instead of using numpy. May contain basis
-     numbers like i, j, k. These are tensors since if they contain basis
+     numbers like i, j, k. These are tensors since they may contain basis
      vectors. If g_lo = Tensor(e0,e1,e2,e3) and g_hi = Tensor(-e0,e1,e2,e3) then
      metric tensor is (g_lo*g_hi.transpose()).scalar() = Tensor.Diag([1]*4)."""
      
@@ -894,9 +899,9 @@ class Tensor(list):
     """diag([vector])
        Return diagonal of square matrix or diagonal of self * vector.transpose
        as vector. Hence trace=sum(matrix.diag()) and dot product is
-       sqrt(sum(v.diag(vector))). This allows Dickson algebra (the product of
-       Real, Complex, Quaternion and Octernion numbers) as Tensor(R,Q(1),Q(2),
-       O(3)). Addition is via + and multiplication via diag(v)."""
+       sum(v.diag(vector)). This allows Dickson algebra (the product of Real,
+       Complex, Quaternion and Octernion numbers) as Tensor(R,Q(1),Q(2), O(3)).
+       Addition is via + and multiplication via diag(v)."""
     out = []
     shape = self.shape()
     if vector is None:
@@ -1934,7 +1939,7 @@ if "numpy" in sys.modules:
         if isinstance(diag[ii], (list, tuple)):
           raise Exception("Invalid Diag element")
         out[ii][ii] = diag[ii]
-      return Tensor(*out)
+      return Matrix(*out)
 else:
   Matrix = Tensor
 
