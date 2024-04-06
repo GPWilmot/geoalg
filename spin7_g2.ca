@@ -175,6 +175,7 @@ NacMap = ( \
 #27:VVOUURVVUO RUVVVVVURV VRUVOUUOVV VVRUVVURVU OOUVRUVVUV VVVUOVVVVO VVRU
 #28:USTVVVOUVT VVUOSOUVVU OVVSTVVTSU UOVVOUVVUV TTVUVVUOVU SSUVTSUUST UOVV
 #29:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
+# Cardinality: R=96, S=96, T=256, U=464, V=704, W=64, O=240
 
 # Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()
 AutoTriads7 = (((), CA(1)),                     (((2,3), (4,5), (6,7)), e246),
@@ -275,14 +276,15 @@ def triads7class(phi, id=False):
     raise Exception("Abs. input phi to triads7class not found in Triads7")
   idx30 = Triads7.index(aPhi)
   idx128,parity = phi.allSignsIndicies()
-  remain = triads7remain(phi *(-1 if parity %2 else 1))
+  sgn = -1 if parity %2 else 1
+  remain = triads7remain(phi *sgn)
   if remain == 0:
     clsName = NacName[28]
   else:
     terms = list(CA(**{x[0]: 1}) for x in (aPhi).copyTerms())
     clsName = NacName[NacMap[idx30][terms.index(abs(remain))]]
   if id:
-    return (clsName, parity %2, idx30, int(idx128))
+    return (clsName, -sgn, idx30, int(idx128))
   return "%s%s:%0.3f" %(clsName, "-" if parity %2 else "+", idx30 +idx128/1000)
 
 def _triads7combs(g2, comb=0, parity=False):

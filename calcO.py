@@ -33,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.3"
+__version__ = "0.4"
 import math
 from calcCommon import *
 
@@ -118,7 +118,7 @@ class O():
       if not isinstance(p, O.Product) or n != p[0]:
         raise Exception("Invalid Product to multiply: %s * %s" %(self, p))
       if n == 0:
-        return self[1] * p[1]
+        return O.Product(0,[self[1] * p[1]], 0)
       if n == 1:
       # (p,q)*(r,s) = (pr -s*q, sp +qr*) [wikiRule]
         return O.Product(-1, self[1] *p[1] -p[2] *self[2],
@@ -535,14 +535,16 @@ class O():
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""
     if isinstance(cf, (int, float)):
+      res = True
       if not self.__g:
-        return oper(self.w, cf)
+        if not oper(self.w, cf):
+          res = False
       for g in self.__g:
         if oper(g.value, cf):
-          return True
+          res = False
       return False
     elif not isinstance(cf, O):
-      return False
+      return res
     cfIdx = 0
     idx = 0
     order = 0
@@ -608,13 +610,12 @@ class O():
        Flat = [number of imaginary terms, number of hyperbolic terms].
        Diff = Flat[0] == Flat[1] + 1 if scalar != 0.
        Simple = (Diff != Commutes) and 2 or less grades with scalar.
-       Even = all even terms including scalar. Commutes = +ve/-ve terms commute.
+       Even = not appropriate as octonions are not graded
+       Commutes = +ve/-ve terms commute.
        Hyperbolic = has x*x>0 terms but no imaginary terms."""
-    out = self
     sgnOut = O()
-    if conj:
-      out = O(self.w) 
-    n2 = 0
+    out = O(self.w) 
+    p2 = 0
     lastDim = (0, 0)
     cnt = 0        # Count of total basis terms
     flat = [0, 0]  # Count of Imaginaries, Hyperbolics with different basis dims
@@ -627,13 +628,11 @@ class O():
         sgnVal = sgnVal.mergeBasis(1, grade.bases())
         flat[int(sgnVal.value > 0)] += 1
       value = grade.value
-      n2 += value *value
+      p2 += value *value
       if conj:
         if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
           sgnOut.__g.append(self.Grade(value, grade.bases()))
-        else:
-          out.__g.append(self.Grade(value, grade.bases()))
     scalar = (1 if self.w else 0)
     simple = False
     if conj:
@@ -644,7 +643,7 @@ class O():
           simple = True
         elif flat[1] + scalar == 1:
           simple = (flat[0] == flat[1])
-    return out +sgnOut, simple, (flat[1] > 0 and flat[0] == 0), n2
+    return out +sgnOut, simple, (flat[1] > 0 and flat[0] == 0), p2
 
   def __versible(self, conj):
     """Try self*conj to see if it generates a single invertible term. Return
@@ -660,12 +659,11 @@ class O():
   def __vectorSizes(self):
     """Return the Octonian vector sizes. Can't handle negative signatures."""
     dims = self.basis()
-    for idx,val1 in enumerate(dims):
-      val2 = int(O.__maxBasis[idx], O.__HEX_BASIS +1)
-      dims[idx] = max(val1, val2)
-    if dims[0] < 2:
+    if dims[0] == 1:
       dims[0] = 2
-    return dims
+    xyz = O.BasisArgs(*dims)
+    dim = len(xyz)
+    return dim, xyz
 
   @staticmethod
   def _basisArray(dim=0):
@@ -686,7 +684,8 @@ class O():
       out = O.__basisXyz
     return out, O.__basisDim, O.__baezMulRule
 
-  def _basisArgs(oDim, uDim, och="o", uch="u"):
+  @staticmethod
+  def _BasisArgs(oDim, uDim, och="o", uch="u"):
     """Used by BasisArgs and externally to return the basis strs."""
     arr = O._basisArray(oDim +uDim)[0]
     out = []
@@ -703,6 +702,11 @@ class O():
               out.append("%s%s%s%s" %(och, base[:idx], uch, base[idx:]))
               break
     return out
+
+  @staticmethod
+  def _VersorArgs(oDim, uDim, och="o", uch="u"):
+    """Used by VersorArgs and externally to return the versor strs."""
+    return O._BasisArgs(oDim, uDim, och, uch)
 
   @staticmethod
   def _basisCache(idx, row=None):
@@ -730,14 +734,14 @@ class O():
        Return true is there are no graded parts."""
     return not self.__g
 
-  def isVersor(self, nonHyperbolic=False):
-    """isVersor([nonHyperbolic])
+  def isVersor(self, hyperbolic=False):
+    """isVersor([hyperbolic])
        Return true if negative signature inverse."""
     precision = Common._getPrecision()
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 + self.w *self.w)
+    conj,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 + self.w *self.w)
     return abs(math.sqrt(l2) -1.0) <= precision and (simple or even) \
-       and (not hyperbolic or nonHyperbolic)
+       and (not isHyperbolic or not hyperbolic)
 
   def degrees(self, ang=None):
     """degrees(deg, [ang])
@@ -823,20 +827,13 @@ class O():
 
   def vector(self):
     """vector()
-       Return the coefficients as a 1-D Matrix with psuedo-scalar."""
-    dims = self.__vectorSizes()
-    vec = [0] *(sum(dims))
+       Return the coefficients as a 1-D Matrix."""
+    dim,xyz = self.__vectorSizes()
+    vec = [0] *dim
     for grade in self.__g:
       bases = grade.bases()
-      lens = len(bases[1]) +len(bases[2])
-      if lens == 1:
-        if bases[1]:
-          idx = int(bases[1], O.__HEX_BASIS +1)
-        else:
-          idx = int(bases[2], O.__HEX_BASIS +1) +dims[0]
-        vec[idx -1] = grade.value
-      elif lens == sum(dims):
-        vec[-1] = grade.value
+      pos = xyz.index("".join(grade.strs()))
+      vec[pos] = grade.value
     return Matrix(*vec)
 
   def grades(self, maxSize=0):
@@ -883,27 +880,27 @@ class O():
        Return the signature or maximum dimension basis of basis elements.
        Optionally set the maxBasis for matrix output. The basis is of form
        ('1','F') or integer and remaining values are set to zero."""
+    dims = self.__class__.__maxBasis
     if maxBasis:
-      if len(maxBasis) > len(self.__class__.__maxBasis):
+      if len(maxBasis) > len(dims):
         raise Exception("Invalid grade(): %s" %maxBasis)
-      for idx in range(len(self.__class__.__maxBasis)):
-        self.__class__.__maxBasis[idx] = '0'
+      for idx in range(len(dims)):
+        dims[idx] = '0'
       for idx,val in enumerate(maxBasis):
         if isinstance(val, int):
           val = hex(val).upper()[2:]
         if isinstance(val, Common._basestr) and len(val) == 1 and \
               (val.isdigit or val in self.__HEX_CHARS):
-          self.__class__.__maxBasis[idx] = val
+          dims[idx] = val
         else:
           raise Exception("Invalid grade(): %s" %val)
-    dims = ["0", "0"]
     for grade in self.__g:
       bases = grade.strs()
       dims[0] = max(dims[0], bases[0][-1:])
       dims[1] = max(dims[1], bases[1][-1:])
-    dims[0] = int(dims[0], self.__HEX_BASIS +1)
-    dims[1] = int(dims[1], self.__HEX_BASIS +1)
-    return dims
+    out0 = int(dims[0], self.__HEX_BASIS +1) # Convert max char to hex-digit
+    out1 = int(dims[1], self.__HEX_BASIS +1) # Convert max char to hex-digit
+    return [out0, out1]
 
   def len(self):
     """len()
@@ -947,21 +944,21 @@ class O():
   def norm(self):
     """norm()
        Return the scalar sqrt of the product with it's conjugate."""
-    n2 = self.w *self.w
+    p2 = self.w *self.w
     for grade in self.__g:
-      n2 += grade.value *grade.value
-    return math.sqrt(n2)
+      p2 += grade.value *grade.value
+    return math.sqrt(p2)
 
   def inverse(self, noError=False):
     """inverse([noError])
        Return inverse of self which is conj()/len() if len()!=0 and is a versor.
        Raise an error on failure or return 0 if noError."""
-    out,simple,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 +self.w *self.w)
+    out,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 +self.w *self.w)
     if l2 < Common._getPrecision() or not simple:
       if l2 >= Common._getPrecision() and out.w >= 0 and sum(out.grades()) == 1:
         return out *(1/l2)
-      tmp = (self * self).trim()  # Could be anti-symmetric - check
+      tmp = (self * self).trim()  # Could be antisymmetric - check
       if sum(tmp.grades()) == 1:  # Single term
         if tmp < 0:
           tmp = -(-tmp).inverse(True)
@@ -1073,13 +1070,13 @@ class O():
        Rotate q by self. See rotation."""
     Common._checkType(q, O, "rotate")
     precision = Common._getPrecision()
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 + self.w *self.w)
+    conj,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 + self.w *self.w)
     if l2 <= precision or not simple:
       conj = self.__versible(conj)
       if conj == 0:
         raise Exception("Illegal versor for rotate")
-    if n2 <= precision:
+    if p2 <= precision:
       return q.dup()
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
@@ -1092,13 +1089,13 @@ class O():
        same as rot.inverse()*self*rot. Multiple rotations are TBD."""
     Common._checkType(rot, O, "rotation")
     precision = Common._getPrecision()
-    conj,simple,hyperbolic,n2 = rot.__invertible()
-    l2 = float(n2 + rot.w *rot.w)
+    conj,simple,isHyperbolic,p2 = rot.__invertible()
+    l2 = float(p2 + rot.w *rot.w)
     if l2 <= precision or not simple:
       conj = self.__versible(conj)
       if conj == 0:
         raise Exception("Illegal versor for rotation()")
-    if n2 <= precision:
+    if p2 <= precision:
       return
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
@@ -1106,24 +1103,24 @@ class O():
     self.w = newSelf.w
     self.__g = newSelf.__g
 
-  def frame(self, nonHyperbolic=True):
-    """frame([nonHyperbolic=FalsenoError])
+  def frame(self, hyperbolic=False):
+    """frame([hyperbolic])
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
        Ready for frameMatrix. Also handles hyperbolic versor. See versor.
-       Set nonHyperbolic=FalsenoError to try an untested solution anyway."""
+       Set hyperbolic to try an hyperbolic angles."""
     precision = Common._getPrecision()
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    l2 = n2 +self.w *self.w
+    conj,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = p2 +self.w *self.w
     if abs(math.sqrt(l2) -1.0) > precision:
       raise Exception("Illegal versor norm for frame")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for frame")
     if not simple:
       if self.__versible(conj) == 0:
         raise Exception("Illegal versor for frame")
-    if n2 < precision:
+    if p2 < precision:
       return O(1)
-    if hyperbolic:
+    if isHyperbolic:
       w = abs(self.w)
       if w < 1.0:
         raise Exception("Invalid hyperbolic frame angle")
@@ -1133,33 +1130,33 @@ class O():
     else:
       w = (self.w +1.0) %2.0 -1.0
       out = self.dup(math.acos(w) *2)
-    p1 = math.sqrt(n2)
+    p1 = math.sqrt(p2)
     if n1 > precision:
       p0 = 1.0 /p1
       for base in out.__g:
         base.value *= p0
     return out
 
-  def versor(self, nonHyperbolic=False):
-    """versor([nonHyperbolic])
+  def versor(self, hyperbolic=False):
+    """versor([hyperbolic])
        Return a versor of length 1 assuming w is the angle(rad) ready for
        rotation. Opposite of frame. See normalise. Hyperbolic versors use
-       cosh and sinh expansions unless nonHyperbolic is set."""
+       cosh and sinh expansions if hyperbolic is set."""
     precision = Common._getPrecision()
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    l2 = n2 +self.w *self.w
+    tmp,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = p2 +self.w *self.w
     if math.sqrt(l2) <= precision or not simple:
       raise Exception("Illegal versor for versor")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for versor")
-    if n2 < precision:
+    if p2 < precision:
       return O(1)
-    if hyperbolic:
+    if isHyperbolic:
       sw = math.sinh(self.w /2.0)
       cw = math.cosh(self.w /2.0)
     else:
       sw,cw = Common._sincos(self.w /2.0)
-    sw /= math.sqrt(n2)
+    sw /= math.sqrt(p2)
     out = self.dup(cw)
     for base in out.__g:
       base.value *= sw
@@ -1190,9 +1187,8 @@ class O():
   def normalise(self):
     """normalise()
        Normalise - reduces error accumulation. Versors have norm 1."""
-    precision = Common._getPrecision()
     n = self.norm()
-    if n <= precision:
+    if n <= Common._getPrecision():
       return O(1.0)
     out = self.dup(self.w /n)
     for base in out.__g:
@@ -1208,15 +1204,15 @@ class O():
       for cnt in range(exp):
         out *= self
       return out
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    if simple and not hyperbolic:
+    tmp,simple,isHyperbolic,p2 = self.__invertible()
+    if simple and not isHyperbolic:
       l1 = math.sqrt(p2 +self.w *self.w)
       w = pow(l1, exp)
       if l1 <= Common._getPrecision():
         return O(w)
       a = math.acos(self.w /l1)
       s,c = Common._sincos(a *exp)
-      s *= w /math.sqrt(n2)
+      s *= w /math.sqrt(p2)
       out = O(w *c)
       for grade in self.__g:
         oStr,uStr = grade.strs()
@@ -1228,11 +1224,11 @@ class O():
   def exp(self):
     """exp()
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    if n2 <= Common._getPrecision():
+    tmp,simple,isHyperbolic,p2 = self.__invertible()
+    if p2 <= Common._getPrecision():
       return O(self.w)
-    if not hyperbolic:
-      n1 = math.sqrt(n2)
+    if not isHyperbolic:
+      n1 = math.sqrt(p2)
       s,c = Common._sincos(n1)
       exp = pow(math.e, self.w)
       s *= exp /n1
@@ -1246,12 +1242,12 @@ class O():
   def log(self):
     """log()
        The functional inverse of the quaternion exp()."""
-    conj,simple,hyperbolic,n2 = self.__invertible()
-    l1 = math.sqrt(n2 +self.w *self.w)
-    if n2 <= Common._getPrecision():
+    tmp,simple,isHyperbolic,p2 = self.__invertible()
+    l1 = math.sqrt(p2 +self.w *self.w)
+    if p2 <= Common._getPrecision():
       return O(math.log(l1))
-    if not hyperbolic:
-      s = math.acos(self.w /l1) /math.sqrt(n2)
+    if not isHyperbolic:
+      s = math.acos(self.w /l1) /math.sqrt(p2)
       out = O(math.log(l1))
       for grade in self.__g:
         oStr,uStr = grade.strs()
@@ -1259,34 +1255,31 @@ class O():
       return out
     raise Exception("Invalid non-hyperbolic, non-versor for log")
 
-  def euler(self, nonHyperbolic=True):
-    """euler([nonHyperbolic])
+  def euler(self, hyperbolic=False):
+    """euler([hyperbolic])
        Quaternion versors can be converted to Euler Angles & back uniquely for
        normal basis order. Error occurs for positive signature. Euler parameters
        are of the form cos(W/2) +m sin(W/2), m pure unit versor. Only defined
-       for o12, o23, o13 quaternion part (TBD). Set nonHyperbolic=False try
-       hyperbolic angles (TBD)."""
+       for o1, o2, o12 quaternion part. Set hyperbolic to try hyperbolic
+       angles."""
     precision = Common._getPrecision()
-    tmp,simple,hyperbolic,n2 = self.__invertible()
-    l2 = n2 +self.w *self.w
+    conj,simple,isHyperbolic,p2 = self.__invertible()
+    l2 = p2 +self.w *self.w
     if not simple:
       raise Exception("Illegal versor for euler")
     if abs(math.sqrt(l2) -1.0) > precision:
       raise Exception("Illegal versor norm for euler")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for versor")
-    if n2 <= precision:
+    if p2 <= precision:
       return Euler()
-    dims = self.__vectorSizes()
-    xyz = list(x for x in O.VersorArgs(*dims, rotate=True))
-    cnt = len(xyz)
-    angles = [0] *cnt
-    args = [0] *cnt
-    for grade in tmp.__g:
+    dim,xyz = self.__vectorSizes()
+    angles = [0] *dim
+    args = [0] *dim
+    for grade in conj.__g:
       base = "".join(grade.strs())
-      if len(base) == 3:  # grade 2 only
-        args[xyz.index(base)] = grade.value
-    w, x, y, z = tmp.w, args[2], args[1], args[0]
+      args[xyz.index(base)] = grade.value
+    w, x, y, z = conj.w, args[0], args[1], args[2]
     disc = w *y - x *z
     if abs(abs(disc) -0.5) < Common._getPrecision():
       sgn = 2.0 if disc < 0 else -2.0
@@ -1299,24 +1292,26 @@ class O():
       angles[2] = math.atan2(2.0 * (z* w + x * y), 1.0 - 2.0 * (y * y + z * z))
     return Euler(*angles)
 
-  def versorMatrix(self, nonHyperbolic=True):
-    """versorMatrix([nonHyperbolic])
+  def versorMatrix(self, hyperbolic=False):
+    """versorMatrix([hyperbolic])
        This is same as frameMatrix but for a versor ie half the angle.
        Converts self to euler than to matrix assuming normal basis order.
-       Only defined for o12, o23, o13 quaternion part (TBD). Set
-       nonHyperbolic=False to try hyperbolic angles (TBD)."""
-    out = self.euler(nonHyperbolic)
-    dims = self.__vectorSizes()
-    return Euler(*out).matrix().reshape(sum(dims))
+       Only defined for o1, o2, o12 quaternion part. Set hyperbolic to try
+       hyperbolic angles."""
+    out = self.euler(hyperbolic)
+    dim,xyz = self.__vectorSizes()
+    return Euler(*out).matrix().reshape(dim)
 
-  def frameMatrix(self, nonHyperbolic=True):
-    """frameMatrix([nonHyperbolic])
+  def frameMatrix(self, hyperbolic=False):
+    """frameMatrix([hyperbolic])
        Rodriges for 3-D. See https://math.stackexchange.com/questions/1288207/
        extrinsic-and-intrinsic-euler-angles-to-rotation-matrix-and-back.
-       Only defined for o12, o23, o13 quaternion part (TBD). Converts self to versor then to euler then matrix.nonHyperbolic=False to try hyperbolic angles (TBD)"""
-    out = self.versor().euler(nonHyperbolic)
-    dims = self.__vectorSizes()
-    return Euler(*out).matrix().reshape(sum(dims))
+       Only defined for o12, o23, o13 quaternion part. Converts self to
+       versor then to euler then matrix. Set hyperbolic to try hyperbolic
+       angles."""
+    out = self.versor().euler(hyperbolic)
+    dim,xyz = self.__vectorSizes()
+    return Euler(*out).matrix().reshape(dim)
 
   def morph(self, pairs):
     """morph(pairs)
@@ -1347,6 +1342,8 @@ class O():
        Return (o,u) basis elements with value one."""
     Common._checkType(oDim, int, "Basis")
     Common._checkType(uDim, int, "Basis")
+    if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
+      raise Exception("Invalid Basis argument size")
     return tuple((O(**{x: 1}) for x in O.BasisArgs(oDim, uDim)))
 
   @staticmethod
@@ -1355,23 +1352,19 @@ class O():
        Return (o,u) basis elements as a list of names in addition order."""
     Common._checkType(oDim, int, "BasisArgs")
     Common._checkType(uDim, int, "BasisArgs")
-    if oDim +uDim > O.__HEX_BASIS:
-      raise Exception("Too many basis arguments")
-    if oDim < 0 or uDim < 0:
-      raise Exception("Too few basis arguments")
-    if oDim +uDim == 0:
-      return []
-    return O._basisArgs(oDim, uDim)
+    if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
+      raise Exception("Invalid Basis argument size")
+    return O._BasisArgs(oDim, uDim)
 
   @staticmethod
-  def VersorArgs(oDim, uDim=0, rotate=False):
+  def VersorArgs(oDim, uDim=0):
     """VersorArgs(oDim, [uDim])
-       Just grade 2 terms from BasisArgs. o12 is negated if rotate."""
+       Just same as BasisArgs for octonions."""
     Common._checkType(oDim, int, "VersorArgs")
     Common._checkType(uDim, int, "VersorArgs")
-    Common._checkType(rotate, bool, "VersorArgs")
-    out = list(x for x in O.BasisArgs(oDim, uDim) if len(x) == 3)
-    return out
+    if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
+      raise Exception("Invalid VersorArgs argument size")
+    return O._VersorArgs(oDim, uDim)
 
   @staticmethod
   def Versor(*args, **kwargs):
@@ -1382,7 +1375,7 @@ class O():
 
   @staticmethod
   def Euler(*args, **kwargs): #order=[], implicit=False):
-    """Euler([angles, ...][o1=multiplier, ...][order, implicit])
+    """Euler([angles, ...][o1=multiplier, ...][order,implicit])
        Euler angles in higher dimensions have (D 2)T=D(D-1)/2 parameters.
        SO(4) has 6 and can be represented by two octonions. Here they are
        changed to a versor using explicit rotation & this is returned.
@@ -1408,7 +1401,7 @@ class O():
     implicitRot = O(1.0)
     store = []
     dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) # l=comb(dim,2)
-    xyz = O.VersorArgs(dim, rotate=True)
+    xyz = O._VersorArgs(dim,0)
     for bi,val in kwargs.items():
       if bi not in ("order", "implicit"):
         while bi not in xyz:
@@ -1522,7 +1515,7 @@ class O():
         args = []
         for val in (q.w, q.x, q.y, q.z):
           args.append(val)
-    xyz = O.VersorArgs(3, rotate=True)
+    xyz = O.VersorArgs(2)
     if len(args) > 4:
       raise Exception("Invalid O parameters")
     kwargs = {}
@@ -1701,17 +1694,17 @@ if __name__ == '__main__':
   # Can only test 2-D rotations until euler stuff is updated. TBD
   Tests = [\
     """d30=radians(30); d60=radians(60); d45=radians(45); d90=radians(90)
-       e=Euler(pi/6,pi/4,pi/2); c=2o2+3o3; c.basis(3)""",
+       e=Euler(pi/6,pi/4,pi/2); c=o1+2o2+3o12; c.basis(0)""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
-       Rx=d60-o23; rx=(d60 -o23).versor()
+       Rx=d60-o12; rx=(d60 -o12).versor()
        test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
-       Rx=d60+o23; rx=O.Versor(d60,o23=1)
+       Rx=d60+o12; rx=O.Versor(d60,o12=1)
        test = Rx.frameMatrix() *c.vector(); store = (rx.rotate(c)).vector()
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.
-       Rx=d60+o23; rx=math.cos(d30) +o23*math.sin(d30)
+       Rx=d60+o12; rx=math.cos(d30) +o12*math.sin(d30)
        test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()
        Calculator.log(store == test, store)""",
     """# Test 4 Quat Euler == O Euler.

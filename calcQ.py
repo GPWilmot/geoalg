@@ -34,7 +34,7 @@
 ## Quaternion tests are included at the end of this file.
 ## Start with either calcQ.py, python calcQ.py or see calcR.py -h.
 ################################################################################
-__version__ = "0.2"
+__version__ = "0.3"
 import math
 from calcCommon import *
 try:
@@ -97,14 +97,14 @@ class Q():
     """Return True if 2 CAs are equal within precision."""
     precision = Common._getPrecision()
     if isinstance(cf, (int, float)):
-      return self.vectorLen() < precision and \
-              abs(self.w -cf) < precision
+      return -self.pureLen() <= precision and \
+              abs(self.w -cf) <= precision
     if not isinstance(cf, Q):
       return False
-    return abs(self.w -cf.w) < precision \
-       and abs(self.x -cf.x) < precision \
-       and abs(self.y -cf.y) < precision \
-       and abs(self.z -cf.z) < precision
+    return abs(self.w -cf.w) <= precision \
+       and abs(self.x -cf.x) <= precision \
+       and abs(self.y -cf.y) <= precision \
+       and abs(self.z -cf.z) <= precision
   def __ne__(self, cf):
     """Not equal is not automatic. Need this."""
     return not self.__eq__(cf)
@@ -182,7 +182,7 @@ class Q():
     if isinstance(q, Q):
       return self.__mul__(q.inverse())
     Common._checkType(q, (int, float), "div")
-    if abs(q) < Common._getPrecision():
+    if abs(q) <= Common._getPrecision():
       raise Exception("Illegal divide by zero")
     if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
       q = float(q)
@@ -222,9 +222,9 @@ class Q():
   def __rotation(self, r):
     """Versor rotation common method. For self=q=w+a then r'=qrq.inverse()
        with r=0+v then v'=v +wt +axt where t=2axv. [verified]. Force versor."""
-    l1 = r.len()
-    if abs(l1 -1.0) >= Common._getPrecision():
-      if l1 < Common._getPrecision():
+    l1 = r.norm()
+    if abs(l1 -1.0) > Common._getPrecision():
+      if l1 <= Common._getPrecision():
         return
       r.x /= l1
       r.y /= l1
@@ -249,12 +249,12 @@ class Q():
   def isScalar(self):
     """isScalar()
        Return true is there are no graded parts."""
-    return abs(self.x) + abs(self.y) + abs(self.z) < Common._getPrecision()
+    return abs(self.x) + abs(self.y) + abs(self.z) <= Common._getPrecision()
 
   def isVersor(self):
     """isVersore()
        Return True if self is of form cos(a) +n*sin(a), |n|==1."""
-    return abs(self.len() -1.0) < Common._getPrecision()
+    return abs(self.norm() -1.0) <= Common._getPrecision()
 
   def degrees(self, ang=None):
     """degrees(deg, [ang])
@@ -316,10 +316,10 @@ class Q():
       precision = Common._getPrecision()
     else:
       Common._checkType(precision, float, "trim")
-    w = 0 if abs(self.w) < precision else  self.w
-    x = 0 if abs(self.x) < precision else  self.x
-    y = 0 if abs(self.y) < precision else  self.y
-    z = 0 if abs(self.z) < precision else  self.z
+    w = 0 if abs(self.w) <= precision else  self.w
+    x = 0 if abs(self.x) <= precision else  self.x
+    y = 0 if abs(self.y) <= precision else  self.y
+    z = 0 if abs(self.z) <= precision else  self.z
     return Q(w, x, y, z)
 
   def pure(self):
@@ -345,27 +345,35 @@ class Q():
       
   def len(self):
     """len()
-       Return the sqrt of the sum of the multiplication with the
-       complex conjugate."""
-    return math.sqrt(self.w*self.w +self.x*self.x +self.y*self.y \
-                    +self.z*self.z)
+       Return the signed sqrt of the sum of the squares."""
+    n2 = self.w*self.w -self.x*self.x -self.y*self.y -self.z*self.z
+    if n2 < 0:
+      return -math.sqrt(-n2)
+    return math.sqrt(n2)
 
-  def vectorLen(self):
-    """vectorLen()
-       Return the length of the pure quaternion part of self."""
-    return math.sqrt(self.x*self.x +self.y*self.y +self.z*self.z)
+  def pureLen(self):
+    """pureLen()
+       Return the signed length of the pure quaternion part of self."""
+    return -math.sqrt(self.x*self.x +self.y*self.y +self.z*self.z)
 
   def conjugate(self):
     """conjugate()
        Return conjugate of self with i, j, k parts negated."""
     return Q(self.w, -self.x, -self.y, -self.z)
+      
+  def norm(self):
+    """norm()
+       Return the sqrt of the sum of the multiplication with the
+       complex conjugate."""
+    return math.sqrt(self.w*self.w +self.x*self.x +self.y*self.y \
+                    +self.z*self.z)
 
   def inverse(self):
     """inverse()
        Return inverse of self as conjugate/len."""
-    l2 = self.len()
+    l2 = self.norm()
     l2 *= l2
-    if self.len() < Common._getPrecision():
+    if l2 <= Common._getPrecision():
       raise Exception("Illegal divide by zero")
     return Q(self.w /l2, -self.x /l2, -self.y /l2, -self.z /l2)
 
@@ -392,7 +400,7 @@ class Q():
 
   def asym(self, q):
     """asym(q)
-       Return anti-symmetric product of two QAs. This is the wedge product."""
+       Return antisymmetric product of two QAs. This is the wedge product."""
     Common._checkType(q, Q, "asym")
     return (self *q -q *self) *0.5 
  
@@ -410,9 +418,9 @@ class Q():
        interpreted as a plane a*b with parts (in,outside) the plane. If q is
        a*b, a != b then return parts (perpendicular, parallel) to plane of a &
        b. a.cross(b) is not needed as scalar part is ignored."""
-    n1 = self.vectorLen()
-    if n1 < Common._getPrecision():
-      raise Exception("Invalid length for projects.")
+    n1 = -self.pureLen()
+    if n1 <= Common._getPrecision():
+      raise Exception("Invalid length for projecnormts.")
     mul = self.pure()
     vect = q.pure()
     mul = mul *vect *mul /float(n1 *n1)
@@ -423,14 +431,14 @@ class Q():
        Return the Geodesic norm which is the half angle subtended by
        the great arc of the S3 sphere d(p,q)=|log(p.inverse())*q|."""
     Common._checkType(q, Q, "distance")
-    return (self.inverse() *q).log().len()
+    return (self.inverse() *q).log().norm()
 
   def normalise(self, noError=False):
     """normalise([noError])
        Return normalised self - reduces versor error accumulation.
        Raise an error on failure or return 0 if noError."""
-    l1 = self.len()
-    if l1 < Common._getPrecision():
+    l1 = self.norm()
+    if l1 <= Common._getPrecision():
       if noError:
         return Q(0)
       raise Exception("Illegal length for normalise()")
@@ -438,9 +446,9 @@ class Q():
 
   def unit(self):
     """unit()
-       Return self=frame with unit vectorLen(). See frame."""
-    l1 = self.vectorLen()
-    if l1 < Common._getPrecision():
+       Return self=frame with unit -pureLen(). See frame."""
+    l1 = -self.pureLen()
+    if l1 <= Common._getPrecision():
       raise Exception("Frame has zero length pure part for unit().")
     return Q(self.w, self.x /l1, self.y /l1, self.z /l1)
 
@@ -448,9 +456,9 @@ class Q():
     """frame()
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w). See versor."""
     q = self.normalise()
-    l1 = q.vectorLen()
+    l1 = -q.pureLen()
     l0 = 0
-    if l1 >= Common._getPrecision():
+    if l1 > Common._getPrecision():
       l0 = self.len() /l1
     w = (q.w +1.0) %2.0 -1.0
     return Q(math.acos(w) *2, q.x *l0, q.y *l0, q.z *l0)
@@ -458,8 +466,8 @@ class Q():
   def versor(self):
     """versor()
        Return self=frame as a versor no magnitude. See frame & normalise."""
-    n1 = self.vectorLen()
-    if n1 < Common._getPrecision():
+    n1 = -self.pureLen()
+    if n1 <= Common._getPrecision():
       return Q(1)
     sw,cw = Common._sincos(self.w /2.0)
     sw /= n1
@@ -486,7 +494,7 @@ class Q():
     n2 = self.x*self.x +self.y*self.y +self.z*self.z
     l1 = math.sqrt(n2 +self.w *self.w)
     w = pow(l1, exp)
-    if n2 < Common._getPrecision():
+    if n2 <= Common._getPrecision():
       return Q(w)
     a = math.acos(self.w /l1)
     s,c = Common._sincos(a *exp)
@@ -497,8 +505,8 @@ class Q():
   def exp(self):
     """exp()
        For self=q=w+v, exp(q)=exp(w)(cos|v|+sin(|v|)v/|v|), inverse of log()."""
-    n1 = self.vectorLen()
-    if n1 < Common._getPrecision():
+    n1 = -self.pureLen()
+    if n1 <= Common._getPrecision():
       return Q(self.w)
     s,c = Common._sincos(n1)
     exp = pow(math.e, self.w)
@@ -510,7 +518,7 @@ class Q():
        For self=q=w+v, log(self)=log|q|+acos(w/|q|)v/|v|, inverse of exp()."""
     n2 = self.x*self.x +self.y*self.y +self.z*self.z
     l1 = math.sqrt(self.w *self.w +n2)
-    if n2 < Common._getPrecision():
+    if n2 <= Common._getPrecision():
       return Q(math.log(l1))
       if l1 == 0.0:
         raise Exception("Log(0) is undefined")
@@ -529,7 +537,7 @@ class Q():
       lat0 = lat
       sLat,cLat = Common._sincos(lat)
       N = Common.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
-      if p >= precision:
+      if p > precision:
         h = p /cLat -N
         lat = math.atan(self.z /p /(1 -Common._EARTH_ECCENT2 *N/(N +h)))
       elif lat >= 0.0:
@@ -538,7 +546,7 @@ class Q():
       else:
         h = self.z +Common.EARTH_MINOR_M
         lat = -math.pi *0.5
-      if abs(lat -lat0) < precision:
+      if abs(lat -lat0) <= precision:
         break
     return Matrix(math.degrees(lat),
                   math.degrees(math.atan2(self.y, self.x)), h)
@@ -547,7 +555,7 @@ class Q():
     """euler([noError])
        Versors can be converted to Euler Angles & back uniquely for default
        order. Euler parameters are q=cos(W/2) +a, a=n sin(W/2), n unit. So
-       rotation angle defined by cosW=2a0a0-1=a0a0-a.a and n sinW=2ae0. XXX
+       rotation angle defined by cosW=2a0a0-1=a0a0-a.a and n sinW=2ae0.
        For r=roll(theta), p=pitch(chi), y=yaw(phi):
          w = cos((p+y)/2)cos(r/2)
            = cos(r/2)cos(p/2)cos(y/2) +sin(r/2)sin(p/2)sin(y/2)
@@ -992,10 +1000,10 @@ if __name__ == '__main__':
        test = math.acos(p.w *q.w -p.dot(q))
        Calculator.log(store == test, store)""",
     """# Test 11 Length *2 == dot(self +self).
-       store = (q *2).len(); test = math.sqrt(-(q +q).dot(q +q))
+       store = (q *2).norm(); test = math.sqrt(-(q +q).dot(q +q))
        Calculator.log(store == test, store)""",
     """# Test 12 Versor *3 /3 == versor.normalise
-       Calculator.log(q/q.len() == q.normalise(), q.normalise())""",
+       Calculator.log(q/q.norm() == q.normalise(), q.normalise())""",
     """# Test 13 Check Rodriges formula
        def para(a,r,w): return -a *a.dot(r)
        def perp(a,r,w): return r *math.cos(w) +a.cross(r) *math.sin(w)\\

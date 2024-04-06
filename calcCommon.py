@@ -19,7 +19,7 @@
 ##
 ## Default case is just the real numbers but calcQ.py defines Quaternions.
 ## For example 1+i+j+k -> Quat(1,1,1,1). It then runs exec() or eval().
-## Assumes quat.py is in the same directory and this has more documentation.
+## Assumes calc?.py is in the same directory and this has more documentation.
 ## Start with either calcR.py, python calcR.py or see ./calcR.py -h.
 ## This module contains classes (run help for more info):
 ##   * Common - miscellaneous functions for all calculators
@@ -27,7 +27,7 @@
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
 ################################################################################
-__version__ = "0.3"
+__version__ = "0.4"
 import math, sys
 
 ################################################################################
@@ -49,7 +49,7 @@ class Common():
   _E             = "Euler's number from math"
   E              = math.e
   __precision  = 1E-15          # Precision used for equality
-  __resolution  = 3             # Digits for float display
+  __resolution  = 4             # Digits for float display
   __resol_form  = r"%0.3G"      # Format string for float display
   __resol_float = r"%0.3f"      # Format string for float display
   __verbose     = False         # Traceback logging
@@ -127,7 +127,7 @@ class Common():
   @staticmethod
   def verbose(verbosity=None):
     """verbose([verbosity])
-       Toggle or set verbosity for traceback reporting."""
+       Toggle or set verbosity for logging and traceback reporting."""
     if verbosity is None:
       verbosity = not Common.__verbose
     Common._checkType(verbosity, bool, "verbose")
@@ -137,12 +137,12 @@ class Common():
   @staticmethod
   def resolution(digits=0):
     """resolution([digits])
-       Set print format digits or reset to default 17."""
+       Set print format digits or reset to 17. Minimum & default is 4."""
     if not isinstance(digits, int) or digits < 0:
       raise Exception("Invalid printing resolution")
     if digits == 0:
       digits = 17
-    if digits < 4:
+    elif digits < 4:
       digits = 4
     Common.__resolution = digits
     Common.__resol_form = "%%0.%dG" %digits
@@ -237,18 +237,21 @@ class Common():
   @staticmethod
   def _mergeBasis(arr1, arr2):
     """Internal utility to merge 2 str basis lists."""
-    out = []
     if arr1 and arr2:
+      out = []
       for ii in arr1:
         for jj in arr2:
           if jj[0] == "-":
-            out.append("-" +ii +jj[1:])
+            if ii[0] == "-":
+              out.append(ii[1:] +jj[1:])
+            else:
+              out.append("-" +ii +jj[1:])
           else:
             out.append(ii +jj)
     elif arr1:
-      out.extend(arr1)
+      out = arr1[:]
     else:
-      out.extend(arr2)
+      out = arr2[:]
     return out
   @staticmethod
   def _unzipBasis(*pairs):
@@ -936,24 +939,25 @@ class Tensor(list):
       out.append(val1 *mat[idx1])
     return self.copy(out)
 
-  def cayleyDicksonMult(self, vector, wikiRule=False):
-    """cayleyDicksonMult(vector, [wikiRule])
+  def cayleyDicksonMult(self, vector, baezRule=False):
+    """cayleyDicksonMult(vector, [baezRule])
        Multiply Tensor pairs using Cayley-Dickson rule, Wikipedia or J.C.Baez:
        q1=(p,q); q2=(r,s); q1*q2 = (pr -s*q, sp +qr*) [wikiRule]
        q1=(p,q); q2=(r,s); q1*q2 = (pr -sq*, p*s +rq) [baezRule]."""
     out = []
-    Common._checkType(vector, (list, tuple) , "bioct")
+    Common._checkType(vector, (list, tuple) , "cayleyDicksonMult")
+    Common._checkType(baezRule, bool , "cayleyDicksonMult")
     if len(self) != len(vector) or len(self) != 2:
-      raise Exception("Vectors for bioct must have length two")
+      raise Exception("Vectors for cayleyDicksonMult must have length two")
     if self and not isinstance(self[0], (list, tuple)):
-      if wikiRule:
-        out.append(self[0] *vector[0] -vector[1].conjugate() *self[1])
-        out.append(vector[1] *self[0] +self[1] *vector[0].conjugate())
-      else:
+      if baezRule:
         out.append(self[0] *vector[0] -vector[1] *self[1].conjugate())
         out.append(self[0].conjugate() *vector[1] +vector[0] *self[1])
+      else:
+        out.append(self[0] *vector[0] -vector[1].conjugate() *self[1])
+        out.append(vector[1] *self[0] +self[1] *vector[0].conjugate())
       return Tensor(*out)
-    raise Exception("Self for bioct needs to be a vector")
+    raise Exception("Self for cayleyDicksonMult needs to be a vector")
 
   def trim(self):
     """trim()
@@ -1009,6 +1013,8 @@ class Tensor(list):
       out.__size = (1, out.size[0])
     return out
 
+  def size(self): return self.__size
+
   def reshape(self, shape):
     """reshape(shape)
        Return copy with new 2-D shape or square if shape is integer."""
@@ -1028,12 +1034,14 @@ class Tensor(list):
         for idx2 in range(shape[1]):
           out[idx1].append(val1[idx2] if idx2 < len(val1) else 0)
       return Tensor(*out)
-    if shape[0] > 1 and shape[1] > 1:
-      for idx1 in range(shape[0]):
-        out.append([0] *shape[1])
-    else:
-      self.__size = (shape[0], shape[1])
-      return Tensor(self)
+    if shape[0] == 1:  # Transpose case
+      out = Tensor(self[:shape[1]])
+      out.__size = (1, shape[1])
+      return out
+    elif shape[1] == 1:
+      return Tensor(self[:shape[0]])
+    for idx1 in range(shape[0]):
+      out.append([0] *shape[1])
     for idx,val in enumerate(self):
       if shape[0] > 1 and shape[1] > 1:
         if self.__size[0] > 1:
@@ -1317,7 +1325,8 @@ class Tensor(list):
     if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
       raise Exception("Tensor is not the same type as basis for %s" %name)
 
-  def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True, initPerm=[]):
+  def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
+             initPerm=[]):
     """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
@@ -1402,11 +1411,11 @@ class Tensor(list):
           difRange[0] = len(dif) if len(dif) <= difRange[0] else difRange[0]
           difRange[1] = len(dif) if len(dif) >= difRange[1] else difRange[1]
           difHisto[len(dif)] += 1
-          if diffs >= 0:
-            if len(dif) == 0: # iso == cf
-              sys.stdout.write("FOUND at %d %s\n" %(cnt, p0))
-            elif len(dif) <= diffs:
-              sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p0, len(dif), dif))
+          if len(dif) == 0: # iso == cf
+            sys.stdout.write("FOUND at %d %s\n" %(cnt, p0))
+          elif diffs >= 0 and len(dif) <= diffs:
+            sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p0,
+                              len(dif), dif))
           if cnt == num or (num == -1 and len(dif) == 0):
             if diffs < 0:
               sys.stdout.write("%s at %d %s\n" \
@@ -1739,7 +1748,7 @@ class Tensor(list):
     return out
 
   def morphCycles(self, perm, tri=False):
-    """morphCycle(perm)
+    """morphCycle(perm, [tri])
        Return cycle sign permuted by perm as a list from (1,2,3,...)."""
     s0 = []
     iso = []

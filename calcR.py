@@ -24,7 +24,7 @@
 ## used by all basis number calculators. Run help for more info.
 ## Start with either calcR.py, python calcR.py or see ./calcR.py -h.
 ###############################################################################
-__version__ = "0.2"
+__version__ = "0.3"
 import sys, math, os
 import platform, glob
 import traceback
@@ -201,7 +201,7 @@ class CommonTest():
         for line in block[0].splitlines()[block[1]:pos]:
           if line[:CommonTest.__testIndent] == " " *CommonTest.__testIndent:
             code += line[CommonTest.__testIndent:] +'\n'
-            if number and not Common._isVerbose():
+            if number and Common._isVerbose():
               sys.stdout.write(line[CommonTest.__testIndent:] +'\n')
             if line.find("Calculator.log") < 0:
               if readline:
@@ -210,7 +210,7 @@ class CommonTest():
             code += line +'\n'
             if readline:
               readline.add_history(line)
-            if number and not Common._isVerbose():
+            if number and Common._isVerbose():
               sys.stdout.write(line +'\n')
       if Common._isVerbose() and idx < last -first -1:
         code += 'sys.stdout.write("\\n")\n'
@@ -319,7 +319,10 @@ class Calculator:
       raise Exception("Invalid calculator for %s tests" %name)
     tst = number.strip() if number else ""
     Calculator.__lastCmd = "test(%s)" %tst
-    return CommonTest.getTestLines(tst, firstTest)
+    code = CommonTest.getTestLines(tst, firstTest)
+    for line in code.splitlines():
+      Calculator.__history.append(line)
+    return code
 
   class ExecError(Exception):
     """Don't report exceptions outside exec() if already reported inside.
@@ -452,7 +455,8 @@ class Calculator:
   def help(cls=None, obj=None, path=None):
     """Print introduction, obj list or obj's documentation."""
     if not cls:
-      tmp = "history%s default or named file"
+      ext = os.path.splitext(Calculator.__default)[1]
+      tmp = "history%s default%s or named file"
       opt = ""
       if not readline:
         opt += "\nPIP: readline not installed - no command line history"
@@ -467,16 +471,16 @@ class Calculator:
             extra += '           %s\n' %Calculator.__eHelp
       sys.stdout.write('%s\n' %Calculator.__cHelp +extra \
           +'Commands: help or help(%s)\n'%"|".join(Calculator.__classList) \
-          +'          calc or calc(<calc>) - list or change calculator\n' \
-          +'          show or show(<file>) - display %s\n' %(tmp %",")\
-          +'          load or load(<file>) - load %s\n' %(tmp %" from") \
-          +'          save or save(<file>) - append %s\n' %(tmp %" to") \
+          +'          calc or calc(<calc>) - list or change calculator\n'  \
+          +'          show or show(<file>) - display %s\n' %(tmp %(",", "()"))\
+          +'          load or load(<file>) - load %s\n' %(tmp %(" from", ext))\
+          +'          save or save(<file>) - append %s\n' %(tmp %(" to", ext))\
           +test \
-          +'          clear or clear<file>) - clear %s\n' %(tmp %"or") \
-          +'          precision, resolution, verbose, version - see Common\n' \
-          +'          vars                 - list local variables/functions\n'\
-          +'          quit or exit or ^d   - exit (^d is control-d)' \
-          +opt +'\n')
+          +'          clear or clear<file>) - clear %s\n' %(tmp %(" or", ext))\
+          +'          vars                  - list local variables/functions\n'\
+          +'          quit or exit or control-d - exit\n' \
+          +'          precision, resolution, verbose, version - see help' \
+          +'(Common)' +opt +'\n')
       if path:
         fNames = list((os.path.basename(fName) for fName in glob.glob(path)))
         if len(fNames) == 0:
@@ -540,92 +544,113 @@ class Calculator:
             doc = "See help(%s.%s)" %(cls.__name__, name0)
           sys.stdout.write("%-20s - %s\n" %(name, doc if doc else "None"))
 
-  def __parseUsefulWord(self, firstWord, isAns, line):
+  def __parseUsefulWord(self, isAns, line, firstWord):
     """Change __parseTokens USEFUL_WORDS and USEFUL_CMDS into useful Common
        methods. Process commands with optional argument. Argument is
        assumed to be a module if help, a filename with default for file commands
        and ignored for other commands. Quotes are removed if found. Return text
        for exec() or exception. Return "" if quitting. USEFUL_CMDS return the
        code to run using lex which is not nested so is added after expansion."""
-    code = ""
     doFirstLoad = False
     firstTest = True
-    for sline in line.split(';'):
-      if firstWord and sline.find(firstWord) >= 0:
-        word = firstWord
-        firstWord = ""
-      else:
-        word = ""
-        for uWord in self.__USEFUL_WORDS:
-          if sline.lstrip().find(uWord) == 0:
-            word = uWord
-            break
-      pline = sline.replace(word, "").strip()
-      pos1 = pline.find("(")
-      pos2 = pline.find(")")
-      param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else None
-      extra = pline[pos2 +1:].strip()                # Anything after word or )
-      if word and extra:
-        if sline.find(word) == 0:
-          raise Exception("Command arguments must be inside brackets")
-        code += sline +';'
-      elif not word or extra or pline[:pos1].strip():  # Ignore if not single cmd
-        code += sline +';'
-      else:  # Separate out parameters
-        if param and len(param) > 1:   # Remove quotes
-          if param[0] == '"' and param[-1] == '"' or \
-             param[0] == "'" and param[-1] == "'":
-            param = param[1:-1]
-        if word in self.__USEFUL_FILE:  # File cmds can use default filename
-          if word == "load" and param == "noError=True":
-            param = ""
-            doFirstLoad = True
-          if param:                     # Maybe use default filename extension
-            if not os.path.splitext(param)[1]:
-              param += os.path.splitext(Calculator.__default)[1]
-          elif pos1 >= 0 or word in self.__USEFUL_FILE[2:]: # Use default file
-            param = Calculator.__default
-          if param:
-            if not os.path.dirname(param):   # Use default path
-              path = os.path.dirname(__file__)
-              param = os.path.join(path, param)
-            pline = "('%s')" %param
-        elif word == "calc" and param:
-          pline = "('%s')" %param.upper()
-        elif word == "vars":
-          pline = "(locals())"
-        elif word == "help":
-          if param:
-            pos1 = param.find(".")
-            if pos1 > 0:
-              pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
-          else:
+    if firstWord and line.find(firstWord) >= 0:
+      word = firstWord
+      firstWord = ""
+    else:
+      word = ""
+      for uWord in self.__USEFUL_WORDS:
+        if line.lstrip().find(uWord) == 0:
+          word = uWord
+          break
+    pline = line.replace(word, "").strip()
+    pos1 = pline.find("(")
+    pos2 = pline.find(")")
+    param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else None
+    extra = pline[pos2 +1:].strip()                # Anything after word or )
+    if word and extra:
+      if line.find(word) == 0:
+        raise Exception("Command arguments must be inside brackets")
+      code = line
+    elif not word or extra or pline[:pos1].strip():  # Ignore if not single cmd
+      code = line
+    else:  # Separate out parameters
+      if param and len(param) > 1:   # Remove quotes
+        if param[0] == '"' and param[-1] == '"' or \
+           param[0] == "'" and param[-1] == "'":
+          param = param[1:-1]
+      if word in self.__USEFUL_FILE:  # File cmds can use default filename
+        if word == "load" and param == "noError=True":
+          param = ""
+          doFirstLoad = True
+        if param:                     # Maybe use default filename extension
+          if not os.path.splitext(param)[1]:
+            param += os.path.splitext(Calculator.__default)[1]
+        elif pos1 >= 0 or word in self.__USEFUL_FILE[2:]: # Use default file
+          param = Calculator.__default
+        if param:
+          if not os.path.dirname(param):   # Use default path
             path = os.path.dirname(__file__)
-            ext = os.path.splitext(Calculator.__default)[1]
-            pline = "(path='%s/*%s')" %(path, ext)
-        if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
-          if word == "load":
-            line = Calculator.load(param, noError=doFirstLoad)
-            doFirstLoad = False
-          elif word == "test":
-            line = Calculator.test(param, firstTest)
-            firstTest = False
-          else:    # version - ignore parameters
-            pline = "'R',%s" %__version__
-            for mod in Calculator.__moduleList:
-              if mod != "R":
-                pline += ",'%s',%s.version()" %(mod, mod)
-            line = "Calculator." +word +"(%s)" %pline
-          self.__lexer.reset(line)
-          isAns,tmp = self.__parseTokens(True,isAns) # No usefulwords in scripts
-          code += tmp
+            param = os.path.join(path, param)
+          pline = "('%s')" %param
+      elif word == "calc" and param:
+        pline = "('%s')" %param.upper()
+      elif word == "vars":
+        pline = "(locals())"
+      elif word == "help":
+        if param:
+          pos1 = param.find(".")
+          if pos1 > 0:
+            pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
         else:
-          code += "Calculator." +word +(pline if pline else "()")
-        if len(code) > 0 and code[-1] != '\n':
-          code += ';'
-    return isAns,code[:-1]
+          path = os.path.dirname(__file__)
+          ext = os.path.splitext(Calculator.__default)[1]
+          pline = "(path='%s/*%s')" %(path, ext)
+      if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
+        if word == "load":
+          loadLine = Calculator.load(param, noError=doFirstLoad)
+        elif word == "test":
+          loadLine = Calculator.test(param, firstTest)
+          firstTest = False
+        else:    # version - ignore parameters
+          pline = "'R',%s" %__version__
+          for mod in Calculator.__moduleList:
+            if mod != "R":
+              pline += ",'%s',%s.version()" %(mod, mod)
+          loadLine = "Calculator." +word +"(%s)" %pline
+        self.__lexer.reset(loadLine)
+        buf = self.__parseTokens(False, isAns) # No usefulwords in scripts
+        if len(buf) != 1:
+          if len(buf) != 0:
+            raise Exception("Command word processing error: %s" %line)
+          buf = ((isAns, ""),)
+        isAns,code = buf[0]
+      else:
+        code = "Calculator." +word +(pline if pline else "()")
+    return isAns,code
 
-  def __parseTokens(self, noUsefulWord=False, isAns=True):
+  def __processExec(self, buf):
+    """Call processExec within calc? adding catch block for exec."""
+    code = buf[1]
+    if buf[0]:  # isAns so do eval with return ans
+      if not code:
+        return None
+    else:
+      tmp = "try:\n"
+      if Common._isVerbose():
+        tmp += "  import traceback\n"
+      elif code.strip()[0] == "#":
+        tmp += "  None\n"
+      for line in code.splitlines():
+        tmp += "  %s\n" %line
+      code = tmp +"except Exception as e:\n"
+      if Common._isVerbose():
+        code += "  traceback.print_exc()\n"
+      else:
+        code += "  sys.stdout.write('%s: %s\\n' %(type(e).__name__, e))\n"
+      code += "  raise Calculator.ExecError(e)\n"
+    return Calculator.__firstCls._processExec(buf[0], code)
+
+  def __parseTokens(self, isUsefulWord=True, isAns=True):
     """Not a full parser because it outputs code for python to parse. It only
        changes numbers with names recognised by _validBasis() and appends these
        to a stored number array which is changed into code by _processStore().
@@ -635,10 +660,11 @@ class Calculator:
        start of a comment even if within a string. Limitations:
        * Does not escape single quote strings (only " and 3"s)
        * Does not escape quotes so use single quote within strings
-       * startLine is used by calcS to not expand the first variable[,...]
-       """
+       * startLine is used by calcS to not expand the first variable[,...].
+       Return list of (isAns, code) for semicolons in input."""
     SpaceChars = (' ', '\t', "NEWLINE")
-    code = ""               # Output line
+    bufs = []               # Output lines, isAnss, doUsefulWords
+    code = ""               # Current output line
     doUsefulWord = ""       # Process this special word
     doLineExpand = True     # Do expand if not special word or function
     noBrackExpand = 0       # Don't expand basis inside calc class
@@ -752,7 +778,7 @@ class Calculator:
             state.startLine = True
           elif state.startLine:
             if token.value in self.__USEFUL_WORDS:
-              if not noUsefulWord:
+              if isUsefulWord:
                 #raise Exception("Multiple commands are not allowed")
                 doUsefulWord = token.value
                 doLineExpand = False
@@ -793,28 +819,36 @@ class Calculator:
         state.extendLine = (token.type == "\\")
         state.lastTyp = token.type
         if token.type in (':', ';'):
+          if token.type == ';' and isUsefulWord:
+            bufs.append((isAns, code[:-1], doUsefulWord))
+            code,isAns,doUsefulWord = "", True, ""
           state.startLine = True
-          noUsefulWord = False
           doLineExpand = True
-          if token.type == ';': #TBD
-            isAns = False
         elif token.type not in (',', "NAME"):
           state.startLine = False
     if state.store:
       code += Calculator.__inCls._processStore(state)
-    if doUsefulWord:    # Run lex again if necessary
-      isAns, code = self.__parseUsefulWord(doUsefulWord, isAns, code)
-    return isAns,code
+    if code:
+      bufs.append((isAns, code, doUsefulWord))
+    out = []
+    for buf in bufs:
+      if buf[2]: # doUsefulWord - run lex again
+        if Common._isVerbose():
+          sys.stdout.write("LOG: " +buf[1] +'\n')
+        ans = self.__processExec(self.__parseUsefulWord(*buf))  # Ignore the ans
+      else:
+        out.append(buf[:2])
+    return out
 
   def __getInput(self, runExec):
     """Tokenise the line with ply.lex and partially parse it to change basis
        numbers into Class constructors and keywords to Common methods.
-       Return isAns,code which is processed by python as
+       Return list of (isAns,code) which is processed by python as
          ifAns: eval(code); else: exec(code).
        If lastLine then a backslash was entered as the last char of the 
        previous input and lines should be accumulated with the backslash
        replaced by a new line character and isAns is set False."""
-    isAns,code = True,None   # Use eval instead of exec & run string
+    out = []   # list of (isAns, code)
     prompt = "calc%s> " %Calculator.__prompt
     if runExec:
       line = runExec
@@ -827,8 +861,7 @@ class Calculator:
           else:
             line += input(prompt) 
           if line and line[-1] == '\\':
-            if len(line.strip()) > 1:
-              line += '\n'
+            line += '\n'
           else:
             break
       except EOFError:
@@ -838,34 +871,12 @@ class Calculator:
       self.__lines = line
       idx = line.find('(')
       idx = len(line) if idx < 0 else idx
-      try:
-        if self.__lexer:
-          self.__lexer.reset(line)
-          isAns,code = self.__parseTokens()
-          if Common._isVerbose():
-            sys.stdout.write("LOG: " +code +'\n')
-        else:
-          code = line
-        if not isAns:
-          tmp = "try:\n"
-          if Common._isVerbose():
-            tmp += "  import traceback\n"
-          elif line.strip()[0] == "#":
-            tmp += "  None\n"
-          for line in code.splitlines():
-            tmp += "  %s\n" %line
-          code = tmp +"except Exception as e:\n"
-          if Common._isVerbose():
-            code += "  traceback.print_exc()\n"
-          else:
-            code += "  sys.stdout.write('%s: %s\\n' %(type(e).__name__, e))\n"
-          code += "  raise Calculator.ExecError(e)\n"
-      except Exception as e:
-        tmp = str(e).replace('"', '\\"')
-        isAns,code = False, 'sys.stdout.write("Error: %s\\n")' %tmp
-        if Common._isVerbose():
-          traceback.print_exc()
-    return isAns,code
+      if self.__lexer:
+        self.__lexer.reset(line)
+        out = self.__parseTokens()
+      else:
+        out = [(False, line),]
+    return out
 
   def processInput(self, args):
     """Process the command line options and commands or run processor.
@@ -874,68 +885,51 @@ class Calculator:
     runExec = ""
     doLoad = os.path.isfile(os.path.join(os.path.dirname(__file__),
                                          Calculator.__default))
-    doCalc = False
-    calcCmd = []
     try:
       for idx,arg in enumerate(args[1:]):
         opt = arg if (arg and arg[0] == '-') else "--"
         if "h" in opt or arg == "--help":
           sp = "          "
           raise Exception(Calculator.__cHelp +"\n" \
-            + "%sEnter command such as help which list all commands.\n" %sp \
-            + "%sNo command line command/calculation runs calculator.\n" %sp \
-            + "%sOptions set full resolution, logging, load & calc cmds." %sp)
-        elif doCalc:
-          calcCmd.append(arg)
-          doCalc = False
-          opt = []
+            + "%sEnter a command such as help which lists all commands.\n" %sp \
+            + "%sNo command line command/calculation runs the calculator.\n"%sp\
+            + "%sOptions set full resolution, logging & stop auto load." %sp)
         elif opt == "--":
           runExec = " ".join(args[idx +(2 if arg == "--" else 1):])
           break
         for pos,ch in enumerate(opt):
-          if doCalc:
-            if ch == "," or not calcCmd:
-              calcCmd.append("" if ch == "," else ch)
-            else:
-              calcCmd[-1] += ch
-            if pos == len(opt) -1:
-              doCalc = False
-          elif ch == "r" or arg == "--resolution":
+          if ch == "r" or arg == "--resolution":
             Matrix.Resolution(0)
           elif ch == "v" or arg == "--verbose":
             Common.verbose(True)
           elif ch == "n" or arg == "--noLoad":
             doLoad = False
-          elif ch == "c" or arg == "--calc":
-            doCalc = True
           elif ch != '-':
             raise Exception("Invalid option: %s" %opt)
       doCmd = "load(noError=True)" if doLoad else ""
-      if calcCmd:
-        doCmd += "%scalc(%s)" %(";" if doCmd else "", ",".join(calcCmd))
       while True:
         try:
           if doCmd:
-            isAns,code = self.__getInput(doCmd)
+            bufs = self.__getInput(doCmd)
           else:
-            isAns,code = self.__getInput(runExec)
-          if code:
-            ans = Calculator.__firstCls._processExec(isAns, code)
-          else:
-            ans = None
-          if isAns:
-            if isinstance(ans, float):
-              resol, resolForm, resolFloat = Common._getResolutions()
-              flt = resolForm %ans
-              if flt.find(".") < 0 and ans != int(ans):
-                flt = resolFloat %ans
-              sys.stdout.write("ans = %s\n" %flt)
-            elif ans is not None:
-              sys.stdout.write("ans = %s\n" %str(ans))
-          else:
-            for line in self.__lines.splitlines():
-              Calculator.__history.append(line)
-            self.__lines = ""
+            bufs = self.__getInput(runExec)
+          for buf in bufs:
+            if Common._isVerbose():
+              sys.stdout.write("LOG: " +buf[1] +'\n')
+            ans = self.__processExec(buf)
+            if buf[0]:   # isAns
+              if isinstance(ans, float):
+                resol, resolForm, resolFloat = Common._getResolutions()
+                flt = resolForm %ans
+                if flt.find(".") < 0 and ans != int(ans):
+                  flt = resolFloat %ans
+                sys.stdout.write("ans = %s\n" %flt)
+              elif ans is not None:
+                sys.stdout.write("ans = %s\n" %str(ans))
+            else:
+              for line in self.__lines.splitlines():
+                Calculator.__history.append(line)
+              self.__lines = ""
         except Calculator.ExecError as e:
           pass  # Already reported
         except KeyboardInterrupt:
@@ -959,7 +953,6 @@ class Calculator:
     except Exception as e:
       cmd = "%s" %os.path.basename(args[0])
       opts = "[-r|--resolution] [-v|--verbose] [-n|--noLoad]"
-      opts += " [-c|--calc list]"
       outLines = ("Usage: %s [-h|--help]" %cmd,
         "Usage: %s %s [<cmd|calculation>]" %(cmd, opts),
         "Summary:  %s" %e,

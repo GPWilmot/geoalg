@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.3"
+__version__ = "0.2"
 import math
 from calcCommon import *
 
@@ -309,16 +309,16 @@ class CA():
     """Not equal is not automatic. Need this."""
     return not self.__eq__(cf)
   def __lt__(self, cf):
-    """Return True if all graded parts smaller or scalar smaller than cf.w."""
+    """Return True if all scalar and graded parts smaller."""
     return self.__cf(cf, lambda x,y: x < y)
   def __le__(self, cf):
-    """Return True if all graded parts <= or scalar <= than cf.w."""
+    """Return True if all scalar and graded parts less than or equal."""
     return self.__cf(cf, lambda x,y: x <= y)
   def __gt__(self, cf):
-    """Return True if all graded parts greater or scalar greater than cf.w."""
+    """Return True if all scalar and graded parts greater."""
     return self.__cf(cf, lambda x,y: x > y)
   def __ge__(self, cf):
-    """Return True if all graded parts >= or scalar >= than cf.w."""
+    """Return True if all scalar and graded parts greater than or equal."""
     return self.__cf(cf, lambda x,y: x >= y)
 
   def __add__(self, ca):
@@ -435,12 +435,14 @@ class CA():
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""
     if isinstance(cf, (int, float)):
+      res = True
       if not self.__g:
-        return oper(self.w, cf)
+        if not oper(self.w, cf):
+          res = False
       for g in self.__g:
-        if oper(g.value, cf):
-          return True
-      return False
+        if not oper(g.value, cf):
+          res = False
+      return res
     elif not isinstance(cf, CA):
       return False
     cfIdx = 0
@@ -533,12 +535,10 @@ class CA():
        Simple = (Diff != Commutes) and 2 or less grades with scalar.
        Even = all even terms including scalar. Commutes = +ve/-ve terms commute.
        Hyperbolic = has x*x>0 terms but no imaginary terms."""
-    out = self
     sgnOut = CA()
-    if conj:
-      out = CA(self.w) 
-      out.__entered0 = self.__entered0
-    n2 = 0
+    out = CA(self.w) 
+    out.__entered0 = self.__entered0
+    p2 = 0
     lastDim = (0, 0)
     cnt = 0        # Count of total basis terms
     flat = [0, 0]  # Count of Imaginaries, Hyperbolics with different basis dims
@@ -554,7 +554,7 @@ class CA():
         if sum(dim) %2 == 1:
           even = False
       value = grade.value
-      n2 += value *value
+      p2 += value *value
       if conj:
         if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
@@ -572,7 +572,7 @@ class CA():
         elif flat[1] + scalar == 1:
           commutes = out._commutes(sgnOut)
           simple = (sum(commutes) == len(commutes))
-    return out +sgnOut, simple, even, (flat[1] > 0 and flat[0] == 0), n2
+    return out +sgnOut, simple, even, (flat[1] > 0 and flat[0] == 0), p2
 
   def __versible(self, conj):
     """Try self*conj to see if it generates a single invertible term. Return
@@ -606,17 +606,13 @@ class CA():
   def __vectorSizes(self):
     """Return the CA vector sizes. Can't handle negative signatures."""
     dims = self.basis()
-    for idx,val1 in enumerate(dims):
-      val2 = CA.__maxBasis[idx]
-      val2 = int(val2, CA.__HEX_BASIS +1)
-      dims[idx] = max(val1, val2)
     if dims[0] < 3:
       dims[0] = 3
     dims[1] = 0  # No negative signatures
     return dims
 
   @staticmethod
-  def _basisArgs(dim, part):
+  def _BasisArg(dim, part):
     """Used by BasisArgs and other calcs and matches Grade.order. Return
        digits list for the combinations of size part out of dim."""
     out = []
@@ -639,14 +635,14 @@ class CA():
        Return true is there are no graded parts."""
     return not self.__g
 
-  def isVersor(self, nonHyperbolic=False):
-    """isVersor([nonHyperbolic])
-       Return true if invertible (if !nonHyperbolic) and even. See versor."""
+  def isVersor(self, hyperbolic=False):
+    """isVersor([hyperbolic])
+       Return true if invertible (if hyperbolic) and even. See versor."""
     precision = Common._getPrecision()
-    conj,simple,even,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 + self.w *self.w)
+    conj,simple,even,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 + self.w *self.w)
     return abs(math.sqrt(l2) -1.0) <= precision and (simple or even) \
-       and (not hyperbolic or nonHyperbolic)
+       and (not isHyperbolic or not hyperbolic)
 
   def degrees(self, ang=None):
     """degrees(deg, [ang])
@@ -767,7 +763,7 @@ class CA():
       for idx,base in enumerate(bases):
         if base:
           pos += int(base[0], self.__HEX_BASIS +1) -1
-          pos += 0 if idx==0 else b[0]
+          pos += 1 if idx==1 and base[0] else 0
       v[pos] = grade.value
     return Matrix(*v)
 
@@ -813,26 +809,27 @@ class CA():
        Return the signature or maximum dimension basis of basis elements.
        Optionally set the maxBasis for matrix output. The basis is of form
        ('1','F') or just the first value."""
+    dims = self.__class__.__maxBasis
     if maxBasis:
-      if len(maxBasis) > len(self.__class__.__maxBasis):
+      if len(maxBasis) > len(dims):
         raise Exception("Invalid grade(): %s" %maxBasis)
-      for idx in range(len(self.__class__.__maxBasis)):
-        self.__class__.__maxBasis[idx] = '0'
+      for idx in range(len(dims)):
+        dims[idx] = '0'
       for idx,val in enumerate(maxBasis):
         if isinstance(val, int):
           val = hex(val).upper()[2:]
         if isinstance(val, Common._basestr) and len(val) == 1 and \
               (val.isdigit or val in self.__HEX_CHARS):
-          self.__class__.__maxBasis[idx] = val
+          dims[idx] = val
         else:
           raise Exception("Invalid grade(): %s" %val)
-    dims = ["0", "0"]
     for grade in self.__g:
       eStr,iStr = grade.strs()
       dims[0] = max(dims[0], eStr[-1:])  # Convert max char to hex-digit
       dims[1] = max(dims[1], iStr[-1:])
-    return [int(dims[0], self.__HEX_BASIS +1),
-            int(dims[1], self.__HEX_BASIS +1)]
+    out0 = int(dims[0], self.__HEX_BASIS +1) # Convert max char to hex-digit
+    out1 = int(dims[1], self.__HEX_BASIS +1) # Convert max char to hex-digit
+    return [out0, out1]
 
   def len(self):
     """len()
@@ -878,10 +875,10 @@ class CA():
   def norm(self):
     """norm()
        Return the scalar sqrt of the product with it's conjugate."""
-    n2 = self.w *self.w
+    p2 = self.w *self.w
     for grade in self.__g:
-      n2 += grade.value *grade.value
-    return math.sqrt(n2)
+      p2 += grade.value *grade.value
+    return math.sqrt(p2)
 
   def inverse(self, noError=False):
     """inverse([noError])
@@ -893,14 +890,16 @@ class CA():
        examples 3e1234567 +e123 +e145 +e167 +e246 +e257 +e347 +e356 and
        (e0+e1+e2+e12)^2 = 2e012 (ie inverse -e0+e01-e02-e12). If not invertible
        then raise an exception unless !noError in which case 0 is returned.
-       NB: Row11,0(paper)*e1234567 = 3 idempotents+2 is invertible but factors
-       aren't eg (1+e1236)(1+e1467)(1+e3567)."""
-    out,simple,even,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 +self.w *self.w)
+       NB: spin7_g2.ca p=triads7all(10,56)*e1234567=(1+1236)(1+e1467)(1+e3567)
+       ie 3 idempotents is octonion & (p//4-1)**2 = 1 ie invertible. Only 5 of
+       each triadOhalf(x) work except x=10,19 have 7. All 35 term combinations 
+       work except (1,2,7),(1,3,6),(1,4,5),(2,3,5),(2,4,6),(3,4,7),(5,6,7))."""
+    out,simple,even,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 +self.w *self.w)
     if l2 < Common._getPrecision() or not simple:
       if l2 >= Common._getPrecision() and out.w >= 0 and sum(out.grades()) == 1:
         return out *(1/l2)
-      tmp = (self * self).trim()  # Could be anti-symmetric - check
+      tmp = (self * self).trim()  # Could be antisymmetric - check
       if sum(tmp.grades()) == 1:  # Single term
         if tmp < 0:
           tmp = -(-tmp).inverse(True)
@@ -937,6 +936,8 @@ class CA():
     """cross(ca)
        Return cross product of pure(1) parts and using e321 * asym/2 product."""
     Common._checkType(ca, CA, "cross")
+    if len(self.grades()) > 2 or len(ca.grades()) > 2:
+      raise Exception("Can only apply cross to 1-forms")
     x = self.pure(1)
     y = ca.pure(1)
     bases = (x+y).basisTerms()
@@ -1002,7 +1003,7 @@ class CA():
       return ca
     if len(parity[0]) != 1:
       raise Exception("Illegal basis for reflect()")
-    inv,simple,even,hyperbolic,n2 = self.__invertible()
+    inv,simple,even,isHyperbolic,p2 = self.__invertible()
     return self *ca *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
 
   def reflection(self, ref):
@@ -1014,7 +1015,7 @@ class CA():
       return
     if len(parity[0]) != 1:
       raise Exception("Illegal basis for reflection")
-    inv,simple,even,hyperbolic,n2 = self.__invertible()
+    inv,simple,even,isHyperbolic,p2 = self.__invertible()
     newSelf = ref *self *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
     self.__g = newSelf.__g
 
@@ -1023,13 +1024,13 @@ class CA():
        Rotate ca by self. See rotation."""
     Common._checkType(ca, CA, "rotate")
     precision = Common._getPrecision()
-    conj,simple,even,hyperbolic,n2 = self.__invertible()
-    l2 = float(n2 + self.w *self.w)
+    conj,simple,even,isHyperbolic,p2 = self.__invertible()
+    l2 = float(p2 + self.w *self.w)
     if l2 <= precision or not (simple or even):
       conj = self.__versible(conj)
       if conj == 0:
         raise Exception("Illegal versor for rotate")
-    if n2 <= precision:
+    if p2 <= precision:
       return ca.dup()
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
@@ -1042,13 +1043,13 @@ class CA():
        For CA vectors this is the same as rot.inverse()*self*rot. See versor."""
     Common._checkType(rot, CA, "rotation")
     precision = Common._getPrecision()
-    conj,simple,even,hyperbolic,n2 = rot.__invertible()
-    l2 = float(n2 + rot.w *rot.w)
+    conj,simple,even,isHyperbolic,p2 = rot.__invertible()
+    l2 = float(p2 + rot.w *rot.w)
     if l2 <= precision or not (simple or even):
       conj = self.__versible(conj)
       if conj == 0:
         raise Exception("Illegal versor for rotation")
-    if n2 <= precision:
+    if p2 <= precision:
       return
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
@@ -1056,24 +1057,24 @@ class CA():
     self.w = newSelf.w
     self.__g = newSelf.__g
 
-  def frame(self, nonHyperbolic=False):
-    """frame([noError])
+  def frame(self, hyperbolic=False):
+    """frame([hyperbolic])
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
-       Ready for frameMatrix. Also handles hyperbolic versor. See versor.
-       Set nonHyperbolic=False to try hyperbolic solutions."""
+       Ready for frameMatrix. See versor. Set hyperbolic to try hyperbolic
+       solutions."""
     precision = Common._getPrecision()
-    conj,simple,even,hyperbolic,n2 = self.__invertible()
-    l2 = n2 +self.w *self.w
+    conj,simple,even,isHyperbolic,p2 = self.__invertible()
+    l2 = p2 +self.w *self.w
     if abs(math.sqrt(l2) -1.0) > precision:
       raise Exception("Illegal versor norm for frame")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for frame")
     if not (simple or even):
       if self.__versible(conj) == 0:
         raise Exception("Illegal versor for frame")
-    if n2 < precision:
+    if p2 < precision:
       return CA(1)
-    if hyperbolic:
+    if isHyperbolic:
       w = abs(self.w)
       if w < 1.0:
         raise Exception("Invalid hyperbolic frame angle")
@@ -1083,34 +1084,33 @@ class CA():
     else:
       w = (self.w +1.0) %2.0 -1.0
       out = self.dup(math.acos(w) *2)
-    p1 = math.sqrt(n2)
+    p1 = math.sqrt(p2)
     if n1 > precision:
       p0 = 1.0 /p1
       for base in out.__g:
         base.value *= p0
     return out
     
-  def versor(self, nonHyperbolic=False):
-    """versor([nonHyperbolic])
+  def versor(self, hyperbolic=False):
+    """versor([hyperbolic])
        Return a versor of length 1 assuming w is the angle(rad) ready for
        rotation if of the correct form with even grade or equal mixed signature.
        Opposite of frame. See normalise. Hyperbolic versors use cosh and sinh
-       expansions unless nonHyperbolic is set."""
+       expansions if hyperbolic is set."""
     precision = Common._getPrecision()
-    conj,simple,even,hyperbolic,n2 = self.__invertible()
-    l2 = n2 +self.w *self.w
-    if math.sqrt(l2) <= precision or not (simple or even):
+    tmp,simple,even,isHyperbolic,p2 = self.__invertible(False)
+    if not (simple or even):
       raise Exception("Illegal versor for versor")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for versor")
-    if n2 <= precision:
+    if p2 <= precision:
       return CA(1)
-    if hyperbolic:
+    if isHyperbolic:
       sw = math.sinh(self.w /2.0)
       cw = math.cosh(self.w /2.0)
     else:
       sw,cw = Common._sincos(self.w /2.0)
-    sw /= math.sqrt(n2)
+    sw /= math.sqrt(p2)
     out = self.dup(cw)
     for base in out.__g:
       base.value *= sw
@@ -1142,9 +1142,8 @@ class CA():
   def normalise(self):
     """normalise()
        Reduces error accumulation. Versors have len 1."""
-    precision = Common._getPrecision()
     n = self.norm()
-    if n <= precision:
+    if n <= Common._getPrecision():
       return CA(1.0)
     out = self.dup(self.w /n)
     for base in out.__g:
@@ -1161,15 +1160,15 @@ class CA():
       for cnt in range(exp):
         out *= self
       return out
-    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    if (simple or even) and not hyperbolic:
-      l1 = math.sqrt(n2 +self.w *self.w)
+    tmp,simple,even,isHyperbolic,p2 = self.__invertible(False)
+    if (simple or even) and not isHyperbolic:
+      l1 = math.sqrt(p2 +self.w *self.w)
       w = pow(l1, exp)
       if l1 <= Common._getPrecision():
         return CA(w)
       a = math.acos(self.w /l1)
       s,c = Common._sincos(a *exp)
-      s *= w /math.sqrt(n2)
+      s *= w /math.sqrt(p2)
       out = CA(w *c)
       out.__entered0 = self.__entered0
       for grade in self.__g:
@@ -1183,11 +1182,11 @@ class CA():
     """exp()
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
     # Look for even, non-hyperbolic form
-    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    if n2 <= Common._getPrecision():
+    tmp,simple,even,isHyperbolic,p2 = self.__invertible(False)
+    if p2 <= Common._getPrecision():
       return CA(self.w)
-    if even and not hyperbolic:
-      n1 = math.sqrt(n2)
+    if even and not isHyperbolic:
+      n1 = math.sqrt(p2)
       s,c = Common._sincos(n1)
       exp = pow(math.e, self.w)
       s *= exp /n1
@@ -1202,12 +1201,12 @@ class CA():
   def log(self):
     """log()
        The functional inverse of the even exp()."""
-    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    l1 = math.sqrt(self.w *self.w +n2)
-    if n2 <= Common._getPrecision():
+    tmp,simple,even,isHyperbolic,p2 = self.__invertible(False)
+    l1 = math.sqrt(self.w *self.w +p2)
+    if p2 <= Common._getPrecision():
       return CA(math.log(l1))
-    if even and not hyperbolic:
-      s = math.acos(self.w /l1) /math.sqrt(n2)
+    if even and not isHyperbolic:
+      s = math.acos(self.w /l1) /math.sqrt(p2)
       out = CA(math.log(l1))
       out.__entered0 = self.__entered0
       for grade in self.__g:
@@ -1247,35 +1246,36 @@ class CA():
     return Matrix(math.degrees(lat),
                   math.degrees(math.atan2(x[1], x[0])), h)
 
-  def euler(self, nonHyperbolic=True):
-    """euler([noError])
+  def euler(self, hyperbolic=False):
+    """euler([hyperbolic])
        Versors can be converted to Euler Angles & back uniquely for default
        order. For n-D greater than 3 need to extract sine terms from the last
        basis at each rank and reduce by multiplying by the inverse for each rank
        until 3-D is reached. See Common.Euler.Matrix. Once 3-D is reached the
        quaternion.euler() calculation can be used. Euler parameters are of the
-       form cos(W/2) +n sin(W/2), n pure unit versor. Set nonHyperbolic=False to
-       try hyperbolic angles (TBD)."""
+       form cos(W/2) +n sin(W/2), n pure unit versor. Set hyperbolic to try
+       hyperbolic angles."""
     precision = Common._getPrecision()
-    tmp,simple,even,hyperbolic,n2 = self.__invertible(False)
-    l2 = n2 +self.w *self.w
+    tmp,simple,even,isHyperbolic,p2 = self.__invertible(False)
+    l2 = p2 +self.w *self.w
     if not (simple or even):
       raise Exception("Illegal versor for euler")
     if abs(math.sqrt(l2) -1.0) > precision:
       raise Exception("Illegal versor norm for euler")
-    if hyperbolic and nonHyperbolic:
+    if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for versor")
-    if (hyperbolic and nonHyperbolic) or not (simple or even):
+    if (isHyperbolic and not hyperbolic) or not (simple or even):
       raise Exception("Illegal versor for euler")
-    if n2 <= precision:
+    if p2 <= precision:
       return Euler()
     dims = self.__vectorSizes()
-    xyz = CA.VersorArgs(*dims, rotate=True)
+    xyz = CA._VersorArgs(*dims, rotate=True)
     cnt = len(xyz)
     angles = [0] *cnt
+    selfRot = self.dup()
     for rank in reversed(range(4, dims[0] +1)): # For dims > 3
       base = CA(**{"e%X" %rank: 1})
-      mul = tmp.rotate(base)
+      mul = selfRot.rotate(base)
       cnt -= rank -1
       for grade in mul.__g:
         if grade.lens()[0] != 1:
@@ -1294,15 +1294,15 @@ class CA():
         accum *= math.cos(val)
         s,c = Common._sincos(val *0.5)
         mul *=  CA(c, **{xyz[idx]: -s})
-      tmp = mul *tmp
+      selfRot = mul *selfRot
     args = [0] *3   # Now only 3 dims left for angles
-    xyz = CA.VersorArgs(3)
-    for grade in tmp.__g:
+    xyz = CA._VersorArgs(3)
+    for grade in selfRot.__g:
       eStr,iStr = grade.strs()
       if eStr in xyz:
         idx = xyz.index(eStr)
         args[idx] = -grade.value if idx != 1 else grade.value #rotate
-    w, x, y, z = tmp.w, args[2], args[1], args[0] # rotate
+    w, x, y, z = selfRot.w, args[2], args[1], args[0] # rotate
     disc = w *y - x *z
     if abs(abs(disc) -0.5) < Common._getPrecision():
       sgn = 2.0 if disc < 0 else -2.0
@@ -1315,8 +1315,8 @@ class CA():
       angles[2] = math.atan2(2.0 * (z* w + x * y), 1.0 - 2.0 * (y * y + z * z))
     return Euler(*angles)
 
-  def versorMatrix(self, nonHyperbolic=True):
-    """versorMatrix([nonHyperbolic])
+  def versorMatrix(self, hyperbolic=False):
+    """versorMatrix([hyperbolic])
        This is same as frameMatrix but for a versor with half the angle.
        For 3-D substitute 1-c = (w*w+b*b)-(w*w-b*b)=2b*b in frameMatrix
        where c=cosW=w*w-b*b, w=cos(W/2) and q=w+a*b, b=sin(W/2), a*a=-1.
@@ -1334,16 +1334,25 @@ class CA():
        where (g,f)=e tan(U/2) as a Rodrigues vector, unit e. n, m & e
        form a spherical triangle with dihedral angles W/2, V/2 & U/2.
        Opposite of Euler.Matrix for default order with CA.Euler. Set
-       nonHyperbolic=False to try hyperbolic angles (TBD)."""
-    return self.euler(nonHyperbolic).matrix()
+       hyperbolic to try hyperbolic angles."""
+    return self.euler(hyperbolic).matrix()
 
-  def frameMatrix(self, nonHyperbolic=True):
-    """frameMatrix(nonHyperbolic)
+  def frameMatrix(self, hyperbolic=False):
+    """frameMatrix([hyperbolic])
        Rodriges for n-D. See https://math.stackexchange.com/questions/1288207/
        extrinsic-and-intrinsic-euler-angles-to-rotation-matrix-and-back for
        3-D. Converts self to versor then applies each even part. Set
-       nonHyperbolic=False to try hyperbolic angles (TBD)"""
-    return self.versor().euler(nonHyperbolic).matrix()
+       hyperbolic to try hyperbolic angles."""
+    return self.versor().euler(hyperbolic).matrix()
+
+  def morph(self, pairs):
+    """morph(pairs)
+       Morphism with a list of name pairs as ("e1","e2") to map only e1->e2."""
+    out = CA(self.w)
+    out.__entered0 = self.__entered0
+    for grade in self.__g:
+      out += CA(**Common._morph(grade.strs(), grade.value, pairs))
+    return out
 
   def swap(self, basisTerms, signTerms=[]):
     """swap(basisTerms,[signTerms])
@@ -1406,15 +1415,6 @@ class CA():
             term[newTerm.index(abs(swaps[-1]))] = swaps[0]
             val = val *sgn
         out += val *CA.Eval(term)
-    return out
-
-  def morph(self, pairs):
-    """morph(pairs)
-       Morphism with a list of name pairs as ("e1","e2") to map only e1->e2."""
-    out = CA(self.w)
-    out.__entered0 = self.__entered0
-    for grade in self.__g:
-      out += CA(**Common._morph(grade.strs(), grade.value, pairs))
     return out
 
   def allSigns(self, half=False):
@@ -1489,7 +1489,7 @@ class CA():
       if len(basis) != maxBasis:
         raise Exception("Invalid basis length for spin")
     else:
-      sBasis = CA.VersorArgs(maxBasis)
+      sBasis = CA._VersorArgs(maxBasis)
       basis = list((CA(**{x: 1}) for x in sBasis))
       triads = []
       for terms in sTriads:
@@ -1507,8 +1507,12 @@ class CA():
     """Basis(eDim, [iDim, parity,maxGrade])
        Yield (e,i) basis elements with value one. Parity=0:all,1:odd,2:even."""
     Common._checkType(eDim, int, "Basis")
+    print(eDim)
     Common._checkType(iDim, int, "Basis")
     Common._checkType(parity, int, "Basis")
+    Common._checkType(maxGrade, int, "Basis")
+    if eDim < 0 or iDim < 0 or eDim > CA.__HEX_BASIS or iDim > CA.__HEX_BASIS:
+      raise Exception("Invalid Basis argument size")
     if parity:
       if parity <0 or parity > 2:
         raise Exception("Invalid parity for Basis")
@@ -1518,7 +1522,7 @@ class CA():
         if (len(base) +odd +parity) %2 == 0:
           yield CA(**{base: 1})
     else:
-      for base in CA.BasisArgs(eDim, iDim, maxGrade):
+      for base in CA._BasisArgs(eDim, iDim, maxGrade):
         yield CA(**{base: 1})
 
   @staticmethod
@@ -1527,17 +1531,22 @@ class CA():
        Yield (e,i) basis elements as a list of names in addition order."""
     Common._checkType(eDim, int, "BasisArgs")
     Common._checkType(iDim, int, "BasisArgs")
-    if eDim > CA.__HEX_BASIS or iDim > CA.__HEX_BASIS:
-      raise Exception("Too many basis arguments")
-    if eDim < 0 or iDim < 0:
-      raise Exception("Too few basis arguments")
+    Common._checkType(maxGrade, int, "BasisArgs")
+    if eDim < 0 or iDim < 0 or eDim > CA.__HEX_BASIS or iDim > CA.__HEX_BASIS:
+      raise Exception("Invalid BasisArgs argument size")
+    for base in CA._BasisArgs(eDim, iDim, maxGrade):
+      yield base
+
+  @staticmethod
+  def _BasisArgs(eDim, iDim=0, maxGrade=0):
+    """Yield (e,i) basis elements as a list of names in addition order."""
     for n in range(1, eDim +iDim +1): # Common.additionTree
       if maxGrade > 0 and n > maxGrade:
         break
       for i in range(n +1):
         if eDim >= n-i and iDim >= i:
-          oute = tuple(("e" +x for x in CA._basisArgs(eDim, n-i)))
-          outi = tuple(("i" +x for x in CA._basisArgs(iDim, i)))
+          oute = tuple(("e" +x for x in CA._BasisArg(eDim, n-i)))
+          outi = tuple(("i" +x for x in CA._BasisArg(iDim, i)))
           for out in Common._mergeBasis(oute, outi):
             yield out
 
@@ -1555,9 +1564,13 @@ class CA():
     Common._checkType(eDim, int, "VersorArgs")
     Common._checkType(iDim, int, "VersorArgs")
     Common._checkType(rotate, bool, "VersorArgs")
-    if eDim +iDim < 2 or eDim < 0 or iDim < 0 or \
-       eDim > CA.__HEX_BASIS or iDim > CA.__HEX_BASIS:
+    if eDim < 0 or iDim < 0 or eDim > CA.__HEX_BASIS or iDim > CA.__HEX_BASIS:
       raise Exception("Invalid VersorArgs argument size")
+    return CA._VersorArgs(eDim, iDim, rotate)
+
+  @staticmethod
+  def _VersorArgs(eDim, iDim=0, rotate=False):
+    """Used internally and externally - see VersorArgs."""
     xyz = ["32", "13", "21", "14"] if rotate else ["12", "13", "23", "14"]
     out = []
     cnt = 0
@@ -1580,8 +1593,8 @@ class CA():
           out.append("i%X%X" %(j,i))
         else:
           out.append("i%X%X" %(i,j))
-    for i in range(1, eDim):
-      for j in range(i+1, iDim+1):
+    for i in range(1, eDim +1):
+      for j in range(1, iDim +1):
         out.append("e%Xi%X" %(i,j))
     return out
 
@@ -1608,7 +1621,7 @@ class CA():
         val1 = int(key[1], CA.__HEX_BASIS +1)
         val2 = int(key[2], CA.__HEX_BASIS +1)
         dim = max(val1, val2, dim)
-    xyz = CA.VersorArgs(dim, rotate=True)
+    xyz = CA._VersorArgs(dim, rotate=True)
     out = [0] *len(xyz)
     for key,value in kwargs.items():
       if key in xyz:
@@ -1651,23 +1664,23 @@ class CA():
     implicitRot = CA(1.0)
     store = []
     dim = 2
-    xyz = CA.VersorArgs(dim, rotate=True)
+    xyz = CA._VersorArgs(dim, rotate=True)
     if args:
       dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) # l=comb(dim,2)
       if dim > CA.__HEX_BASIS:
         raise Exception("Invalid number of Euler angles")
-      xyz = CA.VersorArgs(dim, rotate=True)
+      xyz = CA._VersorArgs(dim, rotate=True)
       for idx,val in enumerate(args):
         if xyz[idx] in kwargs:
           raise Exception("Invalid Euler basis duplication: %s" %xyz[idx])
-    xyz_in = CA.VersorArgs(3)
+    xyz_in = CA._VersorArgs(3)
     for bi,val in kwargs.items():
       if bi not in ("order", "implicit"):
         while bi not in xyz +xyz_in:
           dim += 1
           if dim > CA.__HEX_BASIS:
             raise Exception("Invalid Euler parameter: %s" %bi)
-          xyz = CA.VersorArgs(dim, rotate=True)
+          xyz = CA._VersorArgs(dim, rotate=True)
         if bi in xyz:
           idx = xyz.index(bi) 
         else:
@@ -1694,9 +1707,11 @@ class CA():
         tmpRot = rot.copy()
         rot.rotation(implicitRot)
         implicitRot *= tmpRot
+        #implicitRot = tmpRot *implicitRot
       else:
         store.append(key)
       out = rot * out
+      #out *= rot
     return out
 
   @staticmethod
@@ -1763,7 +1778,7 @@ class CA():
              (mat.get(0,2) -mat.get(2,0)),
             -(mat.get(1,0) -mat.get(0,1))]
     a = math.sqrt(args[0]*args[0] +args[1]*args[1] +args[2]*args[2])
-    xyz = CA.VersorArgs(3, rotate=True)
+    xyz = CA._VersorArgs(3, rotate=True)
     kw = {} 
     for idx,val in enumerate(xyz):
       kw[val] = args[idx] /a
@@ -1812,7 +1827,7 @@ class CA():
         args = [q.w, q.x, q.y, q.z]
     if len(args) > 4:
       raise Exception("Invalid Q parameters")
-    xyz = CA.VersorArgs(3, rotate=True)
+    xyz = CA._VersorArgs(3, rotate=True)
     kw = {} 
     for idx,val in enumerate(xyz):
       kw[val] = 0 if len(args) < 4 else args[idx +1]
@@ -1831,7 +1846,7 @@ class CA():
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for CA."""
     calcHelp = """Clifford Algebra Calculator - Process 30-dimensional basis
-          numbers (e0..F or i0..F) and multiples."""
+          numbers (e0..F or i0..F) of signature (+,-) and multiples."""
     return (("CA", "Q", "R"), ("CA", "math"), "default.ca", calcHelp, "")
 
   @classmethod
@@ -1884,7 +1899,7 @@ class CA():
       if key in cls.__QUAT_CHARS:
         isQuat = cls.__useQuat   # The same validBasis type
         if not isQuat:
-          xyz = cls.VersorArgs(3, rotate=True)
+          xyz = cls._VersorArgs(3, rotate=True)
           key = xyz[cls.__QUAT_CHARS.index(key)]
 
       # If basis already entered or single so double up or accum scalar
@@ -1960,7 +1975,7 @@ if __name__ == '__main__':
     """d30=radians(30); d60=radians(60); d45=radians(45); d90=radians(90)
        e=Euler(pi/6,pi/4,pi/2); c=e1+2e2+3e3; c.basis(3)""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
-       Rx=d60+e32; rx=(d60 +e32).versor()
+       Rx=d60+e23; rx=(d60 +e23).versor()
        test = Rx.frameMatrix() *c.vector(); store = (rx*c*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
@@ -2015,10 +2030,10 @@ if __name__ == '__main__':
        store = p.distance(d)
        Calculator.log(abs(store - test) < 3E-5, store)""",
     """# Test 11 Length *2 == dot(self +self).
-       store = (c *2).len(); test = math.sqrt((c +c).dot(c +c))
+       store = (c *2).norm(); test = math.sqrt((c +c).dot(c +c))
        Calculator.log(abs(store - test) <1E-15, store)""",
     """# Test 12 Versor *3 /3 == versor.normalise
-       Calculator.log(c/c.len() == c.normalise(), c.normalise())""",
+       Calculator.log(c/c.norm() == c.normalise(), c.normalise())""",
     """# Test 13 Check Rodriges formula
        def para(a,r,w): return a *a.dot(r)
        def perp(a,r,w): return r *math.cos(w) +CA(e321=1)*a.wedge(r) \\
