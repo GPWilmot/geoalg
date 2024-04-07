@@ -429,8 +429,11 @@ class Common():
     Common._checkType(maxs, (list, tuple), "additionTree")
     if dim < 1 or split < 2:
       raise Exception("additionTree has invalid dim or split size")
-    if maxs and len(maxs) != split:
-      raise Exception("additionTree has invalid maxs lens")
+    if maxs:
+      if len(maxs) != split:
+        raise Exception("additionTree has invalid maxs lens")
+    else:
+      maxs = [dim] *split
     for val in maxs:
       Common._checkType(val, int, "additionTree")
       if val < 0:
@@ -438,7 +441,7 @@ class Common():
     out = []
     if split == 2:
       for i in range(dim +1):
-        if maxs[0] >= dim-i and maxs[1] >= i:
+        if not maxs or (maxs[0] >= dim-i and maxs[1] >= i):
           out.append([dim-i, i])
     else:
       splits = [0] *split
@@ -455,22 +458,16 @@ class Common():
       if splits[pos] > val:
         store = False
     if store:
-      out.append(splits)
-    splits = splits[:]
-    if splits[idx] > 0:
-      splits[idx] -= 1
-      if idx < 2:
-        splits[idx +1] += 1
-        Common.__additionTree(splits, out, maxs, idx)
-        if idx < 1:
-          splits = splits[:]
-          splits[idx +1] -= 1
-          splits[idx +2] += 1
-          Common.__additionTree(splits, out, maxs, idx +1)
-      elif idx < 1:
-        splits[idx +2] += 1
+      out.append(splits[:])
+    old = splits[idx]
+    for cnt in range(1, old +1):
+      splits[idx] = old -cnt
+      if idx < len(splits) -1:
+        splits[idx +1] += cnt
         Common.__additionTree(splits, out, maxs, idx +1)
-    
+        splits[idx +1] -= cnt
+    splits[idx] = old
+     
   @staticmethod
   def triads(dim):
     """triads(dim)
@@ -647,6 +644,11 @@ class Tensor(list):
     """size()
        Return the dimensions of a matrix. Used for FrameMatrix."""
     return self.__size
+
+  def len(self):
+    """len()
+       Return the vector length or total number of matrix cells."""
+    return self.__size[0] *self.__size[1]
 
   def __str__(self):
     """Overload standard string output."""

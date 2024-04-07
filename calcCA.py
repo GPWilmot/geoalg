@@ -114,7 +114,7 @@ class CA():
 
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
-      return abs(self.value -cf.value) < precision \
+      return abs(self.value -cf.value) <= precision \
              and self.__eBase == cf.__eBase and self.__iBase == cf.__iBase
 
     def order(self, cf):
@@ -296,10 +296,10 @@ class CA():
     """Return True if 2 CAs are equal within precision."""
     precision = Common._getPrecision()
     if isinstance(cf, (int, float)):
-      return not self.__g  and abs(self.w -cf) < precision
+      return not self.__g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, CA):
       return False
-    if abs(self.w -cf.w) >= precision or len(self.__g) != len(cf.__g):
+    if abs(self.w -cf.w) > precision or len(self.__g) != len(cf.__g):
       return False
     for idx,grade in enumerate(self.__g):
       if not grade.isEq(cf.__g[idx], precision):

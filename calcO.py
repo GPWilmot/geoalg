@@ -226,7 +226,7 @@ class O():
 
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
-      return abs(self.value -cf.value) < precision \
+      return abs(self.value -cf.value) <= precision \
              and self.__oBase == cf.__oBase and self.__uBase == cf.__uBase
 
     def order(self, cf):
@@ -406,10 +406,10 @@ class O():
     """Return True if 2 Os are equal within precision."""
     precision = Common._getPrecision()
     if isinstance(cf, (int, float)):
-      return not self.__g  and abs(self.w -cf) < precision
+      return not self.__g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, O):
       return False
-    if abs(self.w -cf.w) >= precision or len(self.__g) != len(cf.__g):
+    if abs(self.w -cf.w) > precision or len(self.__g) != len(cf.__g):
       return False
     for idx,grade in enumerate(self.__g):
       if not grade.isEq(cf.__g[idx], precision):
