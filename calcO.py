@@ -540,21 +540,24 @@ class O():
         if not oper(self.w, cf):
           res = False
       for g in self.__g:
-        if oper(g.value, cf):
+        if not oper(g.value, 0.0):
           res = False
-      return False
-    elif not isinstance(cf, O):
       return res
+    elif not isinstance(cf, O):
+      raise Exception("Invalid comparison for O: %s" %type(cf))
     cfIdx = 0
     idx = 0
     order = 0
     while True:
       base = self.__g[idx] if idx < len(self.__g) else None
       cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
-      if base and cfBase:
-        order = base.order(cfBase)
-      elif not (base and cfBase):
-        break
+      if not (base and cfBase):
+        if not base:
+          if not cfBase:
+            return oper(self.w, cf.w)
+          return oper(0.0, cfBase.value)
+        return oper(base.value, 0.0)
+      order = base.order(cfBase)
       if order < 0 or not base:
         if not oper(0.0, cfBase.value):
           return False
@@ -1000,40 +1003,33 @@ class O():
     """asym(q)
        Return antisymmetric product of two Os. Cross product is pure part."""
     Common._checkType(q, O, "asym")
-    return (self *q -q *self)
  
-  def associator(self, p, q, nonAlternate=False, nonPower=False):
-    """assoc[iator](p,q, [nonAlternate,nonPower])
+  def associator(self, p, q, alternate=False):
+    """assoc[iator](p,q, [alternate])
        Return the associator [self,p,q] = (self * p) *q - self *(p * q) or
-       the first non-alternate or non-power if non-associative where alternate
-       if assoc(x,x,y)==0 and power if assoc(x,x,x)==0 for any input x. Of
-       course, nonPower is always empty as x*x is a scalar."""
+       the first alternate where alternate is [x,y,z]!=0 for any pair equal
+       and x,y,z in {self,p,q}. Any scalar gives zero."""
     Common._checkType(p, O, "associator")
     Common._checkType(q, O, "associator")
-    Common._checkType(nonAlternate, bool, "associator")
-    Common._checkType(nonPower, bool, "associator")
-    if nonAlternate and nonPower:
-      raise Exception("Invalid number of options in assoc")
+    Common._checkType(alternate, bool, "associator")
     accum = []
-    out = (self * p) *q - self *(p * q)
-    if out and nonAlternate:
-      for y in ((self, self, p), (p, self, self), (p, p, q),
-                (q, p, p), (self, self, q), (q, self, self)):
-        out = (y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2])
-        if out:
-          break
-    elif out and nonPower:
-      for y in ((self, self, self), (p, p, p), (q, q, q)):
-        out = (y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2])
-        if out:
-          break
+    out = (self * p) *q  -self *(p * q) 
+    if out and alternate:
+     none = True
+     for y in ((p, self, q), (p, q, self), (self, q, p)):
+       if out != -(y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2]):
+         none = False
+         break
+     if none:
+       out = 0
     return out
   assoc = associator
 
   def moufang(self, p, q, number=0):
     """moufang(p,q,[number])
-       Return differences sum of all four Moufang tests for power-associate or
-       just one if number is set (0=all)."""
+       Return differences of the four Moufang tests or sum of all if number=0,
+         1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
+         3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
     Common._checkType(p, O, "moufang")
     Common._checkType(q, O, "moufang")
     Common._checkType(number, int, "moufang")
@@ -1049,6 +1045,32 @@ class O():
           + (q*self) *(p*q) -(q *(self*p)) *q \
           + (q*self) *(p*q) -q *((self*p) *q)
     return out
+
+  def abcAssociator(self, c, d, abc=0):
+    """abcAssoc[iator](basis,[abc=0])
+       Return [a,b,c] or [b,c,d] or [c,b,d]==0 for abc=1-3 and
+       all associative for abc=0 where b=self and a=b*c*d."""
+    Common._checkType(c, O, "abcAssociator")
+    Common._checkType(d, O, "abcAssociator")
+    Common._checkType(abc, int, "abcAssociator")
+    anyAssoc = (abc == 0 or abs(abc) == 4)
+    if abc < 0 or abc > 3:
+      raise Exception("Invalid abc parameter for abcAssociator")
+    a = self *c *d
+    if abc <= 1:
+      ass = a.assoc(self, c)
+      if ass or abc == 1:
+        return ass
+    if abc in (0, 2):
+      ass = self.assoc(c, d)
+      if ass or abc == 2:
+        return ass
+    if abc in (0, 3):
+      ass = c.assoc(self, d)
+      if ass or abc == 3:
+        return ass
+    return 0
+  abcAssoc = abcAssociator
 
   def projects(self, q):
     """projects(q)
@@ -1436,41 +1458,122 @@ class O():
     return out
 
   @staticmethod
-  def ZeroDivisors(pDim, nDim=0, dump=False):
-    """ZeroDivisors(dim,[nDim=0,dump=False])
-       Return all zero divisors (a+b)(c+d) as [[b,c,d,d1...]...] a=bcd at level
-       pDim. Dump logs progress and checks memory and aborts if too small."""
-    Common._checkType(pDim, int, "ZeroDivisors")
-    Common._checkType(nDim, int, "ZeroDivisors")
-    Common._checkType(dump, bool, "ZeroDivisors")
-    out = []
-    rng = O.Basis(pDim, nDim)
-    lr = len(rng)
+  def AssocTriads(basis, nonAssoc=False, alternate=False, dump=False,
+                  cntOnly=False):
+    """AssocTriads(basis,[nonAssoc,alternate,dump,cntOnly])
+       Return unique O.assoc(...) traids or not. See Common.triadDump."""
+    Common._checkType(nonAssoc, bool, "AssocTriads")
+    Common._checkType(alternate, bool, "AssocTriads")
+    tmp = Common.triadPairs(O.__AssocTriads, basis, dump, alternate, cntOnly)
+    if not nonAssoc: return tmp
+    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+  @staticmethod
+  def __AssocTriads(out, basis, lr, a, b, params):
     cnt = 0
-    Common.procTime()
-    for b in range(lr):
-      if dump and b %10 == 0:
-        sys.stdout.write("%s (%ds) %d: total=%d %dMB\n" %(Common.date(True),
-                       int(Common.procTime()), b, len(out), Common.freeMemMB()))
-        if Common.freeMemMB() < Common._memLimitMB:
-          sys.stdout.write("ABORT: Memory limit reached\n")
-          break
-      for c in range(b +1, lr):
-        bb,cc = rng[b], rng[c]
-        buf = [bb,cc]
-        for d in range(c +1, lr):
-          dd = rng[d]
-          aa = bb *cc *dd
-          if not aa.isScalar():
-            if (aa+bb)*(cc+dd)==0:
-              buf.append(dd)
-              cnt += 1
-        if len(buf) > 2:
-          out.append(tuple(buf))
-    if dump:
-      sys.stdout.write("%s (%ds) total=%d\n" %(Common.date(True),
-                       int(Common.procTime()), cnt))
-    return out
+    buf = []
+    aa,bb,alternate = params
+    for c in range(b +1, lr):
+      cc = basis[c]
+      if not aa.assoc(bb, cc, alternate):
+        buf.append(c)
+        cnt += 1
+    if out:
+      out[a *lr +b] = buf
+    return cnt
+ 
+  @staticmethod
+  def MoufangTriads(basis, number=0, nonMoufang=False,dump=False,cntOnly=False):
+    """MoufangTriads(basis,[number,nonMoufang,dump,cntOnly])
+       Return unique O.moufang() or non traids. See Common.triadDump."""
+    Common._checkType(number, int, "MoufangTriads")
+    Common._checkType(nonMoufang, bool, "MoufangTriads")
+    tmp = Common.triadPairs(O.__MoufangTriads, basis, dump, number, cntOnly)
+    if not nonMoufang: return tmp
+    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+  @staticmethod
+  def __MoufangTriads(out, basis, lr, a, b, params):
+    cnt = 0
+    buf = []
+    aa,bb,number = params
+    for c in range(b +1, lr):
+      cc = basis[c]
+      if not aa.moufang(bb, cc, number):
+        buf.append(c)
+        cnt += 1
+    if out:
+      out[a *lr +b] = buf
+    return cnt
+
+  @staticmethod
+  def AbcTriads(basis, abc=0, nonAssoc=False, dump=False, cntOnly=False):
+    """AbcTriads(basis,[abc,nonAssoc,dump,cntOnly])
+       Return unique abcAssoc() traids or !=0. See Common.triadDump."""
+    Common._checkType(abc, int, "AbcTriads")
+    Common._checkType(nonAssoc, bool, "AbcTriads")
+    tmp = Common.triadPairs(O.__AbcTriads, basis, dump, abc, cntOnly)
+    if not nonAssoc: return tmp
+    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+  @staticmethod
+  def __AbcTriads(out,basis,lr,a,b, params):
+    cnt = 0
+    buf = []
+    aa,bb,abc = params
+    for c in range(b +1, lr):
+      if not aa.abcAssociator(bb, basis[c], abc):
+        buf.append(c)
+        cnt += 1
+    if out:
+      out[a *lr +b] = buf
+    return cnt
+
+  @staticmethod
+  def ZeroTriads(basis, nonZero=False, dump=False):
+    """ZeroTriads(basis,[nonZero,dump])
+       Return zero divisors (+-abc+a)(b+c)=0 or not. See Common.triadDump."""
+    tmp = Common.triadPairs(O.__ZeroTriads, basis, dump)
+    if not nonZero: return tmp
+    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+  @staticmethod
+  def __ZeroTriads(out, basis, lr, b, c, params):
+    buf = []
+    cnt = 0
+    bb,cc,dummy = params
+    for d in range(c +1, lr):
+      dd = basis[d]
+      aa = bb *cc *dd
+      if not aa.isScalar():
+        aaa = abs(aa)
+        a = basis.index(aaa)
+        if d not in buf and \
+           ((aa +bb) *(cc +dd) == 0 or (-aa +bb) *(cc +dd) == 0):
+          addit = True
+          acBuf = out[a *lr +c if a < c else c *lr +a]
+          if b in acBuf or d in acBuf:
+            addit = False
+          else:
+            bdBuf = out[b *lr +d]
+            if a in bdBuf or c in bdBuf:
+              addit = False
+          if addit:
+            buf.append(d)
+            cnt += 1
+        ddd = bb *cc *aa
+        if a not in buf and \
+           ((ddd +bb) *(cc +aa) == 0 or (-ddd +bb) *(cc +aa) == 0):
+          d0 = basis.index(abs(ddd))
+          addit = True
+          abBuf = out[a *lr +b if a < b else b *lr +a]
+          if c in abBuf or d0 in abBuf:
+            addit = False
+          else:
+            cdBuf = out[c *lr +d0 if c < d0 else d0 *lr +c]
+            if a in cdBuf or b in cdBuf:
+              addit = False
+          if addit:
+            buf.append(a)
+            cnt += 1
+    out[b *lr +c] = buf
+    return cnt
 
   @staticmethod
   def Eval(sets):
@@ -1484,14 +1587,14 @@ class O():
     for item in sets:
       Common._checkType(item, (list, tuple), "Eval")
       if isinstance(item, Common._basestr):
-        base = item[0] if item[0][0] in CA.__allChars else ("o" +item[0])
+        base = item[0] if item[0][0] in O.__allChars else ("o" +item[0])
         terms[base] = 1
       elif not isinstance(item, (list, tuple)):
         raise Exception("Invalid basis for Eval: %s" %item)
       elif len(item) == 0:
         scalar = 1
       elif isinstance(item[0], Common._basestr):
-        base = item[0] if item[0][:1] in CA.__allChars else ("o" +item[0])
+        base = item[0] if item[0][:1] in O.__allChars else ("o" +item[0])
         terms[base] = item[1]
       else:
         base = "o"

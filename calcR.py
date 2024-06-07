@@ -233,7 +233,7 @@ class Calculator:
   __PYTHON_FUNCS  = ("def",)                          # Exec & no expand fn
   __PYTHON_STARTS = ("in", "lambda",)                 # No expand 'til!.,
   __oldCls = {}                                # Previous __inCls's
-  __classList = ["Common", "Matrix", "Euler"]  # From calcCommon
+  __classList = ["Common", "Euler", "Matrix", "Tensor"]  # From calcCommon
   __moduleList = []                            # Calc classes loaded
   __promptList = []                            # Subordinate modules
   __history = []                               # For saving and showing
@@ -254,7 +254,7 @@ class Calculator:
     Calculator.__cHelp = cHelp                # Calculator help text
     Calculator.__eHelp = eHelp                # Load extra help text
     Calculator.__default = default            # Load file default value
-    self.__lines = ""                         # Store to history if OK
+    self.__line = ""                          # Store to history if OK
     self.__lexer = Lexer() if ply_lex else None
 
   @staticmethod
@@ -353,8 +353,8 @@ class Calculator:
       if not noError:
         raise Exception("File empty")
     else:
-      for line in code.splitlines():
-        Calculator.__history.append(line)
+      #for line in code.splitlines():
+      #  Calculator.__history.append(line)
       if Common._isVerbose():
         if readline:
           readline.read_history_file(filename)
@@ -544,13 +544,14 @@ class Calculator:
             doc = "See help(%s.%s)" %(cls.__name__, name0)
           sys.stdout.write("%-20s - %s\n" %(name, doc if doc else "None"))
 
-  def __parseUsefulWord(self, isAns, line, firstWord):
+  def __parseUsefulWord(self, isAns, line, ansAssign, firstWord):
     """Change __parseTokens USEFUL_WORDS and USEFUL_CMDS into useful Common
        methods. Process commands with optional argument. Argument is
        assumed to be a module if help, a filename with default for file commands
        and ignored for other commands. Quotes are removed if found. Return text
        for exec() or exception. Return "" if quitting. USEFUL_CMDS return the
-       code to run using lex which is not nested so is added after expansion."""
+       code to run using lex which is not nested so is added after expansion.
+       The ansAssign argument is ignored."""
     doFirstLoad = False
     firstTest = True
     if firstWord and line.find(firstWord) >= 0:
@@ -618,12 +619,12 @@ class Calculator:
               pline += ",'%s',%s.version()" %(mod, mod)
           loadLine = "Calculator." +word +"(%s)" %pline
         self.__lexer.reset(loadLine)
-        buf = self.__parseTokens(False, isAns) # No usefulwords in scripts
-        if len(buf) != 1:
-          if len(buf) != 0:
+        bufs = self.__parseTokens(False, isAns) # No usefulwords in scripts
+        if len(bufs) != 1:
+          if len(bufs) != 0:
             raise Exception("Command word processing error: %s" %line)
-          buf = ((isAns, ""),)
-        isAns,code = buf[0]
+          bufs = ((isAns, "", []),)
+        isAns,code = bufs[0][:2]
       else:
         code = "Calculator." +word +(pline if pline else "()")
     return isAns,code
@@ -663,13 +664,15 @@ class Calculator:
        * startLine is used by calcS to not expand the first variable[,...].
        Return list of (isAns, code) for semicolons in input."""
     SpaceChars = (' ', '\t', "NEWLINE")
-    bufs = []               # Output lines, isAnss, doUsefulWords
+    bufs = []               # Output lines, isAns, doUsefulWords, ansAssigns
+    ansAssigns = []         # Line positions of ans replacements
     code = ""               # Current output line
     doUsefulWord = ""       # Process this special word
     doLineExpand = True     # Do expand if not special word or function
     noBrackExpand = 0       # Don't expand basis inside calc class
     state = ParseState()    # Store basis & numbers for conversion
     isComment = False       # Ignore commented text
+    isAnsAssign = False     # History needs expanded ans
     quoteCnt = 0            # Ignore inside double quotes only
     quotesCnt = 0           # Ignore inside triple double quotes only
     bracketCnt = 0          # Ignore inside brackets if noBrackExpand
@@ -774,6 +777,10 @@ class Calculator:
           signVal = ""
           if token.value in Calculator.__moduleList:
             noBrackExpand = bracketCnt +1
+          elif token.value == "ans":
+            ansAssigns.append(token.lexpos)
+            token.value = 'eval("ans")'
+            isAnsAssign = True
           elif token.value in self.__PYTHON_STARTS:
             state.startLine = True
           elif state.startLine:
@@ -795,8 +802,10 @@ class Calculator:
             state.reset()
           else:
             doLineExpand = True
-          if bracketCnt == 0 and state.lastTyp not in ("<", ">"):
+          if bracketCnt == 0 and state.lastTyp not in ("!", "<", ">"):
             isAns = False
+            if isAnsAssign:
+              raise Exception("Can't assign to ans")
         if token.type in SpaceChars:
           if state.store:
             state.aftFill += " "
@@ -820,24 +829,25 @@ class Calculator:
         state.lastTyp = token.type
         if token.type in (':', ';'):
           if token.type == ';' and isUsefulWord:
-            bufs.append((isAns, code[:-1], doUsefulWord))
-            code,isAns,doUsefulWord = "", True, ""
+            bufs.append((isAns, code[:-1], ansAssigns, doUsefulWord))
+            code,isAns,ansAssigns,doUsefulWord = "", True, [], ""
           state.startLine = True
+          isAnsAssign = False
           doLineExpand = True
         elif token.type not in (',', "NAME"):
           state.startLine = False
     if state.store:
       code += Calculator.__inCls._processStore(state)
     if code:
-      bufs.append((isAns, code, doUsefulWord))
+      bufs.append((isAns, code, ansAssigns, doUsefulWord))
     out = []
     for buf in bufs:
-      if buf[2]: # doUsefulWord - run lex again
+      if buf[3]: # doUsefulWord - run lex again
         if Common._isVerbose():
           sys.stdout.write("LOG: " +buf[1] +'\n')
-        ans = self.__processExec(self.__parseUsefulWord(*buf))  # Ignore the ans
+        self.__processExec(self.__parseUsefulWord(*buf))  # Ignore the ans
       else:
-        out.append(buf[:2])
+        out.append(buf[:3])
     return out
 
   def __getInput(self, runExec):
@@ -868,14 +878,14 @@ class Calculator:
         line = "quit\n" 
         sys.stdout.write("\n")
     if line:
-      self.__lines = line
+      self.__line = line
       idx = line.find('(')
       idx = len(line) if idx < 0 else idx
       if self.__lexer:
         self.__lexer.reset(line)
         out = self.__parseTokens()
       else:
-        out = [(False, line),]
+        out = [(False, line, []),]
     return out
 
   def processInput(self, args):
@@ -907,29 +917,46 @@ class Calculator:
           elif ch != '-':
             raise Exception("Invalid option: %s" %opt)
       doCmd = "load(noError=True)" if doLoad else ""
+      ans = None
       while True:
         try:
           if doCmd:
             bufs = self.__getInput(doCmd)
           else:
             bufs = self.__getInput(runExec)
+          anyAns,anyAssign = False,False
+          assignAns = []
           for buf in bufs:
             if Common._isVerbose():
               sys.stdout.write("LOG: " +buf[1] +'\n')
-            ans = self.__processExec(buf)
+            assignAns.append(ans)
+            tmpAns = self.__processExec(buf[:2])
+            if buf[2]:
+              anyAssign = True
             if buf[0]:   # isAns
-              if isinstance(ans, float):
+              anyAns = True
+              if isinstance(tmpAns, float):
                 resol, resolForm, resolFloat = Common._getResolutions()
-                flt = resolForm %ans
-                if flt.find(".") < 0 and ans != int(ans):
-                  flt = resolFloat %ans
-                sys.stdout.write("ans = %s\n" %flt)
-              elif ans is not None:
-                sys.stdout.write("ans = %s\n" %str(ans))
-            else:
-              for line in self.__lines.splitlines():
-                Calculator.__history.append(line)
-              self.__lines = ""
+                ans = resolForm %tmpAns
+                if ans.find(".") < 0 and tmpAns != int(tmpAns):
+                  ans = resolFloat %tmpAns
+                sys.stdout.write("ans = %s\n" %ans)
+              elif tmpAns is not None:
+                ans = tmpAns
+                if isinstance(ans, tuple) and len(ans) > 1:
+                  ans = (ans,)
+                sys.stdout.write("ans = %s\n" %ans)
+          if anyAssign:
+            for idx in reversed(range(len(bufs))):
+              buf = bufs[idx]
+              for pos in reversed(buf[2]):  # Expand ans in history
+                self.__line = "%s(%s)%s" %(self.__line[:pos],
+                                assignAns[idx], self.__line[pos+3:])
+            if readline:        # Push to cmdline history
+              readline.add_history(self.__line)
+          if not anyAns:
+            Calculator.__history.append(self.__line)
+            self.__line = ""
         except Calculator.ExecError as e:
           pass  # Already reported
         except KeyboardInterrupt:

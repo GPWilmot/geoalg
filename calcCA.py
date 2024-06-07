@@ -141,6 +141,8 @@ class CA():
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs."""
       value *= self.value
+      if CA.newMul:
+        return self.mergeBasisNew(value, rhs)
       lhs = self.bases()
       bases = [None, None]  # Basis for output
       sgn = 0
@@ -444,17 +446,20 @@ class CA():
           res = False
       return res
     elif not isinstance(cf, CA):
-      return False
+      raise Exception("Invalid comparison for O: %s" %type(cf))
     cfIdx = 0
     idx = 0
     order = 0
     while True:
       base = self.__g[idx] if idx < len(self.__g) else None
       cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
-      if base and cfBase:
-        order = base.order(cfBase)
-      elif not (base and cfBase):
-        break
+      if not (base and cfBase):
+        if not base:
+          if not cfBase:
+            return oper(self.w, cf.w)
+          return oper(0.0, cfBase.value)
+        return oper(base.value, 0.0)
+      order = base.order(cfBase)
       if order < 0 or not base:
         if not oper(0.0, cfBase.value):
           return False
@@ -892,7 +897,7 @@ class CA():
        then raise an exception unless !noError in which case 0 is returned.
        NB: spin7_g2.ca p=triads7all(10,56)*e1234567=(1+1236)(1+e1467)(1+e3567)
        ie 3 idempotents is octonion & (p//4-1)**2 = 1 ie invertible. Only 5 of
-       each triadOhalf(x) work except x=10,19 have 7. All 35 term combinations 
+       each triadOhalf(x) work except x=10,19 have 7. All 35 term combinations
        work except (1,2,7),(1,3,6),(1,4,5),(2,3,5),(2,4,6),(3,4,7),(5,6,7))."""
     out,simple,even,isHyperbolic,p2 = self.__invertible()
     l2 = float(p2 +self.w *self.w)
@@ -999,9 +1004,9 @@ class CA():
        Reflect ca by self taking into account self-form parity."""
     Common._checkType(ca, CA, "reflect")
     parity = self.basisTerms()
-    if len(parity[0]) == 0: # Ignore scalars
+    if len(parity[1]) == 0: # Ignore scalars
       return ca
-    if len(parity[0]) != 1:
+    if len(parity[0]) != 1: # Ignore multiple terms
       raise Exception("Illegal basis for reflect()")
     inv,simple,even,isHyperbolic,p2 = self.__invertible()
     return self *ca *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
@@ -1009,15 +1014,18 @@ class CA():
   def reflection(self, ref):
     """reflection(ref)
        Reflect self inplace by ref taking into account ref-form parity."""
+    if isinstance(ref, (int, float)):
+      ref = CA(ref)
     Common._checkType(ref, CA, "reflection")
     parity = ref.basisTerms()
-    if len(parity[0]): # Ignore scalars
-      return
-    if len(parity[0]) != 1:
+    if len(parity[1]) == 0: # Ignore scalars
+      return self
+    if len(parity[0]) != 1:  # Ignore multiple terms
       raise Exception("Illegal basis for reflection")
-    inv,simple,even,isHyperbolic,p2 = self.__invertible()
+    inv,simple,even,isHyperbolic,p2 = ref.__invertible()
     newSelf = ref *self *inv *(1 if len(parity[0][0] +parity[2][0]) %2 else -1)
     self.__g = newSelf.__g
+    return self
 
   def rotate(self, ca):
     """rotate(q)
@@ -1056,6 +1064,7 @@ class CA():
     newSelf = rot *self *conj /l2
     self.w = newSelf.w
     self.__g = newSelf.__g
+    return self
 
   def frame(self, hyperbolic=False):
     """frame([hyperbolic])
@@ -1507,7 +1516,6 @@ class CA():
     """Basis(eDim, [iDim, parity,maxGrade])
        Yield (e,i) basis elements with value one. Parity=0:all,1:odd,2:even."""
     Common._checkType(eDim, int, "Basis")
-    print(eDim)
     Common._checkType(iDim, int, "Basis")
     Common._checkType(parity, int, "Basis")
     Common._checkType(maxGrade, int, "Basis")
@@ -1605,7 +1613,8 @@ class CA():
        form e32=x, e13=y, e21=z, .... Each dimension has (D 2)T=D(D-1)/2
        parameters and these are added as e4 to xyz, e5 to these +e45, etc.
        Use VersorArgs() to see this list. Same result as Euler() but allows
-       for any dimension angle instead of listing all dimensions."""
+       for any dimension angle instead of listing all dimensions. Bases
+       above e34 has the sign reversed."""
     # See Wikipedia.org rotations in 4-dimensional Euclidean space
     # Number of versors in len(args)=comb(dim,2) inversed is:
     dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) if args else 0

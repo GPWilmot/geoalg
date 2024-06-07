@@ -48,16 +48,16 @@ class Common():
   D2R            = math.pi /180.0
   _E             = "Euler's number from math"
   E              = math.e
-  __precision  = 1E-15          # Precision used for equality
-  __resolution  = 4             # Digits for float display
-  __resol_form  = r"%0.3G"      # Format string for float display
-  __resol_float = r"%0.3f"      # Format string for float display
+  __precision   = 1E-15         # Precision used for equality
+  __resolution  = 9             # Digits for float display
+  __resol_form  = r"%0.9G"      # Format string for float display
+  __resol_float = r"%0.9f"      # Format string for float display
   __verbose     = False         # Traceback logging
   __info        = False         # User info logging
   __plotFigure  = 0             # Matplotlib unique figures count
   __lastTime    = 0             # Store epoch for time
   __lastProcTime= 0             # Store program time
-  _memLimitMB   = 500           # Abort if less mem than this
+  _memLimitMB   = 50           # Abort if less mem than this
   if sys.version_info.major == 2:
     _basestr = basestring       # Handle unicode
   else:
@@ -137,11 +137,11 @@ class Common():
   @staticmethod
   def resolution(digits=0):
     """resolution([digits])
-       Set print format digits or reset to 17. Minimum & default is 4."""
+       Set print format digits or reset to 18. Minimum is 4 & default is 9."""
     if not isinstance(digits, int) or digits < 0:
       raise Exception("Invalid printing resolution")
     if digits == 0:
-      digits = 17
+      digits = 18
     elif digits < 4:
       digits = 4
     Common.__resolution = digits
@@ -192,6 +192,15 @@ class Common():
       if len(tmp) > 9:
         tmp = str(type(arg))
       raise Exception("Invalid parameter type (%s) for %s" %(tmp, method))
+  @staticmethod
+  def _checkList(arg, typ, method, size=None):
+    """Raise exception if not a list/tuple of typ types and optional size."""
+    Common._checkType(arg, (list, tuple), method)
+    for elem in arg:
+      Common._checkType(elem, typ, method)
+    if size and size != len(arg):
+      raise Exception("Invalid list length for %s" %method)
+
   @staticmethod
   def _getResolutions():
     """Internal method to return the digits and print format."""
@@ -360,32 +369,42 @@ class Common():
        Return program user+sys seconds since start or diff. to previous call."""
     import time
     if Common.__lastProcTime == 0 or start:
-      Common.__lastProcTime = time.process_time()
+      if sys.version_info.major == 2:
+        Common.__lastProcTime = time.time()
+      else:
+        Common.__lastProcTime = time.process_time()
     lastTime = Common.__lastProcTime
-    Common.__lastProcTime = time.process_time()
+    if sys.version_info.major == 2:
+      Common.__lastProcTime = time.time()
+    else:
+      Common.__lastProcTime = time.process_time()
     return Common.__lastProcTime -(0 if start else lastTime)
 
   @staticmethod
-  def comb(n, r, perms=False, dump=False):
-    """comb(n, r, [perms])
-       Return number of combinations of r in n or perm(n,r) set generator."""
+  def comb(n, r, basis=False, dump=False):
+    """comb(n,r,[basis=False,dump])
+       Return number of combinations of r in n, basis list or no. generator."""
     Common._checkType(n, int, "comb")
     Common._checkType(r, int, "comb")
-    Common._checkType(perms, bool, "comb")
+    Common._checkType(basis, (bool, list, tuple), "comb")
     Common._checkType(dump, bool, "comb")
     if n < r:
       raise Exception("Invalid parameter for comb(%s,%s)" %(n, r))
-    if perms:
+    if basis:
       if dump:
         dump = [r,0]
-      return Common.__perm(n, [1] *r, 1, dump)
+      if basis == True:
+        return Common.__perm(n, [1] *r, 1, dump)
+      if len(basis) < n:
+        raise Exception("Invalid basis length in comb")
+      return list((list(basis[idx -1]  for idx in elem) \
+                   for elem in Common.__perm(n, [1] *r, 1, dump)))
     return math.factorial(n) /math.factorial(n-r) /math.factorial(r) 
   
   @staticmethod
   def perm(n, r=None):
     """perm(n, [r])
-       Return the number of permutations of n elements or set of r in n perms
-       as a generator."""
+       Return number of permutations of n terms or generator of r in n perms."""
     Common._checkType(n, int, "perm")
     if isinstance(r, int) and not isinstance(r, bool):
       return Common.__perm(n, [1] *r, 0, None)
@@ -518,87 +537,135 @@ class Common():
         if len(faces) == facesLen:
           yield faces
 
+  def dump(name, value, filename):
+    """dump(name, value, filename)
+       Print value into a file."""
+    if isinstance(value, dict):
+      with open(filename, 'w') as fp:
+        fp.write("%s = { \\\n" %name)
+        for key,var in value.items():
+          fp.write(" %s: %s,\n" %(key, var))
+        fp.write("}\n")
+    elif isinstance(value, (list, tuple)):
+      with open(filename, 'w') as fp:
+        fp.write("%s = ( \\\n" %name)
+        for var in value:
+          fp.write(" %s,\n" %str(var))
+        fp.write(")\n")
+    else:
+      with open(filename, 'w') as fp:
+        fp.write("%s = %s\n" %(name, value))
+
   @staticmethod
-  def assocTriads(basis, code=0, nonAssoc=False, all=False, dump=False):
-    """assocTriads(basis,[code=0,all=False,dump=False])
-       Return assoc traids [a,b,c] or [b,c,d] or [c,b,d]=0 for code=1-3 where
-       a=b*c*d is pure, code=4 returns scalars, code=5-8 returns moufang != 0
-       for types=1-4, code=0,9 prints abc,moufang counts only. nonAssoc inverts
-       associative test, all ranges c and d over whole range and dump prints
-       progress and aborts if memory limit is exceeded."""
-    Common._checkType(basis, (list,tuple), "assocTriads")
-    Common._checkType(code, int, "assocTriads")
-    Common._checkType(nonAssoc, bool, "assocTriads")
-    Common._checkType(all, bool, "assocTriads")
-    Common._checkType(dump, bool, "assocTriads")
-    if code not in range(10):
-      raise Exception("Invalid code in assocTriads")
+  def triadPairs(pairFn, basis, dump=False, param=None, cntOnly=False):
+    """triadPairs(pairFn,basis,[dump,param,cntOnly])
+       Return list for pairFn(list,basis,idx,a,b,(aa,bb,param)) being called for
+       all pairs in triadDump() order if set. Dump logs progress and checks
+       memory & aborts if too small. cntOnly uses paiFn(None) & returns cnt."""
+    Common._checkType(basis, (list, tuple), "triadPairs")
+    Common._checkType(dump, bool, "triadPairs")
+    Common._checkType(cntOnly, bool, "triadPairs")
+    if not hasattr(pairFn, "__call__"):
+      raise Exception("triadPairs pairFn needs to be a function with 5 parameters")
     lr = len(basis)
-    total = pairs = soles = 0
-    acnt = bcnt = ccnt = scnt = 0
-    mcnt = [0] *4
-    Common.time()
-    out = []
-    for b in range(lr):
-      if dump and b %10 == 0:
-        sys.stdout.write("%s %d %d..%d\n" %(Common.date(True),
-                         int(Common.time()), b, lr))
+    out = None if cntOnly else [[]] *(lr *(lr -1))
+    cnt = 0
+    Common.procTime()
+    for a in range(lr):
+      aa = basis[a]
+      if dump and a %10 == 0:
+        sys.stdout.write("%s (%ds) %d: total=%s %dMB\n" %(Common.date(True),
+                       int(Common.procTime()), a, cnt, Common.freeMemMB()))
         if Common.freeMemMB() < Common._memLimitMB:
           sys.stdout.write("ABORT: Memory limit reached\n")
           break
-      cr = 0 if all else b +1
-      for c in range(cr, lr):
-        bb,cc = basis[b], basis[c]
-        dr = 0 if all else c +1
-        for d in range(dr, lr):
-          dd = basis[d]
-          aa = bb *cc *dd
-          buf = (bb, cc, dd)
-          total += 1
-          if all and (b==c or c==d or d==b):
-            if b==c and c==d:
-              soles += 1
-            else:
-              pairs += 1
-          elif aa.isScalar():
-              scnt += 1
-              if code == 4:
-                out.append(buf)
-          elif code > 4:
-            if code == 9:
-              for num in range(4):
-                nass = (bb.moufang(cc,dd,num +1) == 0)
-                if (nass and nonAssoc) or not (nass or nonAssoc):
-                  mcnt[num] += 1
-            else:
-              nass = (bb.moufang(cc, dd, code -4) == 0)
-              if (nass and nonAssoc) or not (nass or nonAssoc):
-                out.append((bb,cc,dd))
+      for b in range(a +1, lr):
+        params = (aa, basis[b], param)
+        tmp = pairFn(out, basis, lr, a, b, params)
+        if isinstance(tmp, int):
+          cnt += tmp
+        elif cnt == 0:
+          cnt = list(tmp)
+        else:
+          for idx,val in enumerate(tmp):
+            cnt[idx] += val
+        #cnt += pairFn(out, basis, lr, a, b, params)
+    if dump:
+      sys.stdout.write("%s (%ds): total=%s %dMB\n" %(Common.date(True),
+                       int(Common.procTime()), cnt, Common.freeMemMB()))
+    return cnt if cntOnly else out
+
+  @staticmethod
+  def allTriads(basis, dump=False, cntOnly=False):
+    """allTriads(basis,[dump,cntOnly])
+       Return a list all unique triads (or cnt). See triadDump()."""
+    Common._checkType(basis, (list, tuple), "allTriads")
+    lr = len(basis)
+    return Common.triadPairs(Common._NonTriads, basis, dump,
+                             [[]] *(lr *(lr-1)), cntOnly)
+  @staticmethod
+  def _NonTriads(out, basis, lr, b, c, params):
+    """Inverse triadPair() triads list for allTriads and others."""
+    bufOut = []
+    cnt = 0
+    bb,cc,outIn = params
+    if isinstance(outIn, int):
+      raise Exception("Can't invert a cntOnly triadPair function")
+    Common._checkType(basis, (list, tuple), "triadDump")
+    bufIn = outIn[b *lr +c]
+    for d in range(c +1, lr):
+      if d not in bufIn:
+        bufOut.append(d)
+        cnt += 1
+    if out:
+      out[b *lr +c] = bufOut
+    return cnt
+
+  @staticmethod
+  def triadDump(pairBuf, basis, expand=0):
+    """triadDump(pairBuf,basis, [expand=0])
+       Yield pairBuf list from Common.triadPairs() with (a,b) unique pairs of
+       basis elements for non-empty results as a gen lists depending on expand.
+       0: pairs (a,b)(c,...) (use dict(list()),  1: expanded triples (a,b,c),
+       2: zero divisors (+-abc +a)(b+c),     3: sorted list (+-abc, a, b, c)."""
+    Common._checkType(basis, (list, tuple), "triadDump")
+    Common._checkType(pairBuf, (list, tuple), "triadDump")
+    Common._checkType(expand, int, "triadDump")
+    lr = len(basis)
+    if len(pairBuf) != lr *(lr -1):
+      raise Exception("triadDump pairBuf should be result of triadPairs")
+    for a in range(lr):
+      idx = a *lr
+      for b in range(a +1, lr):
+        buf = pairBuf[idx +b]
+        if buf:
+          aa,bb = basis[a], basis[b]
+          if expand == 0:
+            yield (aa,bb), list(basis[c] for c in buf)
+          elif expand == 1:
+            for c in buf:
+              yield aa, bb, basis[c]
+          elif expand == 2:
+            for c in buf:
+              cc = basis[c]
+              rr = aa*bb*cc
+              if (rr +aa)*(bb +cc) == 0:
+                yield rr +aa, bb +cc
+              else:
+                yield -rr +aa, bb +cc
+          elif expand == 3:
+            for c in buf:
+              cc = basis[c]
+              rr = aa*bb*cc
+              sgn = (rr < 0)
+              tmp1 = sorted((abs(rr), aa))
+              tmp2 = sorted((bb, cc))
+              tmp = tmp1 +tmp2 if tmp1[0] < tmp2[0] else tmp2 +tmp1
+              if (abs(rr) +aa)*(bb +cc) != 0:
+                tmp [0] *= -1
+              yield tmp
           else:
-            nass = (aa.assoc(bb,cc) != 0)
-            if (nass and nonAssoc) or not (nass or nonAssoc):
-              acnt += 1
-              if code == 1:
-                out.append(buf)
-            nass = (bb.assoc(aa,cc) != 0)
-            if (nass and nonAssoc) or not (nass or nonAssoc):
-              bcnt += 1
-              if code == 2:
-                out.append(buf)
-            nass = (cc.assoc(bb,dd) != 0)
-            if (nass and nonAssoc) or not (nass or nonAssoc):
-              ccnt += 1
-              if code == 3:
-                out.append(buf)
-    if code == 0:
-      sys.stdout.write("total=%d, %sscalar=%d, a#=%d, b#=%d, c#=%d\n"
-          %(total, ("pairs=%d, soles=%d, " %(pairs, soles) if all else ""),
-                  scnt, acnt, bcnt, ccnt))
-    elif code == 9:
-      sys.stdout.write("total=%d, %sscalar=%d, m#1=%d, m#2=%d, m#3=%d, m#4=%d\n"
-          %(total, ("pairs=%d, soles=%d, " %(pairs, soles) if all else ""),
-                  scnt, mcnt[0], mcnt[1], mcnt[2], mcnt[3]))
-    return out
+            raise Exception("Invalid BasisDump parameter: expand")
 
 ################################################################################
 class Tensor(list):
@@ -641,13 +708,13 @@ class Tensor(list):
     return self[x][y]
 
   def shape(self):
-    """size()
-       Return the dimensions of a matrix. Used for FrameMatrix."""
+    """shape()
+       Return the dimensions of a 2D tensor. Used for FrameMatrix."""
     return self.__size
 
   def len(self):
     """len()
-       Return the vector length or total number of matrix cells."""
+       Return the vector length or total number of tensor cells."""
     return self.__size[0] *self.__size[1]
 
   def __str__(self):
@@ -977,7 +1044,7 @@ class Tensor(list):
     return self.copy(out)
 
   def slice(self, offset, shape=None):
-    """slice(offset, [size]):
+    """slice(offset,[shape])
        Return copy of 2-D selection or square if offset, shape are integers."""
     if not isinstance(offset, (list, tuple)):
       offset = (offset, offset)
@@ -1014,8 +1081,6 @@ class Tensor(list):
     if self.__size[1] > 1:
       out.__size = (1, out.size[0])
     return out
-
-  def size(self): return self.__size
 
   def reshape(self, shape):
     """reshape(shape)
@@ -1163,7 +1228,7 @@ class Tensor(list):
         out.append(Common._morph(val1, 1, basis)[val1])
       return self.copy(out)
     Common._checkType(labels, (list, tuple), "morph")
-    if len(basis) != len(labels) or len(self) < len(basis):
+    if len(basis) != len(labels):
       raise Exception("Swap length is not valid")
     val1 = self[0]
     if isinstance(val1, (list, tuple)) and len(val1) > 0:
@@ -1328,8 +1393,8 @@ class Tensor(list):
       raise Exception("Tensor is not the same type as basis for %s" %name)
 
   def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
-             initPerm=[]):
-    """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm])
+             initPerm=[], permCycle=False):
+    """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
        signs are searched and the histogram of difference counts is returned
@@ -1340,7 +1405,7 @@ class Tensor(list):
        cycle is also quicker (default) because it converts to Tensor.cycles
        and uses morphCycles instead of isomorph. Parameter initPerm is used
        to fix the first part of all permutations such as octonians when
-       looking for sedenions."""
+       looking for sedenions. permCycle outputs cycles instead of maps."""
     self.__checkSquare(basis, "search", "basis")
     Common._checkType(cf, (list, tuple), "search")
     cf = Tensor(*cf)
@@ -1350,7 +1415,9 @@ class Tensor(list):
     Common._checkType(diffs, int, "search")
     Common._checkType(cycles, bool, "search")
     Common._checkType(initPerm, (list, tuple), "search")
+    Common._checkType(permCycle, bool, "search")
     chkPerm = list(x for x in sorted(list(abs(y) for y in initPerm)))
+    cycPerm = Tensor(list(x+1 for x in range(len(basis))))
     for idx in range(len(initPerm)):
       if chkPerm[idx] != idx +1:
         raise Exception("Search initPerm needs numbers %s" %range(len(initPerm)))
@@ -1382,7 +1449,6 @@ class Tensor(list):
       cf = cf.cycles(cfBasis if cfBasis else basis)
       cycleIso = self.cycles(basis)
       if len(cf) < len(self) or len(cycleIso) < len(self):
-        print(len(cf), len(self), len(cycleIso),cf)
         raise Exception("Invalid basis for table.cycles()")
     cnt = 0
     for p in perms:                # For all permutations
@@ -1413,15 +1479,16 @@ class Tensor(list):
           difRange[0] = len(dif) if len(dif) <= difRange[0] else difRange[0]
           difRange[1] = len(dif) if len(dif) >= difRange[1] else difRange[1]
           difHisto[len(dif)] += 1
+          if permCycle:
+            p0 = cycPerm.permute(p0, True).permCycles()
           if len(dif) == 0: # iso == cf
             sys.stdout.write("FOUND at %d %s\n" %(cnt, p0))
           elif diffs >= 0 and len(dif) <= diffs:
             sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p0,
                               len(dif), dif))
           if cnt == num or (num == -1 and len(dif) == 0):
-            if diffs < 0:
-              sys.stdout.write("%s at %d %s\n" \
-                   %("FOUND" if num == -1 else "GOT", cnt, p0))
+            if diffs < 0 and len(dif) > 0:
+              sys.stdout.write("GOT at %d %s\n" %(cnt, p0))
             return iso
           cnt += 1
     i = difRange[0]
@@ -1525,7 +1592,7 @@ class Tensor(list):
     if abs(x2) == scalar: return x1 *(-1 if x2 < 0 else 1)
     mul = self[abs(x1) -1][abs(x2) -1]
     if abs(x1) == abs(x2):
-      neg = (mul[0] == "-") if isinstance(mul, Common._basestr) else (mul < 0)
+      neg = (str(mul)[0] == "-")
       idx = scalar * (-1 if neg else 1)
     else:
       idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul)) -1
@@ -1543,111 +1610,208 @@ class Tensor(list):
       idx = self.__assocTriads1(x[0], rhs, basis, mBasis)
     return idx
 
-  def assocTriads(self, basis, nonAssoc=False, nonAlternate=False,
-                  nonPower=False, moufang=0, offs=None):
-    """assocTriads(basis, [nonAssoc,nonAlternate,nonPower,moufang,offs])
-       Return list of 3 +/- basis indicies associative, nonAssociative, nonPower
-       nonAlternate or moufang associativity entries in self table. Any mutually
-       exclusive, non-associative parameter enabled will return such triples.
-       Associator is [a,b,c] = a(bc) -(ab)c and associativity means [a,b,c] = 0.
-       Alternate associativity is [a,b,c] = 0 if any two of a,b,c are equal and
-       Power associativity means [a,a,a] = 0 and are counted only if associator
-       is non-zero. Optional parameters [only one allowed] are boolean apart
-       from moufang which is a number 0-5 where 0 is off and 5 is the sum of all
-       4 Moufang checks:
-         1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
-         3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a).
-       For large basis, offs=0, ... will break when free memory is less than
-       1GB and print status periodically including the next offs."""
+  def assocTriads(self, basis, nonAssoc=False, alternate=False, dump=False):
+    """assocTriads(basis,[nonAssoc,alternate,dump])
+       Return assoc traids [a,b,c]=0 or !=0 if nonAssoc. Alternate associativity
+       is [a,b,c] = 0 if any two of a,b,c are equal. See Common.triadDump()."""
     self.__checkSquare(basis, "assocTriads", "basis")
     Common._checkType(nonAssoc, bool, "assocTriads")
-    Common._checkType(nonAlternate, bool, "assocTriads")
-    Common._checkType(nonPower, bool, "assocTriads")
-    Common._checkType(moufang, int, "assocTriads")
-    if moufang not in range(6):
-      raise Exception("Invalid vaue for number in moufang")
-    assoc = int(nonAssoc) +int(nonAlternate) +int(nonPower) +int(moufang>0)
-    if assoc > 1:
-      raise Exception("Invalid number of options in assocTriads")
-    for b in basis:
-      if not hasattr(b, "assoc"):
-        raise("Invalid basis element for assocTriads: %d" %b)
-    dim = int(math.log(len(basis))/math.log(2) +1)       # l=pow(2,dim)
-    accum = []
+    Common._checkType(alternate, bool, "assocTriads")
+    Common._checkType(dump, bool, "assocTriads")
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
-    for x in Common.comb(len(basis), 3, True, (offs is not None)):
-      if offs is not None:
-        if cnt1 == 1000000:
-          cnt1 = 0
-          cnt2 += 1
-          sys.stdout.write("%s %d %d %dMB" %(Common.date(), cnt2, len(accum),
-                           Common.freeMemMB()))
-          if Common.freeMemMB() < Common._memLimitMB:
-            sys.stdout.write("ABORT: Memmory limit reached\n")
-            break
-        if offs > cnt2:
-          continue
-        cnt1 += 1
-      out = 0
-      if moufang:
-        if moufang in (1, 5):
-          lhs = self.__assocTriads2((x[1], x[0], x[2]), False, basis, mBasis)
-          rhs = self.__assocTriads2((x[0], x[1], x[0]), True, basis, mBasis)
-          if self.__assocTriads1(x[0], lhs, basis, mBasis) \
-            -self.__assocTriads1(rhs, x[2], basis, mBasis):
-            accum.append(x)
-        if moufang in (2, 5):
-          lhs = self.__assocTriads2((x[0], x[2], x[0]), False, basis, mBasis)
-          rhs = self.__assocTriads2((x[1], x[0], x[2]), True, basis, mBasis)
-          if self.__assocTriads1(x[1], lhs, basis, mBasis) \
-            -self.__assocTriads1(rhs, x[0], basis, mBasis):
-            if x not in accum:
-              accum.append(x)
-        if moufang in (3, 5):
-          lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
-          rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
-          ths = self.__assocTriads2(x, False, basis, mBasis)
-          if self.__assocTriads1(lhs, rhs, basis, mBasis) \
-            -self.__assocTriads1(x[0], ths, basis, mBasis):
-            if x not in accum:
-              accum.append(x)
-        if moufang in (4, 5):
-          lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
-          rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
-          ths = self.__assocTriads2((x[1], x[2], x[0]), True, basis, mBasis)
-          if self.__assocTriads1(lhs, rhs, basis, mBasis) \
-            -self.__assocTriads1(x[0], ths, basis, mBasis):
-            if x not in accum:
-              accum.append(x)
+    if isinstance(self[0][0], Common._basestr):
+      basis = pBasis
+    tmp = Common.triadPairs(self.__assocTriads, basis, dump, (alternate,mBasis))
+    if not nonAssoc:  return tmp
+    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+  def __assocTriads(self, out, basis, lr, a, b, params):
+    cnt = 0
+    buf = []
+    aa,bb,param = params
+    alternate,mBasis = param
+    for c in range(b +1, lr):
+      x = (a+1, b+1, c+1)
+      ass = self.__assocTriads2(x, True, basis, mBasis) \
+           -self.__assocTriads2(x, False, basis, mBasis)
+      if ass:
+        if alternate:
+          none = True
+          for y in ((x[1], x[0], [2]), (x[1], x[2], x[0]), (x[0], x[2], x[1])):
+            if ass != self.__assocTriads2(y, False, basis, mBasis) \
+                     -self.__assocTriads2(y, True, basis, mBasis):
+              none = False
+              break
+          if none:         # Alternate Associativity
+            buf.append(y)
       else:
-        out = self.__assocTriads2(x, True, basis, mBasis) \
-             -self.__assocTriads2(x, False, basis, mBasis)
-        if out and nonAlternate:
-          for y in ((x[0], x[0], x[1]), (x[1], x[0], x[0]), (x[1], x[1], x[2])):
-             if self.__assocTriads2(y, True, basis, mBasis) \
-               -self.__assocTriads2(y, False, basis, mBasis):
-               if y not in accum:
-                 accum.append(y)
-          for y in ((x[2], x[1], x[1]), (x[0], x[0], x[2]), (x[2], x[0], x[0])):
-             if self.__assocTriads2(y, True, basis, mBasis) \
-               -self.__assocTriads2(y, False, basis, mBasis):
-               if y not in accum:
-                 accum.append(y)
-        elif out and nonPower:
-          for y in ((x[0], x[0], x[0]), (x[1], x[1], x[1]), (x[2], x[2], x[2])):
-            if self.__assocTriads2(y, True, basis, mBasis) \
-              -self.__assocTriads2(y, False, basis, mBasis):
-              if x not in accum:
-                accum.append(x)
-        elif out and nonAssoc:
-          accum.append(x)
-        elif assoc == 0 and not out:
-          accum.append(x)
-    ret = []
-    for x in accum:
-      ret.append(list(basis[y -1] for y in x))
-    return ret
+        buf.append(c)      # Associative
+        cnt += 1
+    out[a *lr +b] = buf
+    return cnt
+
+  def moufangTriads(self, basis, moufang=0, dump=False):
+    """moufangTriads(basis,[moufang,dump])
+       Return moufang traids depending on moufang=0-5 where 0 is none and 5 is
+       the sum of all four. See Common.triadDump() for return and other values.
+         1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
+         3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
+    self.__checkSquare(basis, "moufangTriads", "basis")
+    Common._checkType(moufang, int, "moufangTriads")
+    Common._checkType(dump, bool, "moufangTriads")
+    pBasis = list((str(x) for x in basis))
+    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
+    if isinstance(self[0][0], Common._basestr):
+      basis = pBasis
+    return Common.triadPairs(self.__moufangTriads, basis, dump, (moufang, mBasis))
+  def __moufangTriads(self, out, basis, lr, a, b, params):
+    cnt = 0
+    buf = []
+    aa,bb,param = params
+    code,mBasis = param
+    for c in range(b +1, lr):
+      found = False
+      doAll = code in (0,5)
+      x = (a+1, b+1, c+1)
+      if code == 1 or doAll:
+        lhs = self.__assocTriads2((x[1], x[0], x[2]), False, basis, mBasis)
+        rhs = self.__assocTriads2((x[0], x[1], x[0]), True, basis, mBasis)
+        if self.__assocTriads1(x[0], lhs, basis, mBasis) \
+          -self.__assocTriads1(rhs, x[2], basis, mBasis):
+          found = True
+          doAll = False
+      if code == 2 or doAll:
+        lhs = self.__assocTriads2((x[0], x[2], x[0]), False, basis, mBasis)
+        rhs = self.__assocTriads2((x[1], x[0], x[2]), True, basis, mBasis)
+        if self.__assocTriads1(x[1], lhs, basis, mBasis) \
+          -self.__assocTriads1(rhs, x[0], basis, mBasis):
+          found = True
+          doAll = False
+      if code == 3 or doAll:
+        lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
+        rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
+        ths = self.__assocTriads2(x, False, basis, mBasis)
+        if self.__assocTriads1(lhs, rhs, basis, mBasis) \
+          -self.__assocTriads1(x[0], ths, basis, mBasis):
+          found = True
+          doAll = False
+      if code == 4 or doAll:
+        lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
+        rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
+        ths = self.__assocTriads2((x[1], x[2], x[0]), True, basis, mBasis)
+        if self.__assocTriads1(lhs, rhs, basis, mBasis) \
+          -self.__assocTriads1(x[0], ths, basis, mBasis):
+          found = True
+          doAll = False
+      if code == 0:
+        if not found:
+          buf.append(c)
+          cnt += 1
+      elif found:
+        buf.append(c)
+        cnt += 1
+    out[a *lr +b] = buf
+    return cnt
+
+  def zeroTriads(self, basis, dump=False):
+    """zeroTriads(basis, [dump])
+       Return all zero divisors (a+b)(c+d) as list of (b,c,d1,d2,...) with
+       a=bcd non-scalar and unique where b > c > d range through the table."""
+    self.__checkSquare(basis, "zeroTriads", "basis")
+    Common._checkType(dump, bool, "zeroTriads")
+    pBasis = list((str(x) for x in basis))
+    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
+    if isinstance(self[0][0], Common._basestr):
+      basis = pBasis
+    return Common.triadPairs(self.__zeroTriads, basis, dump, mBasis)
+  def __zeroTriads(self, out, basis, lr, b, c, params):
+    buf = []
+    cnt = 0
+    cnt1 = cnt2 = cnt3 = cnt4 = 0
+    scalar = lr +1  # Represent +-1 as +-(len(basis) +1)
+    bb,cc,mBasis = params
+    b1,c1 = b +1, c +1
+    for d in range(c1, lr):
+      d1 = d +1
+      a1 = self.__assocTriads2((b1, c1, d1), True, basis, mBasis)
+      aa = abs(a1)
+      a0 = aa -1
+      if aa != scalar:
+        if d not in buf:
+          # (a+b)(c+d) = ac +bd +ad +bc
+          ac = self.__assocTriads1(a1, c1, basis, mBasis)
+          ad = self.__assocTriads1(a1, d1, basis, mBasis)
+          bc = self.__assocTriads1(b1, c1, basis, mBasis)
+          bd = self.__assocTriads1(b1, d1, basis, mBasis)
+          if (ac +bd == 0 and ad +bc == 0) or (ac -bd == 0 and ad -bc == 0):
+            addit = True
+            acBuf = out[a0 *lr +c if a0 < c else c *lr +a0]
+            if b in acBuf or d in acBuf:
+              addit = False
+              cnt1 += 1
+            else:
+              bdBuf = out[b *lr +d]
+              if a0 in bdBuf or c in bdBuf:
+                cnt2 += 1
+                addit = False
+            if addit:
+              buf.append(d)
+              cnt += 1
+        if a0 not in buf:
+          # (d+b)(c+a) = dc +ba +da +bc
+          d1 = self.__assocTriads2((b1, c1, a1), True, basis, mBasis)
+          dd = abs(d1)
+          d0 = dd -1
+          dc = self.__assocTriads1(d1, c1, basis, mBasis)
+          ba = self.__assocTriads1(b1, a1, basis, mBasis)
+          da = self.__assocTriads1(d1, a1, basis, mBasis)
+          if (dc +ba == 0 and da +bc == 0) or (dc -ba == 0 and da -bc == 0):
+            addit = True
+            abBuf = out[a0 *lr +b if a0 < b else b *lr +a0]
+            if c in abBuf or d0 in abBuf:
+              cnt3 += 1
+              addit = False
+            else:
+              cdBuf = out[c *lr +d0 if c < d0 else d0 *lr +c]
+              if a0 in cdBuf or b in cdBuf:
+                cnt4 += 1
+                addit = False
+            if addit:
+              buf.append(a0)
+              cnt += 1
+    out[b *lr +c] = buf
+    return(cnt, cnt1, cnt2, cnt3, cnt4)
+    #return cnt
+
+  def compare(self, cmp, over=False):
+    """compare(cmp,[over])
+       Return differences or overlap if over set."""
+    if cmp is not None:
+      Common._checkType(cmp, (list, tuple), "compare")
+    Common._checkType(over, bool, "compare")
+    cnt = 0
+    out = []
+    sout = list(sorted(x) for x in cmp) if cmp else []
+    for val in self:
+      cnt += 1
+      sval = sorted(val)
+      if sval in sout:
+        if over:
+          out.append(val)
+          if not (over or cmp):
+            sout.append(sval)
+      else:
+        if not over:
+          out.append(val)
+        if not cmp:
+          sout.append(sval)
+    return Tensor(*out)
+
+  def unique(self, dups=False):
+    """unique([dups])
+       Return unique or duplicate elements if dups set."""
+    Common._checkType(dups, bool, "unique")
+    return self.compare(None, dups)
 
   def isomorph(self, basis, perm):
     """isomorph(basis, perm)
@@ -1787,7 +1951,7 @@ class Tensor(list):
   @staticmethod
   def Resolution(digits):
     """Resolution([digits])
-       Set print format digits or reset to default 17."""
+       Set print format digits or reset to Common.resolution default."""
     Common.resolution(digits)
 
   @staticmethod
@@ -1861,7 +2025,7 @@ class Tensor(list):
   @staticmethod
   def Triads(triList, basis):
     """Triads(triList, basis)
-       Turn triad list into Table using basis assumed imaginary."""
+       Turn triad list into Table using basis of assumed square -1."""
     Common._checkType(triList, (list, tuple), "Triads")
     Common._checkType(basis, (list, tuple), "Triads")
     isStr = isinstance(basis[0], Common._basestr) if len(basis) > 0 else False
@@ -1898,7 +2062,7 @@ class Tensor(list):
 if "numpy" in sys.modules:
   import numpy   # Rename
   class Matrix(numpy.ndarray):
-    """Class to interface to numpy instead of using a development class."""
+    """Class to interface & extend numpy instead of using Tensor class."""
     def __init__(self, *args):
       """Matrix(ndarray)
          Define a nx1 or nxm matrix as an numpy.ndarray."""
@@ -1920,7 +2084,7 @@ if "numpy" in sys.modules:
       return self[x][y]
 
     def slice(self, offset, shape):
-      """slice(offset, size):
+      """slice(offset, shape):
          Return copy of 2-D selection or square if offset,shape are integers."""
       return self._getitem(offset, shape) # TBD XXX
 
@@ -1933,11 +2097,9 @@ if "numpy" in sys.modules:
     @staticmethod
     def Resolution(digits):
       """Resolution([digits])
-         Set print format digits or reset to default 17."""
+         Set print format digits or reset to Common.resolution default."""
       Common.resolution(digits)
-      if digits == 0:
-        digits = 18
-      numpy.set_printoptions(digits)
+      numpy.set_printoptions(Common._getResolutions()[0])
 
     @staticmethod
     def Diag(diag):
@@ -1951,8 +2113,12 @@ if "numpy" in sys.modules:
           raise Exception("Invalid Diag element")
         out[ii][ii] = diag[ii]
       return Matrix(*out)
+  Matrix.__doc__ += "\n     " +numpy.__doc__
 else:
   Matrix = Tensor
+  Matrix.__name__ = "Matrix"
+  Matrix.__doc__ = "Class that maps to numpy if available otherwise Tensor " \
+                 + "with the following description.\n     " +Tensor.__doc__
 
 ################################################################################
 class Euler(list):
