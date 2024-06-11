@@ -141,8 +141,6 @@ class CA():
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs."""
       value *= self.value
-      if CA.newMul:
-        return self.mergeBasisNew(value, rhs)
       lhs = self.bases()
       bases = [None, None]  # Basis for output
       sgn = 0

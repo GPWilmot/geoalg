@@ -669,10 +669,11 @@ class Common():
 
 ################################################################################
 class Tensor(list):
-  """Class for development and test instead of using numpy. May contain basis
-     numbers like i, j, k. These are tensors since they may contain basis
+  """Class Tensor for development and test instead of using numpy. May contain
+     basis numbers like i, j, k. These are tensors since they may contain basis
      vectors. If g_lo = Tensor(e0,e1,e2,e3) and g_hi = Tensor(-e0,e1,e2,e3) then
-     metric tensor is (g_lo*g_hi.transpose()).scalar() = Tensor.Diag([1]*4)."""
+     metric tensor is (g_lo*g_hi.transpose()).scalar() = Tensor.Diag([1]*4).
+     Class Matrix maps to this class if numpy is not available."""
      
   def __init__(self, *args):
     """Tensor(list)
@@ -2062,7 +2063,7 @@ class Tensor(list):
 if "numpy" in sys.modules:
   import numpy   # Rename
   class Matrix(numpy.ndarray):
-    """Class to interface & extend numpy instead of using Tensor class."""
+    """Class Matrix interfaces & extends numpy instead of using Tensor class."""
     def __init__(self, *args):
       """Matrix(ndarray)
          Define a nx1 or nxm matrix as an numpy.ndarray."""
@@ -2113,12 +2114,8 @@ if "numpy" in sys.modules:
           raise Exception("Invalid Diag element")
         out[ii][ii] = diag[ii]
       return Matrix(*out)
-  Matrix.__doc__ += "\n     " +numpy.__doc__
 else:
   Matrix = Tensor
-  Matrix.__name__ = "Matrix"
-  Matrix.__doc__ = "Class that maps to numpy if available otherwise Tensor " \
-                 + "with the following description.\n     " +Tensor.__doc__
 
 ################################################################################
 class Euler(list):
