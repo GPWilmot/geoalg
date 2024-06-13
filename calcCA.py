@@ -620,7 +620,7 @@ class CA():
        digits list for the combinations of size part out of dim."""
     out = []
     if part > 0 and dim > 0:
-      for form in Common.comb(dim, part, perms=True):
+      for form in Common.comb(dim, part, True):
         out.append("".join(map(lambda x: "%X" %x, form)))
     return out
 
