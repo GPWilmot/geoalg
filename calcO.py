@@ -35,7 +35,7 @@
 ################################################################################
 __version__ = "0.4"
 import math
-from calcCommon import *
+from calcLib import *
 
 ################################################################################
 class O():
@@ -315,7 +315,7 @@ class O():
        bases are not allowed and hex digits must be increasing. See Basis and
        BasisArgs for a list of basis numbers and names."""
     self.w = 0.0 if len(args) == 0 else args[0] # Scalar
-    Common._checkType(self.w, (int, float), "O")
+    Lib._checkType(self.w, (int, float), "O")
     self.__g = []                               # Array of ordered Grades
     self.__currentAdd = -1                      # Previous add index
     if len(args) > 1:
@@ -324,13 +324,13 @@ class O():
         raise Exception("Too many basis elements")
       xyz = O._basisArray(dim)[0]   # Setup global dimension
       for idx,val in enumerate(args[1:]):
-        Common._checkType(val, (int, float), "O")
+        Lib._checkType(val, (int, float), "O")
         if val:
           self.__g.append(O.Grade(val, [idx +1, xyz[idx +1], ""]))
         if xyz[idx][-1:] > O.__maxBasis[0]:
           O.__maxBasis[0] = xyz[idx][-1]
     for key,value in kwargs.items():
-      Common._checkType(value, (int, float), "O")
+      Lib._checkType(value, (int, float), "O")
       if value:
         lGrade = O._init(key, value, O.__BASIS_CHARS)
         self.__add(lGrade)
@@ -388,13 +388,13 @@ class O():
       else:
         val = self.w
         oOut = uOut = ""
-      out += Common._resolutionDump(sign, val, oOut +uOut)
+      out += Lib._resolutionDump(sign, val, oOut +uOut)
       if out:
         sign = " +"
     return out if out else "0"
   def __repr__(self):
     """Overwrite object output using __str__ for print if !verbose."""
-    if Common._isVerbose() and O.dumpRepr:
+    if Lib._isVerbose() and O.dumpRepr:
       return '<%s.%s object at %s>' % (self.__class__.__module__,
              self.__class__.__name__, hex(id(self)))
     return str(self)
@@ -404,7 +404,7 @@ class O():
 
   def __eq__(self, cf):
     """Return True if 2 Os are equal within precision."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     if isinstance(cf, (int, float)):
       return not self.__g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, O):
@@ -440,7 +440,7 @@ class O():
     elif isinstance(q, Tensor):
       out = q.__add__(self)
     else:
-      Common._checkType(q, (int, float), "add")
+      Lib._checkType(q, (int, float), "add")
       out = self.dup(self.w +q)
     return out
   __radd__ = __add__
@@ -458,7 +458,7 @@ class O():
       return self.copy(self.w -q.w, **lhs)
     if isinstance(q, Tensor):
       return q.__add__(-self)
-    Common._checkType(q, (int, float), "sub")
+    Lib._checkType(q, (int, float), "sub")
     out = self.dup(self.w -q)
     return out
   def __rsub__(self, q):
@@ -499,7 +499,7 @@ class O():
     elif isinstance(q, Tensor):
       out = q.__rmul__(self)
     else:
-      Common._checkType(q, (int, float), "mul")
+      Lib._checkType(q, (int, float), "mul")
       out = O(self.w *q)
       for grade in self.__g:
         out.__g.append(self.Grade(grade.value *q, grade.bases()))
@@ -514,8 +514,8 @@ class O():
     """Attempted division for 2 versors or self by scalar."""
     if isinstance(q, O):
       return self.__mul__(q.inverse())
-    Common._checkType(q, (int, float), "div")
-    if abs(q) < Common._getPrecision():
+    Lib._checkType(q, (int, float), "div")
+    if abs(q) < Lib._getPrecision():
       raise Exception("Illegal divide by zero")
     if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
       q = float(q)
@@ -673,7 +673,7 @@ class O():
     """Used by Grade, BasisArgs and other calcs and matches Grade.order.
        Returns basis digits list for current max dim = oDim + uDim,
        current max (increasing if dim > max dim) and multiplication rule."""
-    if isinstance(dim, Common._basestr):
+    if isinstance(dim, Lib._basestr):
       dim = int(dim, O.__HEX_BASIS +1)
     if dim > O.__basisDim:
       out = [""]
@@ -740,7 +740,7 @@ class O():
   def isVersor(self, hyperbolic=False):
     """isVersor([hyperbolic])
        Return true if negative signature inverse."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     conj,simple,isHyperbolic,p2 = self.__invertible()
     l2 = float(p2 + self.w *self.w)
     return abs(math.sqrt(l2) -1.0) <= precision and (simple or even) \
@@ -750,7 +750,7 @@ class O():
     """degrees(deg, [ang])
        Return or set scalar part in degrees."""
     if ang:
-      Common._checkType(ang, (int, float), "degrees")
+      Lib._checkType(ang, (int, float), "degrees")
       self.w = math.radians(ang)
     return math.degrees(self.w)
 
@@ -758,7 +758,7 @@ class O():
     """scalar([scalar])
        Return and/or set scalar part. Use float() [automatic] for return."""
     if scalar is not None:
-      Common._checkType(scalar, (int, float), "scalar")
+      Lib._checkType(scalar, (int, float), "scalar")
       self.w = scalar
     return self.w
 
@@ -769,7 +769,7 @@ class O():
     if scalar is None:
       out.w = self.w
     else:
-      Common._checkType(scalar, (int, float), "dup")
+      Lib._checkType(scalar, (int, float), "dup")
       out.w = scalar
     out.__g = self._copyGrades()
     return out
@@ -814,9 +814,9 @@ class O():
     """trim([precision])
        Remove elements smaller than precision."""
     if precision is None:
-      precision = Common._getPrecision()
+      precision = Lib._getPrecision()
     else:
-      Common._checkType(precision, float, "trim")
+      Lib._checkType(precision, float, "trim")
     out = O(0 if abs(self.w) < precision else self.w)
     for grade in self.__g:
       if abs(grade.value) >= precision:
@@ -842,7 +842,7 @@ class O():
   def grades(self, maxSize=0):
     """grades([maxSize])
        Return a list of basis terms count at each grade with scalar first."""
-    Common._checkType(maxSize, int, "grades")
+    Lib._checkType(maxSize, int, "grades")
     g = [1 if self.w else 0]
     for base in self.__g:
       l = sum(base.lens())
@@ -892,7 +892,7 @@ class O():
       for idx,val in enumerate(maxBasis):
         if isinstance(val, int):
           val = hex(val).upper()[2:]
-        if isinstance(val, Common._basestr) and len(val) == 1 and \
+        if isinstance(val, Lib._basestr) and len(val) == 1 and \
               (val.isdigit or val in self.__HEX_CHARS):
           dims[idx] = val
         else:
@@ -958,8 +958,8 @@ class O():
        Raise an error on failure or return 0 if noError."""
     out,simple,isHyperbolic,p2 = self.__invertible()
     l2 = float(p2 +self.w *self.w)
-    if l2 < Common._getPrecision() or not simple:
-      if l2 >= Common._getPrecision() and out.w >= 0 and sum(out.grades()) == 1:
+    if l2 < Lib._getPrecision() or not simple:
+      if l2 >= Lib._getPrecision() and out.w >= 0 and sum(out.grades()) == 1:
         return out *(1/l2)
       tmp = (self * self).trim()  # Could be antisymmetric - check
       if sum(tmp.grades()) == 1:  # Single term
@@ -984,7 +984,7 @@ class O():
   def cross(self, q):
     """cross(q)
        Return half asym product of pure parts."""
-    Common._checkType(q, O, "cross")
+    Lib._checkType(q, O, "cross")
     x = O()
     x.__g = self.__g    # Shallow copies
     y = O()
@@ -995,33 +995,33 @@ class O():
   def sym(self, q):
     """sym(q)
        Return symmetric product of two Os. The pure part is always zero."""
-    Common._checkType(q, O, "sym")
+    Lib._checkType(q, O, "sym")
     out = (self *q +q *self)
     return out
 
   def asym(self, q):
     """asym(q)
        Return antisymmetric product of two Os. Cross product is pure part."""
-    Common._checkType(q, O, "asym")
+    Lib._checkType(q, O, "asym")
  
   def associator(self, p, q, alternate=False):
     """assoc[iator](p,q, [alternate])
        Return the associator [self,p,q] = (self * p) *q - self *(p * q) or
        the first alternate where alternate is [x,y,z]!=0 for any pair equal
        and x,y,z in {self,p,q}. Any scalar gives zero."""
-    Common._checkType(p, O, "associator")
-    Common._checkType(q, O, "associator")
-    Common._checkType(alternate, bool, "associator")
+    Lib._checkType(p, O, "associator")
+    Lib._checkType(q, O, "associator")
+    Lib._checkType(alternate, bool, "associator")
     accum = []
     out = (self * p) *q  -self *(p * q) 
     if out and alternate:
-     none = True
-     for y in ((p, self, q), (p, q, self), (self, q, p)):
-       if out != -(y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2]):
-         none = False
-         break
-     if none:
-       out = 0
+      none = True
+      for y in ((p, self, q), (p, q, self), (self, q, p)):
+        if out != -(y[0] *y[1]) *y[2] -y[0] *(y[1] *y[2]):
+          none = False
+          break
+      if none:
+        out = 0
     return out
   assoc = associator
 
@@ -1030,9 +1030,9 @@ class O():
        Return differences of the four Moufang tests or sum of all if number=0,
          1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
          3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
-    Common._checkType(p, O, "moufang")
-    Common._checkType(q, O, "moufang")
-    Common._checkType(number, int, "moufang")
+    Lib._checkType(p, O, "moufang")
+    Lib._checkType(q, O, "moufang")
+    Lib._checkType(number, int, "moufang")
     if number == 1:   out = q*(self *(q*p)) -((q*self) *q) *p
     elif number == 2: out = self *(q* (p*q)) -((self*q) *p) *q
     elif number == 3: out = (q*self) *(p*q) -(q *(self*p)) *q
@@ -1050,9 +1050,9 @@ class O():
     """abcAssoc[iator](basis,[abc=0])
        Return [a,b,c] or [b,c,d] or [c,b,d]==0 for abc=1-3 and
        all associative for abc=0 where b=self and a=b*c*d."""
-    Common._checkType(c, O, "abcAssociator")
-    Common._checkType(d, O, "abcAssociator")
-    Common._checkType(abc, int, "abcAssociator")
+    Lib._checkType(c, O, "abcAssociator")
+    Lib._checkType(d, O, "abcAssociator")
+    Lib._checkType(abc, int, "abcAssociator")
     anyAssoc = (abc == 0 or abs(abc) == 4)
     if abc < 0 or abc > 3:
       raise Exception("Invalid abc parameter for abcAssociator")
@@ -1078,9 +1078,9 @@ class O():
        interpreted as a plane a*b with parts (in,outside) the plane. If q is
        a*b, a != b then return parts (perpendicular, parallel) to plane of a &
        b. a.cross(b) is not needed as scalar part is ignored."""
-    Common._checkType(q, O, "projects")
+    Lib._checkType(q, O, "projects")
     n1 = abs(self.pureLen())
-    if n1 < Common._getPrecision():
+    if n1 < Lib._getPrecision():
       raise Exception("Invalid length for projects")
     mul = self.pure()
     vect = q.pure()
@@ -1090,8 +1090,8 @@ class O():
   def rotate(self, q):
     """rotate(q)
        Rotate q by self. See rotation."""
-    Common._checkType(q, O, "rotate")
-    precision = Common._getPrecision()
+    Lib._checkType(q, O, "rotate")
+    precision = Lib._getPrecision()
     conj,simple,isHyperbolic,p2 = self.__invertible()
     l2 = float(p2 + self.w *self.w)
     if l2 <= precision or not simple:
@@ -1109,8 +1109,8 @@ class O():
        Rotate self inplace by rot, if necessary. Applying to versors rotates
        in the same sense as quaternions and frame. For O vectors this is the
        same as rot.inverse()*self*rot. Multiple rotations are TBD."""
-    Common._checkType(rot, O, "rotation")
-    precision = Common._getPrecision()
+    Lib._checkType(rot, O, "rotation")
+    precision = Lib._getPrecision()
     conj,simple,isHyperbolic,p2 = rot.__invertible()
     l2 = float(p2 + rot.w *rot.w)
     if l2 <= precision or not simple:
@@ -1130,7 +1130,7 @@ class O():
        Return self=w+v as a frame=acos(w)*2 +v*len(w+v)/asin(w) for vector v.
        Ready for frameMatrix. Also handles hyperbolic versor. See versor.
        Set hyperbolic to try an hyperbolic angles."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     conj,simple,isHyperbolic,p2 = self.__invertible()
     l2 = p2 +self.w *self.w
     if abs(math.sqrt(l2) -1.0) > precision:
@@ -1164,7 +1164,7 @@ class O():
        Return a versor of length 1 assuming w is the angle(rad) ready for
        rotation. Opposite of frame. See normalise. Hyperbolic versors use
        cosh and sinh expansions if hyperbolic is set."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     tmp,simple,isHyperbolic,p2 = self.__invertible()
     l2 = p2 +self.w *self.w
     if math.sqrt(l2) <= precision or not simple:
@@ -1177,7 +1177,7 @@ class O():
       sw = math.sinh(self.w /2.0)
       cw = math.cosh(self.w /2.0)
     else:
-      sw,cw = Common._sincos(self.w /2.0)
+      sw,cw = Lib._sincos(self.w /2.0)
     sw /= math.sqrt(p2)
     out = self.dup(cw)
     for base in out.__g:
@@ -1191,7 +1191,7 @@ class O():
     n2 = 0
     for base in out.__g:
       n2 += base.value *base.value
-    if n2 > Common._getPrecision():
+    if n2 > Lib._getPrecision():
       n1 = math.sqrt(n2)
       for base in out.__g:
         base.value /= n1
@@ -1201,7 +1201,7 @@ class O():
     """distance(qa)
        Return the Geodesic norm which is the half angle subtended by
        the great arc of the S3 sphere d(p,q)=|log(p.inverse())*q|."""
-    Common._checkType(q, O, "distance")
+    Lib._checkType(q, O, "distance")
     if self.isVersor(True) and q.isVersor(True):
       return abs((self.inverse() *q).log().len())
     raise Exception("Invalid non-hyperbolic, non-versor for distance")
@@ -1210,7 +1210,7 @@ class O():
     """normalise()
        Normalise - reduces error accumulation. Versors have norm 1."""
     n = self.norm()
-    if n <= Common._getPrecision():
+    if n <= Lib._getPrecision():
       return O(1.0)
     out = self.dup(self.w /n)
     for base in out.__g:
@@ -1220,7 +1220,7 @@ class O():
   def pow(self, exp):
     """pow(exp)
        For even q=w+v then a=|q|cos(a) & v=n|q|sin(a), n unit."""
-    Common._checkType(exp, (int, float), "pow")
+    Lib._checkType(exp, (int, float), "pow")
     if isinstance(exp, int):
       out = O(1.0)
       for cnt in range(exp):
@@ -1230,10 +1230,10 @@ class O():
     if simple and not isHyperbolic:
       l1 = math.sqrt(p2 +self.w *self.w)
       w = pow(l1, exp)
-      if l1 <= Common._getPrecision():
+      if l1 <= Lib._getPrecision():
         return O(w)
       a = math.acos(self.w /l1)
-      s,c = Common._sincos(a *exp)
+      s,c = Lib._sincos(a *exp)
       s *= w /math.sqrt(p2)
       out = O(w *c)
       for grade in self.__g:
@@ -1247,11 +1247,11 @@ class O():
     """exp()
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
     tmp,simple,isHyperbolic,p2 = self.__invertible()
-    if p2 <= Common._getPrecision():
+    if p2 <= Lib._getPrecision():
       return O(self.w)
     if not isHyperbolic:
       n1 = math.sqrt(p2)
-      s,c = Common._sincos(n1)
+      s,c = Lib._sincos(n1)
       exp = pow(math.e, self.w)
       s *= exp /n1
       out = O(exp *c)
@@ -1266,7 +1266,7 @@ class O():
        The functional inverse of the quaternion exp()."""
     tmp,simple,isHyperbolic,p2 = self.__invertible()
     l1 = math.sqrt(p2 +self.w *self.w)
-    if p2 <= Common._getPrecision():
+    if p2 <= Lib._getPrecision():
       return O(math.log(l1))
     if not isHyperbolic:
       s = math.acos(self.w /l1) /math.sqrt(p2)
@@ -1284,7 +1284,7 @@ class O():
        are of the form cos(W/2) +m sin(W/2), m pure unit versor. Only defined
        for o1, o2, o12 quaternion part. Set hyperbolic to try hyperbolic
        angles."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     conj,simple,isHyperbolic,p2 = self.__invertible()
     l2 = p2 +self.w *self.w
     if not simple:
@@ -1303,7 +1303,7 @@ class O():
       args[xyz.index(base)] = grade.value
     w, x, y, z = conj.w, args[0], args[1], args[2]
     disc = w *y - x *z
-    if abs(abs(disc) -0.5) < Common._getPrecision():
+    if abs(abs(disc) -0.5) < Lib._getPrecision():
       sgn = 2.0 if disc < 0 else -2.0
       angles[0] = sgn *math.atan2(x, w)
       angles[1] = -math.pi /sgn
@@ -1340,7 +1340,7 @@ class O():
        Morphism with a list of pairs of names with o1,o2 meaning map o1->o2."""
     out = O(self.w)
     for grade in self.__g:
-      out += O(**Common._morph(grade.strs(), grade.value, pairs))
+      out += O(**Lib._morph(grade.strs(), grade.value, pairs))
     return out
 
   ##############################################################################
@@ -1353,7 +1353,7 @@ class O():
        baez is False). (a,b)*(c,d) = (a*c-d.conj*b, d*a +b*c.conj) [Wikipedia] or 
        (a,b)*(c,d) = (a*c-d*b.conj, a.conj*d +c*b) [J.C.Baez]."""
     if baez is not None:
-      Common._checkType(baez, bool, "cayleyDicksonRule")
+      Lib._checkType(baez, bool, "cayleyDicksonRule")
       O.__basisCache  = []
       O.__baezMulRule = baez
     return "baez" if O.__baezMulRule else "wiki"
@@ -1362,8 +1362,8 @@ class O():
   def Basis(oDim, uDim=0):
     """Basis(pDim, [nDim])
        Return (o,u) basis elements with value one."""
-    Common._checkType(oDim, int, "Basis")
-    Common._checkType(uDim, int, "Basis")
+    Lib._checkType(oDim, int, "Basis")
+    Lib._checkType(uDim, int, "Basis")
     if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
       raise Exception("Invalid Basis argument size")
     return tuple((O(**{x: 1}) for x in O.BasisArgs(oDim, uDim)))
@@ -1372,8 +1372,8 @@ class O():
   def BasisArgs(oDim, uDim=0):
     """BasisArgs(oDim, [uDim])
        Return (o,u) basis elements as a list of names in addition order."""
-    Common._checkType(oDim, int, "BasisArgs")
-    Common._checkType(uDim, int, "BasisArgs")
+    Lib._checkType(oDim, int, "BasisArgs")
+    Lib._checkType(uDim, int, "BasisArgs")
     if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
       raise Exception("Invalid Basis argument size")
     return O._BasisArgs(oDim, uDim)
@@ -1382,8 +1382,8 @@ class O():
   def VersorArgs(oDim, uDim=0):
     """VersorArgs(oDim, [uDim])
        Just same as BasisArgs for octonions."""
-    Common._checkType(oDim, int, "VersorArgs")
-    Common._checkType(uDim, int, "VersorArgs")
+    Lib._checkType(oDim, int, "VersorArgs")
+    Lib._checkType(uDim, int, "VersorArgs")
     if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
       raise Exception("Invalid VersorArgs argument size")
     return O._VersorArgs(oDim, uDim)
@@ -1412,8 +1412,8 @@ class O():
        development TBD."""
     order = kwargs["order"] if "order" in kwargs else [] # for importlib
     implicit = kwargs["implicit"] if "implicit" in kwargs else False
-    Common._checkType(order, (list, tuple), "Euler")
-    Common._checkType(implicit, bool, "Euler")
+    Lib._checkType(order, (list, tuple), "Euler")
+    Lib._checkType(implicit, bool, "Euler")
     for key in kwargs:
       if key not in ("order", "implicit"):
         raise TypeError("Euler() got unexpected keyword argument %s" %key)
@@ -1440,13 +1440,13 @@ class O():
     elif len(order) < len(args):
       raise Exception("Invalid order size")
     for idx,key in enumerate(order):
-      Common._checkType(key, (float, int), "Euler")
+      Lib._checkType(key, (float, int), "Euler")
       key = int(key)
       if key in store or key > len(args):
         raise Exception("Invalid order index for rotation: %s" %key)
       ang = args[key -1]
-      Common._checkType(ang, (int, float), "Euler")
-      s,c = Common._sincos(ang *0.5)
+      Lib._checkType(ang, (int, float), "Euler")
+      s,c = Lib._sincos(ang *0.5)
       rot = O(c, **{xyz[key -1]: s})
       if implicit:
         tmpRot = rot.copy()
@@ -1461,12 +1461,12 @@ class O():
   def AssocTriads(basis, nonAssoc=False, alternate=False, dump=False,
                   cntOnly=False):
     """AssocTriads(basis,[nonAssoc,alternate,dump,cntOnly])
-       Return unique O.assoc(...) traids or not. See Common.triadDump."""
-    Common._checkType(nonAssoc, bool, "AssocTriads")
-    Common._checkType(alternate, bool, "AssocTriads")
-    tmp = Common.triadPairs(O.__AssocTriads, basis, dump, alternate, cntOnly)
+       Return unique O.assoc(...) traids or not. See Lib.triadDump."""
+    Lib._checkType(nonAssoc, bool, "AssocTriads")
+    Lib._checkType(alternate, bool, "AssocTriads")
+    tmp = Lib.triadPairs(O.__AssocTriads, basis, dump, alternate, cntOnly)
     if not nonAssoc: return tmp
-    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
   @staticmethod
   def __AssocTriads(out, basis, lr, a, b, params):
     cnt = 0
@@ -1484,12 +1484,12 @@ class O():
   @staticmethod
   def MoufangTriads(basis, number=0, nonMoufang=False,dump=False,cntOnly=False):
     """MoufangTriads(basis,[number,nonMoufang,dump,cntOnly])
-       Return unique O.moufang() or non traids. See Common.triadDump."""
-    Common._checkType(number, int, "MoufangTriads")
-    Common._checkType(nonMoufang, bool, "MoufangTriads")
-    tmp = Common.triadPairs(O.__MoufangTriads, basis, dump, number, cntOnly)
+       Return unique O.moufang() or non traids. See Lib.triadDump."""
+    Lib._checkType(number, int, "MoufangTriads")
+    Lib._checkType(nonMoufang, bool, "MoufangTriads")
+    tmp = Lib.triadPairs(O.__MoufangTriads, basis, dump, number, cntOnly)
     if not nonMoufang: return tmp
-    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
   @staticmethod
   def __MoufangTriads(out, basis, lr, a, b, params):
     cnt = 0
@@ -1507,12 +1507,12 @@ class O():
   @staticmethod
   def AbcTriads(basis, abc=0, nonAssoc=False, dump=False, cntOnly=False):
     """AbcTriads(basis,[abc,nonAssoc,dump,cntOnly])
-       Return unique abcAssoc() traids or !=0. See Common.triadDump."""
-    Common._checkType(abc, int, "AbcTriads")
-    Common._checkType(nonAssoc, bool, "AbcTriads")
-    tmp = Common.triadPairs(O.__AbcTriads, basis, dump, abc, cntOnly)
+       Return unique abcAssoc() traids or !=0. See Lib.triadDump."""
+    Lib._checkType(abc, int, "AbcTriads")
+    Lib._checkType(nonAssoc, bool, "AbcTriads")
+    tmp = Lib.triadPairs(O.__AbcTriads, basis, dump, abc, cntOnly)
     if not nonAssoc: return tmp
-    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
   @staticmethod
   def __AbcTriads(out,basis,lr,a,b, params):
     cnt = 0
@@ -1529,10 +1529,10 @@ class O():
   @staticmethod
   def ZeroTriads(basis, nonZero=False, dump=False):
     """ZeroTriads(basis,[nonZero,dump])
-       Return zero divisors (+-abc+a)(b+c)=0 or not. See Common.triadDump."""
-    tmp = Common.triadPairs(O.__ZeroTriads, basis, dump)
+       Return zero divisors (+-abc+a)(b+c)=0 or not. See Lib.triadDump."""
+    tmp = Lib.triadPairs(O.__ZeroTriads, basis, dump)
     if not nonZero: return tmp
-    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
   @staticmethod
   def __ZeroTriads(out, basis, lr, b, c, params):
     buf = []
@@ -1579,28 +1579,28 @@ class O():
   def Eval(sets):
     """Eval(sets)
        Return the O evaluated from sets of o-basis, str lists or dict pairs."""
-    Common._checkType(sets, (list, tuple), "Eval")
+    Lib._checkType(sets, (list, tuple), "Eval")
     if not (len(sets) and isinstance(sets[0], (list, tuple))):
       sets = [sets]
     scalar = 0
     terms = {}
     for item in sets:
-      Common._checkType(item, (list, tuple), "Eval")
-      if isinstance(item, Common._basestr):
+      Lib._checkType(item, (list, tuple), "Eval")
+      if isinstance(item, Lib._basestr):
         base = item[0] if item[0][0] in O.__allChars else ("o" +item[0])
         terms[base] = 1
       elif not isinstance(item, (list, tuple)):
         raise Exception("Invalid basis for Eval: %s" %item)
       elif len(item) == 0:
         scalar = 1
-      elif isinstance(item[0], Common._basestr):
+      elif isinstance(item[0], Lib._basestr):
         base = item[0] if item[0][:1] in O.__allChars else ("o" +item[0])
         terms[base] = item[1]
       else:
         base = "o"
         sgn = 1
         for num in item:
-          Common._checkType(num, int, "Eval")
+          Lib._checkType(num, int, "Eval")
           base += "%X" %abs(num)
           if num < 0:
             sgn *= -1
@@ -1786,8 +1786,8 @@ if __name__ == '__main__':
   import traceback
   import sys, os
   from math import *
-  exp = Common.exp
-  log = Common.log
+  exp = Lib.exp
+  log = Lib.log
   try:
     import importlib
   except:
@@ -1820,7 +1820,7 @@ if __name__ == '__main__':
          test = O.Q(Q.Euler(e, order=[1,2,3], implicit=True))
        else:
          test = O.Euler(e, order=[3,2,1])
-         Common.precision(1E-12)
+         Lib.precision(1E-12)
        store = O.Euler(e, order=[1,2,3], implicit=True)
        Calculator.log(store == test, store)""",
     """# Test 6 Versor squared == exp(2*log(e)).

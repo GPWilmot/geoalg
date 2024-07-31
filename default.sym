@@ -29,9 +29,9 @@ def fixQ(roll,pitch,yaw,d=1.0):
   global sy
   global cz
   global sz
-  sx,cx=Common.sincos(roll/d)
-  sy,cy=Common.sincos(pitch/d)
-  sz,cz=Common.sincos(yaw/d)
+  sx,cx=Lib.sincos(roll/d)
+  sy,cy=Lib.sincos(pitch/d)
+  sz,cz=Lib.sincos(yaw/d)
   if not S.IsCalc("CA"):
     raise Exception("CA must be loaded to use fixQ")
   else:
@@ -67,13 +67,13 @@ def fixE():
   global s35
   global c54
   global s54
-  s14,c14=Common.sincos(.11)
-  s24,c24=Common.sincos(.12)
-  s34,c34=Common.sincos(.13)
-  s15,c15=Common.sincos(.14)
-  s25,c25=Common.sincos(.15)
-  s35,c35=Common.sincos(.16)
-  s54,c54=Common.sincos(.17)
+  s14,c14=Lib.sincos(.11)
+  s24,c24=Lib.sincos(.12)
+  s34,c34=Lib.sincos(.13)
+  s15,c15=Lib.sincos(.14)
+  s25,c25=Lib.sincos(.15)
+  s35,c35=Lib.sincos(.16)
+  s54,c54=Lib.sincos(.17)
 
 def matE(dim, idx1, idx2):
   m = Tensor.Diag([1] *dim)

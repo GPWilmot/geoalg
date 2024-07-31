@@ -26,7 +26,7 @@
 __version__ = "0.1"
 import sys, math
 import keyword
-from calcCommon import *
+from calcLib import *
 
 ################################################################################
 class P(list):
@@ -89,7 +89,7 @@ class P(list):
 
   def __mul__(self, p):
     """Product n => (a,b)(c,d) = (ac-d*b, da+bc*) for conjugate level n-1."""
-    Common._checkType(p, P, "mul")
+    Lib._checkType(p, P, "mul")
     print(repr(self), "*", repr(p))
     n = self[0]
     if n != p[0]:
@@ -208,7 +208,7 @@ class S():
     return str(sStr)
   def __repr__(self):
     """Overwrite object output using __str__ for print if !verbose."""
-    if (Common._isVerbose()):
+    if (Lib._isVerbose()):
       tmp = self.__eval()
       sgn = "+"
       if self.__isMinus and tmp is None:
@@ -254,7 +254,7 @@ class S():
         return S("%s+%s" %(sStr, saStr))
       return sTmp + saTmp
     else:
-      Common._checkType(sa, (int, float), "add")
+      Lib._checkType(sa, (int, float), "add")
       if sTmp is None:
         if sa == 0:
           return self
@@ -275,7 +275,7 @@ class S():
       tmp = S(sa.__value, sa.__getLocals, not sa.__isMinus)
       return self.__add__(tmp)
     else:
-      Common._checkType(sa, (int, float), "sub")
+      Lib._checkType(sa, (int, float), "sub")
       return self.__add__(-sa)
   def __rsub__(self, sa):
     """Subtract S from scalar with S output."""
@@ -310,7 +310,7 @@ class S():
         return S("%s*%s" %(sStr, saStr))
       return sTmp * saTmp
     else:
-      Common._checkType(sa, (int, float, list, tuple), "mul")
+      Lib._checkType(sa, (int, float, list, tuple), "mul")
       if sTmp == 0 or sa == 0:
         return 0
       if sTmp is None:
@@ -329,7 +329,7 @@ class S():
   def __rmul__(self, sa):
     """Left multiplication of scalar by S."""
     sTmp = self.__eval()
-    Common._checkType(sa, (int, float, list, tuple), "rmul")
+    Lib._checkType(sa, (int, float, list, tuple), "rmul")
     if sTmp == 0 or sa == 0:
       return 0
     if sTmp == 1:
@@ -361,7 +361,7 @@ class S():
         return S("%s/%s" %(sStr, saStr))
       return sTmp /saTmp
     else:
-      Common._checkType(sa, (int, float), "div")
+      Lib._checkType(sa, (int, float), "div")
       if sTmp is None:
         sStr = self.__value if self.__getLocals else "(%s)" %self.__value
         return S("%s/%s" %(sStr, sa))
@@ -371,7 +371,7 @@ class S():
 
   def __rdiv__(self, sa):
     """Division for number, sa, divided by a CA."""
-    Common._checkType(sa, (int, float), "rdiv")
+    Lib._checkType(sa, (int, float), "rdiv")
     sTmp = self.__eval()
     if sTmp is None:
       sStr = self.__value if self.__getLocals else "(%s)" %self.__value
@@ -383,7 +383,7 @@ class S():
   def __eval(self):
     """Return exposed value if possible for setting else None."""
     val = None
-    if not isinstance(self.__value, Common._basestr):
+    if not isinstance(self.__value, Lib._basestr):
       return -self.__value if self.__isMinus else self.__value
     if self.__getLocals:
       name = self.__value

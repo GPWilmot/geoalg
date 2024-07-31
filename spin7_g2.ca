@@ -5,19 +5,8 @@
 ## This file for calcCA defines the Triads7[30] 3-forms for Spin7, triads7*
 ## functions to process allSign() elements and makeG2(i,j) to generate globals
 ## A, B,...,N for octonian representations.
-
-#--------------------------------------------------------------------------
-# Find all 21 2-forms, 35 3/4-forms, 7 6-forms  # Triads7[0].swap(each term)
-# Same as list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(2/3/4/5/6)
-TT71 = list(CA.Basis(7))[:7] 
-TT72 = list(CA.Basis(7))[7:28] 
-TT73 = list(CA.Basis(7))[28:63]
-TT74 = list(CA.Basis(7))[63:98]
-TT75 = list(CA.Basis(7))[98:119]
-TT76 = list(CA.Basis(7))[119:126]
-
 # From CA(7)+ find 30 tetrahedron faces selected to define sub-algebras of CA(7).
-Triads7gen = (CA.Eval(x) for x in Common.triads(7))
+Triads7gen = (CA.Eval(x) for x in Lib.triads(7))
 # Triads7 = list(Triads7gen) [takes 2.3 minutes]
 Triads7 = (e123 +e145 +e167 +e246 +e257 +e347 +e356, e123 +e145 +e167 +e247 +e256 +e346 +e357,
            e123 +e146 +e157 +e245 +e267 +e347 +e356, e123 +e146 +e157 +e247 +e256 +e345 +e367,
@@ -39,7 +28,7 @@ Triads7 = (e123 +e145 +e167 +e246 +e257 +e347 +e356, e123 +e145 +e167 +e247 +e25
 # ie Fp^FFp=7e1234567. But Fp*e1234567 negates terms 2,3,5 so that (Fp*Fp +7) = 6*Fp *e1234567.
 P1 = Tensor(e123, e145, e167, e246, e257, e347, e356)  # = (CA(**dict([x])) for x in Triads7[0].copyTerms())
 PP1 = (e1247, e1256, e1346, e1357, e2345, e2367, e4567) # = sum(PP1) = -e1234567 *sum(P1)
-PPP1 = list(Common.chain(*([CA.Eval([x[0],x[1]])+CA.Eval([x[2],x[3]]), CA.Eval([x[0],x[2]])+CA.Eval([x[1],x[3]]),
+PPP1 = list(Lib.chain(*([CA.Eval([x[0],x[1]])+CA.Eval([x[2],x[3]]), CA.Eval([x[0],x[2]])+CA.Eval([x[1],x[3]]),
         CA.Eval([x[0],x[3]])+CA.Eval([x[1],x[2]])] for x in (y.basisTerms()[0][0] for y in PP1))))
 
 PP1p = (e1247, e1256, -e4567, -e1346, e2367, e1357, e2345) # Is +ve triads == Triads7[0].spin(.)
@@ -54,14 +43,15 @@ PP1o = e1247 +e1256 +e1346 -e1357 +e2345 +e2367 +e4567
 S1 = list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(3) -sum(P1)).copyTerms())
 SS1 = list(CA(**dict([x])) for x in (sum(CA.Basis(7)).pure(4) -sum(PP1)).copyTerms())
 
-# Select S1o s.t. PP1o *S1o = S1o and SS1o = e1234567 *S1o = P1o *S1o
-# Takes ages but can get ?=181382, S1o, in 1.5 hours which is first min. with 19 terms in S1o*S1o
+# Select S1o s.t. PP1o *S1o = S1o and SS1o = e1234567 *S1o = P1o *S1o ie S1o = next(TriadsG2)
+# Takes ages but can get allSignsIndex=181382 as first min. with 19 terms in S1o*S1o
 TriadsG2 = (x for x in sum(S1).allSigns() if PP1o *x == x)
 
-S1o = -e124 +e125 +e126 +e127 +e134 +e135 -e136 +e137 +e146 +e147 +e156 +e157 -e234 +e235 \
-     +e236 +e237 +e245 +e247 +e256 -e267 +e345 -e346 +e357 +e367 +e456 +e457 +e467 -e567
-SS1o = e1234 +e1235 -e1236 +e1237 -e1245 +e1246 -e1257 -e1267 -e1345 +e1347 +e1356 +e1367 -e1456 +e1457 \
-    -e1467 -e1567 +e2346 -e2347 -e2356 +e2357 +e2456 +e2457 +e2467 -e2567 -e3456 +e3457 -e3467 -e3567
+S1o = -e124 +e125 +e126 -e127 +e134 +e135 -e136 -e137 -e146 +e147 +e156 +e157 +e234 +e235 \
+      +e236 +e237 +e245 -e247 +e256 +e267 +e345 +e346 +e357 +e367 +e456 +e457 +e467 +e567
+#S1o = -e124 +e125 +e126 +e127 +e134 +e135 -e136 +e137 +e146 +e147 +e156 +e157 -e234 +e235 \
+#     +e236 +e237 +e245 +e247 +e256 -e267 +e345 -e346 +e357 +e367 +e456 +e457 +e467 -e567
+SS1o = e1234567 *S1o
 # Find P1o *SS1o = -S1o, PP1o *S1o = S1o, PP1o *SS1o = SS1o, S1o *S1o = -SS1o *SS1o, S1o *SS1o = ...
 # (P1o+PP1o)**2 = 12*P1o +14e1234567 & no product of P1o, S1o, PP1o, SS1o contains a 6-form which is part of CA(7)+
 # (P1o+S1o)**2  (S1o+SS1o)**2  (PP1o+SS1o)**2 (P1o+SS1o)**2 
@@ -70,11 +60,8 @@ SS1o = e1234 +e1235 -e1236 +e1237 -e1245 +e1246 -e1257 -e1267 -e1345 +e1347 +e13
 # Check isomorphism to Octonians (A7) including -F cases which give other 8 signed F's.
 # Also checked all P not in 480 +/-TriadsOhalf[*]) are not isomorphic to Octonians.
 # Hence 30 * 16 = 480 3-forms generating tables isomorphic to Octonians.
-# TriadsOhalf = list(Common.chain(*(triadsOhalf(x) for x in range(30)))) # len=240
+# TriadsOhalf = list(Lib.chain(*(triadsOhalf(x) for x in range(30)))) # len=240
 # Octonians = TriadsOhalf +(-1*Tensor(TriadsOhalf))                      # len=480
-
-reese=e123-e147-e156+e246-e257-e345-e367 # O-:5.117
-reesec=e1245 -e1267 +e1346 +e1357 -e2347 +e2356 +e4567
 
 # Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Tensor.Table/Cycles(basis)
 f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))    # morph(PP1, f7Basis)
@@ -123,9 +110,75 @@ Spin7R = Tensor( \
  ("-f7", "f4", "f5","-f2","-f3", "-1", "f1"),
  ("f6", "f5", "f4","-f3","-f2","-f1", "-1"))
 
-# Correlation between the class index and non-assoc cnt is multi-cover so invert
-NacName = {4:"R", 8:"S", 10:"T", 12:"U", 14:"V", 16:"W", 28:"O"}
-NacMap = ( \
+def nac7subalg(tri, pos=None):
+  """nac7subalg(tri, [pos])
+     Return non-associative count for tri or tri.allSigns()[pos] sub-algebra."""
+  if pos is not None:
+    if pos not in range(8):
+      raise Exception("Invalid nac7subalg signed position")
+    tri = list(Triads7[idx].allSigns(8))[pos]
+  return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f7Basis)) \
+                 .assocTriads(f7Basis,True),f7Basis,1)))
+
+# Map algebras to remainders with repeats shown with *,#,$
+# S4:  [e123, e567]
+# S8:  [e124, e467]
+# S10: [e125$, e134, e234, e367$, e456, e457]
+# S12: [e125$, e126, e127, e135*, e145*, e167, e235*, e245*, e267, e345,
+#       e346*, e347*, e356*, e357*, e367$]
+# S14: [e135*, e136, e137, e145*, e146#, e147#, e156, e157, e235*, e236,
+#       e237, e245*, e246#, e247#, e256, e257, e346*, e347*, e356*, e357*]
+# S16: [e146#, e147#, e246#, e247#]
+
+# Sign combination indices for mirrors from the first 8 combinations (add all 128-idx)
+Nac7Mirrors = [[0, 29, 38, 43, 49, 52, 56, 57], [1, 14, 23, 28, 50, 51, 55, 58],
+               [2, 9, 24, 27, 40, 41, 54, 59], [3, 8, 25, 26, 39, 42, 48, 53],
+               [4, 11, 17, 22, 33, 36, 45, 63], [5, 10, 18, 21, 32, 37, 44, 62],
+               [6, 13, 15, 20, 31, 34, 47, 61], [7, 12, 16, 19, 30, 35, 46, 60]]
+
+def nac7mirrors():
+  """Check all Triads7 first 8 signed combination have the same mirror indices."""
+  global Triads15
+  out = []
+  for triad in Triads7:
+    cmp = []
+    for cnt,tri in enumerate(triad.allSigns(8)):
+      buf = [cnt]
+      for ref in CA.Basis(7,0,1):
+        idx128,parity = ref.reflect(tri).allSignsIndices() # ie triads7class(id)[3]
+        buf.append(idx128)
+        buf.append(127 -idx128)
+      cmp.append(sorted(buf)[:8])
+    out.append((cmp == Nac7Mirrors))
+  return out
+
+def nac7map(idx):
+  """nac7map(idx)
+     Map all Triads7[idx] remainders to sub-algebra in term order."""
+  global Triads15
+  global Nac15Name
+  if idx < 0 or idx >= len(Triads7):
+    raise Exception("Invalid nac7Map Triads7 index")
+  out = []
+  macMap = set(Nac7Name.keys())
+  nac={} if idx in (10,19) else {abs(triads7remain(triads7all(idx,0))): triads7all(idx,0)}
+  for offs in range(1,9):
+    tmp = triads7remain(-triads7all(idx,offs))
+    if tmp and len(tmp.copyTerms()) == 1:
+      nac[abs(tmp)] = triads7all(idx,offs)
+  for pos in sorted(nac.keys()):
+    tmp = len(list(Lib.triadDump(Tensor.Triads(*(nac[pos]).spin(f7Basis)) \
+                           .assocTriads(f7Basis,True),f7Basis,1)))
+    if tmp not in nacMap:
+      nacMap.append(tmp)
+      Nac15Name[tmp] = ("", idx, sgn)
+      print("Not in Map", tmp, Nac15Name[tmp])
+    out.append(tmp)
+  return out
+
+# Non-assoc cnt to sub-algebra name & first example idx and allSign position
+Nac7Name = {4:("R",0,6), 8:("S",6,3), 10:("T",6,5), 12:("U",0,7), 14:("V",0,0), 16:("W",12,0), 28:("O",0,5)}
+Nac7Map = ( \
   (4, 12, 12, 14, 14, 14, 14),  (4, 12, 12, 14, 14, 14, 14),  #0  R:8, U:16, V:32;       same 
   (4, 14, 14, 12, 12, 14, 14),  (4, 14, 14, 14, 14, 12, 12),  #2  R:8, U:16, V:32;       same 
   (4, 14, 14, 12, 12, 14, 14),  (4, 14, 14, 14, 14, 12, 12),  #4  R:8, U:16, V:32;       same 
@@ -142,7 +195,6 @@ NacMap = ( \
   (12, 12, 16, 10, 14, 10, 10), (12, 14, 14, 14, 14, 12, 4),  #26 T:24, U:16, V:8; W:8;  R:8, U:16, V:32
   (12, 14, 14, 10, 14, 12, 8),  (12, 14, 14, 14, 14, 12, 4))  #28 S:8, T:8, U:16, V:24;  R:8, U:16, V:32
 
-#NacName = {4:"R", 8:"S", 10:"T", 12:"U", 14:"V", 16:"W", 28:"O"}
 ### +-      +  1          2        - 3          4          5          6
 ### 0123456789 0123456789 0123456789 0123456789 0123456789 0123456789 0123
 #0: VVVVORUUVV ROUUVUUORU UROVVVVVVV UUROUUORVV VVVVROUUVV VVVVVVVVVV UURO
@@ -241,8 +293,8 @@ def triadsOhalf(idx):
 def triads7all(idx, pos=0):
   """triads7all(idx, [pos])
      Enumerate all signed terms of Triads7[idx] and return pos index."""
-  Common._checkType(idx, int, "triads7all")
-  Common._checkType(pos, int, "triads7all")
+  Lib._checkType(idx, int, "triads7all")
+  Lib._checkType(pos, int, "triads7all")
   if idx <0 or idx > 29 or pos < 0 or pos > 127:
     raise Exception("Invalid input range in triads7all: %d,%d" %(idx,pos))
   return list(Triads7[idx].allSigns())[pos]
@@ -250,8 +302,8 @@ def triads7all(idx, pos=0):
 def triads7terms(idx, pos=0):
   """triads7terms(idx, [pos])
      Return triads7all(idx,pos) as a Tensor of Eval(copyTerms)."""
-  Common._checkType(idx, int, "triads7terms")
-  Common._checkType(pos, int, "triads7terms")
+  Lib._checkType(idx, int, "triads7terms")
+  Lib._checkType(pos, int, "triads7terms")
   if idx <0 or idx > 29 or pos < 0 or pos > 127:
     raise Exception("Invalid input range in triads7terms: %d,%d" %(idx,pos))
   return Tensor(list(CA(**dict([x])) for x in triads7all(idx,pos).copyTerms()))
@@ -259,7 +311,7 @@ def triads7terms(idx, pos=0):
 def triads7remain(phi):
   """triad7remain(phi)
      Return remainder of phi assuming correct parity."""
-  Common._checkType(phi, CA, "triads7remain")
+  Lib._checkType(phi, CA, "triads7remain")
   val = (3e1234567 -phi)/2
   remain = val *val +4
   if remain == 0:
@@ -269,20 +321,20 @@ def triads7remain(phi):
 def triads7class(phi, id=False):
   """triad7class(phi, [id])
      Classify phi as <class=R/S/T/U/V/W/O> with parity & index in 30:128."""
-  Common._checkType(phi, CA, "triads7class")
-  Common._checkType(id, bool, "triads7class")
+  Lib._checkType(phi, CA, "triads7class")
+  Lib._checkType(id, bool, "triads7class")
   aPhi = abs(phi)
   if aPhi not in Triads7:
     raise Exception("Abs. input phi to triads7class not found in Triads7")
   idx30 = Triads7.index(aPhi)
-  idx128,parity = phi.allSignsIndicies()
+  idx128,parity = phi.allSignsIndices()
   sgn = -1 if parity %2 else 1
   remain = triads7remain(phi *sgn)
   if remain == 0:
-    clsName = NacName[28]
+    clsName = Nac7Name[28][0]
   else:
     terms = list(CA(**{x[0]: 1}) for x in (aPhi).copyTerms())
-    clsName = NacName[NacMap[idx30][terms.index(abs(remain))]]
+    clsName = Nac7Name[Nac7Map[idx30][terms.index(abs(remain))]][0]
   if id:
     return (clsName, -sgn, idx30, int(idx128))
   return "%s%s:%0.3f" %(clsName, "-" if parity %2 else "+", idx30 +idx128/1000)
@@ -316,11 +368,11 @@ def triads7test(g2, row, rng0=0, rng1=0, loop=1, comb=0, mod=None, minus=False,
   """triads7test(g2, row, [rng0,rng1,loop,comb,mod,minus,dump])
      Swap phi=Triads7[row].allSigned()[rng0[:rng1]] & accum. to & return mod by
      g2 terms. minus negates phi and comb=(1,2,3:swap pairs, 0:all)."""
-  Common._checkType(g2, CA, "triads7test")
-  Common._checkType(row, int, "triads7test")
-  Common._checkType(rng0, int, "triads7test")
-  Common._checkType(rng1, int, "triads7test")
-  Common._checkType(loop, int, "triads7test")
+  Lib._checkType(g2, CA, "triads7test")
+  Lib._checkType(row, int, "triads7test")
+  Lib._checkType(rng0, int, "triads7test")
+  Lib._checkType(rng1, int, "triads7test")
+  Lib._checkType(loop, int, "triads7test")
   if not mod:
     mod = list([] for x in range(30))
   if rng1 <= rng0: rng1 = rng0 +1
@@ -534,9 +586,9 @@ def _findG2(elem, basis=G21+G212, names=G2n+G2n2, dump=False): # TBC
      Internal function to find  and return G2 elements name or -name."""
   if elem == 0:
     return "0"
-  Common._checkType(elem, (CA, Tensor), "_findG2")
-  Common._checkType(basis, (list, tuple), "_findG2")
-  Common._checkType(names, (list, tuple), "_findG2")
+  Lib._checkType(elem, (CA, Tensor), "_findG2")
+  Lib._checkType(basis, (list, tuple), "_findG2")
+  Lib._checkType(names, (list, tuple), "_findG2")
   if len(basis) != len(names):
     raise Exception("_findG2 needs inputs basis and names of same length")
   for scale in (("", 1), ("-", -1), ("2", 2), ("-2", -2), ("8", 8),("-8", -8)):
@@ -685,7 +737,7 @@ def _constructG2(idx=0, pos=0, dump=False):
         pos += 1
         trialG.append(mul)
         trialMG2.append((elemM *mul -mul *elemM)/2)
-      for pairs in Common.comb(len(trialMG2), 2, True):
+      for pairs in Lib.comb(len(trialMG2), 2, True):
         mul1,mul2 = trialMG2[pairs[0] -1], trialMG2[pairs[1] -1]
         trialMG22.append((mul1 *mul2 -mul2 *mul1)/2)
       newTrial = [0 if not remainder and abs(remain) == \
@@ -1019,3 +1071,4 @@ g23s = (sr2*(e12+e15)-e37+e46, sr2*(e13+e16)-e45+e27, sr2*(14+e17)-e26+e35,
 g01s = (G01[4]-G01[5], G01[12]-G01[13], G01[10]-G01[11], G01[9]-G01[8], G01[2]-G01[3], G01[6]-G01[7])
 gn1s = ("X1-Y1", "X2-Y2", "Y3-X3", "X4-Y4", "X5-Y5", "X6-Y6")
 # = (E-L, D+K, H; ~G+N, ~M, ~J) # ~ = skewed
+

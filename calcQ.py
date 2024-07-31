@@ -28,7 +28,7 @@
 ## group operation q' = r * q * r.inverse() where r is a versor.
 ## Euler angles converted directly to versors for initialisation or
 ## interpretation of quaternion axial rotations. This module contains classes:
-## Q & Euler & calc contains Common & Matrix run help for more information.
+## Q & Euler & calc contains Lib & Matrix run help for more information.
 ## Can be included as a module or run as a command line calculator.
 ## Assumes calcR.py is in same directory & numpy is imported first, if required.
 ## Quaternion tests are included at the end of this file.
@@ -36,7 +36,7 @@
 ################################################################################
 __version__ = "0.3"
 import math
-from calcCommon import *
+from calcLib import *
 try:
   import numpy as np
 except:
@@ -65,7 +65,7 @@ class Q():
     params = locals().copy()
     for key in params:
       if key != "self":
-        Common._checkType(params[key], (int, float), "Q")
+        Lib._checkType(params[key], (int, float), "Q")
     self.w,self.x,self.y,self.z = (w, x, y, z)
 
   def __float__(self):
@@ -79,13 +79,13 @@ class Q():
     out = ""
     sign = ""
     for i in ((self.w, ""), (self.x, 'i'), (self.y, 'j'), (self.z, 'k')):
-      out += Common._resolutionDump(sign, i[0], i[1])
+      out += Lib._resolutionDump(sign, i[0], i[1])
       if out:
         sign = " +"
     return out if out else "0"
   def __repr__(self):
     """Overwrite object output using __str__ for print if !verbose."""
-    if Common._isVerbose() and Q.dumpRepr:
+    if Lib._isVerbose() and Q.dumpRepr:
       return '<%s.%s object at %s>' % (self.__class__.__module__,
              self.__class__.__name__, hex(id(self)))
     return str(self)
@@ -95,7 +95,7 @@ class Q():
 
   def __eq__(self, cf):
     """Return True if 2 CAs are equal within precision."""
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     if isinstance(cf, (int, float)):
       return -self.pureLen() <= precision and \
               abs(self.w -cf) <= precision
@@ -135,7 +135,7 @@ class Q():
       return Q(self.w +q.w, self.x +q.x, self.y +q.y, self.z +q.z)
     if isinstance(q, Tensor):
       return q.__add__(self)
-    Common._checkType(q, (int, float), "add")
+    Lib._checkType(q, (int, float), "add")
     return Q(self.w +q, self.x, self.y, self.z)
   __radd__ = __add__
   def __sub__(self, q):
@@ -144,7 +144,7 @@ class Q():
       return Q(self.w -q.w, self.x -q.x, self.y -q.y, self.z -q.z)
     if isinstance(q, Tensor):
       return q.__add__(-self)
-    Common._checkType(q, (int, float), "sub")
+    Lib._checkType(q, (int, float), "sub")
     return Q(self.w -q, self.x, self.y, self.z)
   def __rsub__(self, w):
     """Subtract quaternion from a scalar."""
@@ -169,7 +169,7 @@ class Q():
                self.w *q.z +self.x *q.y -self.y *q.x +self.z *q.w)
     if isinstance(q, Tensor):
       return q.__rmul__(self)
-    Common._checkType(q, (int, float), "mul")
+    Lib._checkType(q, (int, float), "mul")
     return Q(self.w *q, self.x *q, self.y *q, self.z *q)
   __rmul__ = __mul__
   
@@ -181,8 +181,8 @@ class Q():
     """Quaternion division for 2 quaternions or self by scalar."""
     if isinstance(q, Q):
       return self.__mul__(q.inverse())
-    Common._checkType(q, (int, float), "div")
-    if abs(q) <= Common._getPrecision():
+    Lib._checkType(q, (int, float), "div")
+    if abs(q) <= Lib._getPrecision():
       raise Exception("Illegal divide by zero")
     if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
       q = float(q)
@@ -196,13 +196,13 @@ class Q():
   __rfloordiv__ = __rdiv__
   def __mod__(self, q):
     """Modulo % operator for quaternion."""
-    Common._checkType(q, (int, float), "mod")
+    Lib._checkType(q, (int, float), "mod")
     p = self //q
     return self -p *q
   __rmod__ = __mod__
   def __divmod__(self, q):
     """Modulo  nd div operator for quaternion."""
-    Common._checkType(q, (int, float), "mod")
+    Lib._checkType(q, (int, float), "mod")
     p = self //q
     return (p, self -p *q)
   __rdivmod__ = __divmod__
@@ -223,8 +223,8 @@ class Q():
     """Versor rotation common method. For self=q=w+a then r'=qrq.inverse()
        with r=0+v then v'=v +wt +axt where t=2axv. [verified]. Force versor."""
     l1 = r.norm()
-    if abs(l1 -1.0) > Common._getPrecision():
-      if l1 <= Common._getPrecision():
+    if abs(l1 -1.0) > Lib._getPrecision():
+      if l1 <= Lib._getPrecision():
         return
       r.x /= l1
       r.y /= l1
@@ -249,18 +249,18 @@ class Q():
   def isScalar(self):
     """isScalar()
        Return true is there are no graded parts."""
-    return abs(self.x) + abs(self.y) + abs(self.z) <= Common._getPrecision()
+    return abs(self.x) + abs(self.y) + abs(self.z) <= Lib._getPrecision()
 
   def isVersor(self):
     """isVersore()
        Return True if self is of form cos(a) +n*sin(a), |n|==1."""
-    return abs(self.norm() -1.0) <= Common._getPrecision()
+    return abs(self.norm() -1.0) <= Lib._getPrecision()
 
   def degrees(self, ang=None):
     """degrees(deg, [ang])
        Return or set scalar part in degrees."""
     if ang:
-      Common._checkType(ang, (int, float), "degrees")
+      Lib._checkType(ang, (int, float), "degrees")
       self.w = math.radians(ang)
     return math.degrees(self.w)
 
@@ -268,7 +268,7 @@ class Q():
     """scalar([w])
        Return or set scalar part."""
     if w:
-      Common._checkType(w, (int, float), "scalar")
+      Lib._checkType(w, (int, float), "scalar")
       self.w = w
     return self.w
 
@@ -279,7 +279,7 @@ class Q():
     quat = Q(self.w, self.x, self.y, self.z)
     for key in params:
       if params[key] is not None and key != "self":
-        Common._checkType(params[key], (int, float), "copy")
+        Lib._checkType(params[key], (int, float), "copy")
         setattr(quat, key, params[key])
     return quat
 
@@ -313,9 +313,9 @@ class Q():
     """trim([precision])
        Return copy with elements smaller than precision removed."""
     if precision is None:
-      precision = Common._getPrecision()
+      precision = Lib._getPrecision()
     else:
-      Common._checkType(precision, float, "trim")
+      Lib._checkType(precision, float, "trim")
     w = 0 if abs(self.w) <= precision else  self.w
     x = 0 if abs(self.x) <= precision else  self.x
     y = 0 if abs(self.y) <= precision else  self.y
@@ -335,7 +335,7 @@ class Q():
   def grades(self, maxSize=0):
     """grades([maxSize])
        Return a list of count of set terms x, y and z with scalar first."""
-    Common._checkType(maxSize, int, "grades")
+    Lib._checkType(maxSize, int, "grades")
     g = [1 if self.w else 0]
     g.append[0]
     for val in (self.x, self.y, self.z):
@@ -373,20 +373,20 @@ class Q():
        Return inverse of self as conjugate/len."""
     l2 = self.norm()
     l2 *= l2
-    if l2 <= Common._getPrecision():
+    if l2 <= Lib._getPrecision():
       raise Exception("Illegal divide by zero")
     return Q(self.w /l2, -self.x /l2, -self.y /l2, -self.z /l2)
 
   def dot(self, q):
     """dot(q)
        Return dot product of self with quaternion q. See sym."""
-    Common._checkType(q, Q, "dot product")
+    Lib._checkType(q, Q, "dot product")
     return -self.x*q.x -self.y*q.y -self.z*q.z
 
   def cross(self, q):
     """cross(q)
        Return cross product of self with quaternion q. See asym."""
-    Common._checkType(q, Q, "cross product")
+    Lib._checkType(q, Q, "cross product")
     return Q(0, self.y *q.z -self.z *q.y,
              self.z *q.x -self.x *q.z,
              self.x *q.y -self.y *q.x)
@@ -394,14 +394,14 @@ class Q():
   def sym(self, q):
     """sym(q)
        Return symmetric product of two Qs. Same as dot product for pure parts"""
-    Common._checkType(q, Q, "sym")
+    Lib._checkType(q, Q, "sym")
     out = (self *q +q *self) *0.5 
     return out.w
 
   def asym(self, q):
     """asym(q)
        Return antisymmetric product of two QAs. This is the wedge product."""
-    Common._checkType(q, Q, "asym")
+    Lib._checkType(q, Q, "asym")
     return (self *q -q *self) *0.5 
  
   def associator(self, p, q):
@@ -419,7 +419,7 @@ class Q():
        a*b, a != b then return parts (perpendicular, parallel) to plane of a &
        b. a.cross(b) is not needed as scalar part is ignored."""
     n1 = -self.pureLen()
-    if n1 <= Common._getPrecision():
+    if n1 <= Lib._getPrecision():
       raise Exception("Invalid length for projecnormts.")
     mul = self.pure()
     vect = q.pure()
@@ -430,7 +430,7 @@ class Q():
     """distance(q)
        Return the Geodesic norm which is the half angle subtended by
        the great arc of the S3 sphere d(p,q)=|log(p.inverse())*q|."""
-    Common._checkType(q, Q, "distance")
+    Lib._checkType(q, Q, "distance")
     return (self.inverse() *q).log().norm()
 
   def normalise(self, noError=False):
@@ -438,7 +438,7 @@ class Q():
        Return normalised self - reduces versor error accumulation.
        Raise an error on failure or return 0 if noError."""
     l1 = self.norm()
-    if l1 <= Common._getPrecision():
+    if l1 <= Lib._getPrecision():
       if noError:
         return Q(0)
       raise Exception("Illegal length for normalise()")
@@ -448,7 +448,7 @@ class Q():
     """unit()
        Return self=frame with unit -pureLen(). See frame."""
     l1 = -self.pureLen()
-    if l1 <= Common._getPrecision():
+    if l1 <= Lib._getPrecision():
       raise Exception("Frame has zero length pure part for unit().")
     return Q(self.w, self.x /l1, self.y /l1, self.z /l1)
 
@@ -458,7 +458,7 @@ class Q():
     q = self.normalise()
     l1 = -q.pureLen()
     l0 = 0
-    if l1 > Common._getPrecision():
+    if l1 > Lib._getPrecision():
       l0 = self.len() /l1
     w = (q.w +1.0) %2.0 -1.0
     return Q(math.acos(w) *2, q.x *l0, q.y *l0, q.z *l0)
@@ -467,16 +467,16 @@ class Q():
     """versor()
        Return self=frame as a versor no magnitude. See frame & normalise."""
     n1 = -self.pureLen()
-    if n1 <= Common._getPrecision():
+    if n1 <= Lib._getPrecision():
       return Q(1)
-    sw,cw = Common._sincos(self.w /2.0)
+    sw,cw = Lib._sincos(self.w /2.0)
     sw /= n1
     return Q(cw, sw *self.x, sw *self.y, sw *self.z)
 
   def rotate(self, q):
     """rotate(q)
        Return q rotated by self as versor. Short for self*q*self.inverse()."""
-    Common._checkType(q, Q, "rotate")
+    Lib._checkType(q, Q, "rotate")
     q = q.copy()
     q.__rotation(self)
     return q
@@ -484,20 +484,20 @@ class Q():
   def rotation(self, rot):
     """rotation(rot)
        Rotate self inplace by rot converting rot to versor first. See rotate."""
-    Common._checkType(rot, Q, "rotation")
+    Lib._checkType(rot, Q, "rotation")
     self.__rotation(rot)
 
   def pow(self, exp):
     """pow(exp)
        For self=q=W+n, W=cos(a) then pow(q,x)=pow(|q|,x)(cos(xa) +sin(xa)n), n unit."""
-    Common._checkType(exp, (int, float), "pow")
+    Lib._checkType(exp, (int, float), "pow")
     n2 = self.x*self.x +self.y*self.y +self.z*self.z
     l1 = math.sqrt(n2 +self.w *self.w)
     w = pow(l1, exp)
-    if n2 <= Common._getPrecision():
+    if n2 <= Lib._getPrecision():
       return Q(w)
     a = math.acos(self.w /l1)
-    s,c = Common._sincos(a *exp)
+    s,c = Lib._sincos(a *exp)
     s *= w /math.sqrt(n2)
     return Q(w *c, self.x *s, self.y *s, self.z *s)
   __pow__ = pow
@@ -506,9 +506,9 @@ class Q():
     """exp()
        For self=q=w+v, exp(q)=exp(w)(cos|v|+sin(|v|)v/|v|), inverse of log()."""
     n1 = -self.pureLen()
-    if n1 <= Common._getPrecision():
+    if n1 <= Lib._getPrecision():
       return Q(self.w)
-    s,c = Common._sincos(n1)
+    s,c = Lib._sincos(n1)
     exp = pow(math.e, self.w)
     s *= exp /n1
     return Q(c *exp, self.x *s, self.y *s, self.z *s)
@@ -518,7 +518,7 @@ class Q():
        For self=q=w+v, log(self)=log|q|+acos(w/|q|)v/|v|, inverse of exp()."""
     n2 = self.x*self.x +self.y*self.y +self.z*self.z
     l1 = math.sqrt(self.w *self.w +n2)
-    if n2 <= Common._getPrecision():
+    if n2 <= Lib._getPrecision():
       return Q(math.log(l1))
       if l1 == 0.0:
         raise Exception("Log(0) is undefined")
@@ -529,22 +529,22 @@ class Q():
     """latLonAlt()
        Return geodetic lat(deg)/long(deg)/altitude(m) on WGS-84 for an ECEF
        quaternion vector (see LatLonAlt()). From fossen.biz/wiley/pdf/Ch2.pdf."""
-    precision = Common._getPrecision()
-    ee3 = 1 -Common._EARTH_ECCENT2
+    precision = Lib._getPrecision()
+    ee3 = 1 -Lib._EARTH_ECCENT2
     p = math.sqrt(self.x *self.x +self.y *self.y)
     lat = math.atan2(self.z, p *ee3) # First approx.
     while True:
       lat0 = lat
-      sLat,cLat = Common._sincos(lat)
-      N = Common.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
+      sLat,cLat = Lib._sincos(lat)
+      N = Lib.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
       if p > precision:
         h = p /cLat -N
-        lat = math.atan(self.z /p /(1 -Common._EARTH_ECCENT2 *N/(N +h)))
+        lat = math.atan(self.z /p /(1 -Lib._EARTH_ECCENT2 *N/(N +h)))
       elif lat >= 0.0:
-        h = self.z -Common.EARTH_MINOR_M
+        h = self.z -Lib.EARTH_MINOR_M
         lat = math.pi *0.5
       else:
-        h = self.z +Common.EARTH_MINOR_M
+        h = self.z +Lib.EARTH_MINOR_M
         lat = -math.pi *0.5
       if abs(lat -lat0) <= precision:
         break
@@ -580,7 +580,7 @@ class Q():
         raise Exception("Illegal versor norm for versorMatrix()")
       tmp = self.normalise()
     disc = tmp.w *tmp.y - tmp.x *tmp.z
-    if abs(abs(disc) -0.5) < Common._getPrecision():
+    if abs(abs(disc) -0.5) < Lib._getPrecision():
       sgn = 2.0 if disc < 0 else -2.0
       return Euler(sgn *math.atan2(tmp.x, tmp.w), -math.pi /sgn, 0.0)
     return Euler(math.atan2(2.0 * (tmp.z * tmp.y + tmp.w * tmp.x),
@@ -649,7 +649,7 @@ class Q():
        So return I +sinW aX +(1 -cosW)(aX)(aX) [verified].
        Opposite of FrameMatrix."""
     tmp = self.unit()
-    s,c = Common._sincos(self.w)
+    s,c = Lib._sincos(self.w)
     c1 = 1 -c
     x = tmp.x
     y = tmp.y
@@ -689,12 +689,12 @@ class Q():
     if isinstance(roll, (int, float)):
       roll = Euler(roll, pitch, yaw)
     else:
-      Common._checkType(roll, Euler, "Euler")
-    Common._checkType(order, (list, tuple), "Euler")
-    Common._checkType(implicit, bool, "Euler")
-    sx,cx = Common._sincos(roll[0] * 0.5)
-    sy,cy = Common._sincos(roll[1] * 0.5)
-    sz,cz = Common._sincos(roll[2] * 0.5)
+      Lib._checkType(roll, Euler, "Euler")
+    Lib._checkType(order, (list, tuple), "Euler")
+    Lib._checkType(implicit, bool, "Euler")
+    sx,cx = Lib._sincos(roll[0] * 0.5)
+    sy,cy = Lib._sincos(roll[1] * 0.5)
+    sz,cz = Lib._sincos(roll[2] * 0.5)
     if not order:
       if not implicit:
         return Q(cx * cy * cz + sx * sy * sz,
@@ -711,13 +711,13 @@ class Q():
     store = []
     names = ('xXroll', 'yYpitch', 'zZyaw')
     for key in order:
-      if isinstance(key, Common._basestr):
+      if isinstance(key, Lib._basestr):
         for i,name in enumerate(names):
           if name.find(key) >= 0:
             key = i +1
             break
       else:
-        Common._checkType(key, (float, int), "Euler")
+        Lib._checkType(key, (float, int), "Euler")
       if key in store or key not in (1, 2, 3):
         raise Exception("Invalid order index for Euler: %s" %key)
       args = [rc[key -1], 0, 0, 0]
@@ -738,14 +738,14 @@ class Q():
        Return Earth Centred, Fixed (ECEF) quaternion vector for geodetic
        WGS-84 lat(deg)/lng(deg). From Appendix C - Coorinate Transformations
        at onlinelibrary.wiley.com/doi/pdf/10.1002/9780470099728.app3."""
-    Common._checkType(lat, (int, float), "LatLon")
-    Common._checkType(lng, (int, float), "LatLon")
-    sLat,cLat = Common._sincos(math.radians(lat))
-    sLng,cLng = Common._sincos(math.radians(lng))
-    major = Common.EARTH_MAJOR_M
-    minor = Common.EARTH_MINOR_M
+    Lib._checkType(lat, (int, float), "LatLon")
+    Lib._checkType(lng, (int, float), "LatLon")
+    sLat,cLat = Lib._sincos(math.radians(lat))
+    sLng,cLng = Lib._sincos(math.radians(lng))
+    major = Lib.EARTH_MAJOR_M
+    minor = Lib.EARTH_MINOR_M
     latParametric = math.atan2(minor *sLat, major *cLat)
-    sLat,cLat = Common._sincos(latParametric)
+    sLat,cLat = Lib._sincos(latParametric)
     xMeridian = major *cLat
     return Q(0, xMeridian *cLng, xMeridian *sLng, minor *sLat)
 
@@ -755,13 +755,13 @@ class Q():
        Return Earth Centred, Earth Fixed (ECEF) quaternion vector for geodetic
        WGS-84 lat(deg)/lng(deg)/altitude(m). From fossen.biz/wiley/pdf/Ch2.pdf.
        EarthPolar/EarthMajor = sqrt(1-e*e), e=eccentricity. alt default is 0."""
-    Common._checkType(lat, (int, float), "LatLonAlt")
-    Common._checkType(lng, (int, float), "LatLonAlt")
-    Common._checkType(alt, (int, float), "LatLonAlt")
-    sLat,cLat = Common._sincos(math.radians(lat))
-    sLng,cLng = Common._sincos(math.radians(lng))
-    ee3 = 1 -Common._EARTH_ECCENT2
-    N = Common.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
+    Lib._checkType(lat, (int, float), "LatLonAlt")
+    Lib._checkType(lng, (int, float), "LatLonAlt")
+    Lib._checkType(alt, (int, float), "LatLonAlt")
+    sLat,cLat = Lib._sincos(math.radians(lat))
+    sLng,cLng = Lib._sincos(math.radians(lng))
+    ee3 = 1 -Lib._EARTH_ECCENT2
+    N = Lib.EARTH_MAJOR_M /math.sqrt(cLat *cLat +sLat *sLat *ee3)
     return Q(0, (N +alt) *cLat *cLng, (N +alt) *cLat *sLng,
                 (N *ee3 +alt) *sLat)
   @staticmethod
@@ -770,10 +770,10 @@ class Q():
        Lat/lng Earth Centred-Earth Fixed (ECEF) to North-East-Down (NED)
        frame. Return a versor to perform this rotation. The inverse changes
        from NED to ECEF."""
-    Common._checkType(lat, (int, float), "NED")
-    Common._checkType(lng, (int, float), "NED")
-    sLat,cLat = Common._sincos(math.radians(-lat -90) *0.5)
-    sLng,cLng = Common._sincos(math.radians(lng) *0.5)
+    Lib._checkType(lat, (int, float), "NED")
+    Lib._checkType(lng, (int, float), "NED")
+    sLat,cLat = Lib._sincos(math.radians(-lat -90) *0.5)
+    sLng,cLng = Lib._sincos(math.radians(lng) *0.5)
     return Q(cLng *cLat, -sLng *sLat, cLng *sLat, sLng *cLat)
 
   @staticmethod
@@ -782,7 +782,7 @@ class Q():
        Return the quaternion for a frame matrix ie opposite of frameMatrix()
        for a unit vector except than angles outside 90 deg are disallowed.
        tr(mat) = 2cosW +1. If W=0 R=Id. If W=pi R=?."""
-    Common._checkType(mat, (Matrix, Tensor), "FrameMatrix")
+    Lib._checkType(mat, (Matrix, Tensor), "FrameMatrix")
     if mat.shape()[0] != 3 or mat.shape()[1] != 3:
       raise Exception("Invalid FrameMatrix Matrix size")
     tr = mat.get(0,0) +mat.get(1,1) +mat.get(2,2)
@@ -834,7 +834,7 @@ class Q():
        yScale = abs(a *xScale *xScale +b *xScale)
        xAxis = list(x *xScale for x in range(xMax0, xMax1))
        yAxis = list(y *yScale *10 +c for y in (-xMax, xMax))
-       plt.figure(Common.nextFigure())
+       plt.figure(Lib.nextFigure())
        plt.plot(xAxis, (0,)*(xMax1 -xMax0))   # default blue
        plt.plot((0,)*2, yAxis, color="C0")    # first colour
        loc = "offset points"
@@ -848,7 +848,7 @@ class Q():
                     color='C1', fontsize=_fs)
        plt.annotate('$x \\sqrt{-1}$', (xAxis[-1], 0), textcoords=loc,
               xytext=(-26 -int(_fs), -17 -int(_fs/2.0)), color='C2', fontsize=_fs)
-       resolution, resolForm, resolFloat = Common._getResolutions("%s")
+       resolution, resolForm, resolFloat = Lib._getResolutions("%s")
        fnVals = list(a*x*x +b*x +c for x in xAxis)
        plt.plot(xAxis, fnVals)
        plt.annotate(_fnText(a,b,c), (xAxis[-1], fnVals[-1]), textcoords=loc,
@@ -856,8 +856,8 @@ class Q():
        if a != 0.0:
          duVals = list(-a*x*x -b*x +c -b*b/a/2.0 for x in xAxis)
          plt.plot(xAxis, duVals)
-         du = "Quad(%s,%s,%s)" %(Common.getResolNum(-a), Common.getResolNum(-b),
-                                 Common.getResolNum(c -b*b/a/2.0))
+         du = "Quad(%s,%s,%s)" %(Lib.getResolNum(-a), Lib.getResolNum(-b),
+                                 Lib.getResolNum(c -b*b/a/2.0))
          du = _fnText(-a, -b, c -b*b/a/2.0)
          #du = "$-x^2 + 1$"
          plt.annotate(du, (xAxis[-1], duVals[-1]), textcoords=loc,
@@ -950,8 +950,8 @@ if __name__ == '__main__':
   import traceback
   import sys, os
   from math import *
-  exp = Common.exp
-  log = Common.log
+  exp = Lib.exp
+  log = Lib.log
   try:
     import importlib
   except:
@@ -982,7 +982,7 @@ if __name__ == '__main__':
        Calculator.log(store == test, store)""",
     """# Test 6 Quaternion squared == exp(2*log(q)).
        test = q.pow(2); store = (q.log() *2).exp()
-       Common.precision(6E-15)
+       Lib.precision(6E-15)
        Calculator.log(store == test, store)""",
     """# Test 7 Rotate via frameMatrix == versor.versorMatrix(half angle).
        test = (d45+i+j+k).frameMatrix()
@@ -1012,7 +1012,7 @@ if __name__ == '__main__':
        Calculator.log(store == test.rotate(i+j), store)""",
     """# Test 14 Check lat-long conversion to ECEF xyz and back.
        lat=45; lng=45; test = Tensor(lat,lng)
-       store = Q.LatLon(lat,lng); Common.precision(1E-8)
+       store = Q.LatLon(lat,lng); Lib.precision(1E-8)
        Calculator.log(test == store.latLonAlt()[:2], store.latLonAlt())""",
     """# Test 15 Check lat-long-alt conversion to ECEF xyz and back.
        lat=45; lng=45; test = Tensor(lat,lng,0)

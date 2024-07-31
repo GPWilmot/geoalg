@@ -167,20 +167,20 @@ def nonAssocLine(dLine, code=0, triadFn=nonAssocType, key=None):
   """nonAssocLine(dim,[nDim=0,code=0,triadFn=nonAssocType,all=False])
      Return triadFn(...,code) for dLine=(b,c,ds,...) or dict if key in
      which case key is (b,c) and values are (ds,...)[,(ds,...),...]."""
-  Common._checkType(code, int, "nonAssocLine")
+  Lib._checkType(code, int, "nonAssocLine")
   if key is not None:
-    Common._checkType(key, (list, tuple), "nonAssocLine")
+    Lib._checkType(key, (list, tuple), "nonAssocLine")
   if key:
-    Common._checkType(dLine, dict, "nonAssocLine")
+    Lib._checkType(dLine, dict, "nonAssocLine")
     b,c = key
     dLine = dLine[key]
     if isinstance(dLine, (list, tuple)) and len(dLine) > 0:
       if isinstance(dLine[0], (list, tuple)):
-        dLine = list(Common.chain(*dLine))
+        dLine = list(Lib.chain(*dLine))
   else:
     b,c = dLine[:2]
     dLine = dLine[2:]
-  Common._checkType(dLine, (list, tuple), "nonAssocLine")
+  Lib._checkType(dLine, (list, tuple), "nonAssocLine")
   out = []
   for d in dLine:
     out.append(triadFn(b, c, d, code))
@@ -209,10 +209,10 @@ def triadMalcev(b, c, d, code):
 def nonAssocCube(pDim, nDim=0, code=0, triadFn=nonAssocType, all=True):
   """nonAssocCube(dim,[nDim=0,code=0,triadFn=nonAssocType,all=False])
      Return triadFn(...,code) for unique triples, unordered if all."""
-  Common._checkType(pDim, int, "nonAssocCube")
-  Common._checkType(nDim, int, "nonAssocCube")
-  Common._checkType(code, int, "nonAssocCube")
-  Common._checkType(all, bool, "nonAssocCube")
+  Lib._checkType(pDim, int, "nonAssocCube")
+  Lib._checkType(nDim, int, "nonAssocCube")
+  Lib._checkType(code, int, "nonAssocCube")
+  Lib._checkType(all, bool, "nonAssocCube")
   size1 = int(pow(2,(pDim +nDim))-1)
   size2 = size1 *size1 #(size1 -1)
   out = [None] *size2
@@ -233,9 +233,9 @@ def nonAssocCube(pDim, nDim=0, code=0, triadFn=nonAssocType, all=True):
 def triads(pDim, nDim=0, scalars=False, all=True):
   """allTriads(dim,[nDim=0,scalars=False,all=False])
      Return triads ie bcd non-scalar unless scalar, unordered if all."""
-  Common._checkType(pDim, int, "allTriads")
-  Common._checkType(nDim, int, "allTriads")
-  Common._checkType(all, bool, "allTriads")
+  Lib._checkType(pDim, int, "allTriads")
+  Lib._checkType(nDim, int, "allTriads")
+  Lib._checkType(all, bool, "allTriads")
   out = []
   rng = O.Basis(pDim, nDim)
   lr = len(rng)
@@ -258,22 +258,22 @@ def zeroDivisors(pDim, nDim=0, nod=False, dump=False):
      Return zero divisors (a+b)(c+d) for cycles (b,c),(b,bc),(c,bc) as 
      {(b,c): [d0, ...][d1, ...][d2, ...]} a=bcd. Excludes empty ds unless nod.
      Dump logs progress and checks memory and abborts if too small."""
-  Common._checkType(pDim, int, "ZeroDivisors")
-  Common._checkType(nDim, int, "ZeroDivisors")
-  Common._checkType(nod, bool, "ZeroDivisors")
-  Common._checkType(dump, bool, "ZeroDivisors")
+  Lib._checkType(pDim, int, "ZeroDivisors")
+  Lib._checkType(nDim, int, "ZeroDivisors")
+  Lib._checkType(nod, bool, "ZeroDivisors")
+  Lib._checkType(dump, bool, "ZeroDivisors")
   out = {}
   rng = O.Basis(pDim, nDim)
   lr = len(rng)
   cnt = 0
   if dump:
-    Common.procTime()
-    Common.freeMemMB(init=True)
+    Lib.procTime()
+    Lib.freeMemMB(init=True)
   for b in range(lr):
     if dump and b %10 == 0:
-      sys.stdout.write("%s (%ds) %d: total=%d %dMB\n" %(Common.date(True),
-                     int(Common.procTime()), b, cnt*3, Common.freeMemMB()))
-      if Common.freeMemMB(check=True) < 0:
+      sys.stdout.write("%s (%ds) %d: total=%d %dMB\n" %(Lib.date(True),
+                     int(Lib.procTime()), b, cnt*3, Lib.freeMemMB()))
+      if Lib.freeMemMB(check=True) < 0:
         sys.stdout.write("ABORT: Memory limit reached\n")
         break
     for c in range(b +1, lr):
@@ -300,11 +300,11 @@ def zeroDivisors(pDim, nDim=0, nod=False, dump=False):
       if bufs[0] or nod:
         out[pair] = bufs
   if dump:
-    sys.stdout.write("%s (%ds) total=%d\n" %(Common.date(True),
-                     int(Common.procTime()), cnt))
+    sys.stdout.write("%s (%ds) total=%d\n" %(Lib.date(True),
+                     int(Lib.procTime()), cnt))
   return out
 
-# p4=list((O.Basis(4)[x[0]-1],O.Basis(4)[x[1]-1]) for x in Common.comb(15,2,True))
+# p4=list((O.Basis(4)[x[0]-1],O.Basis(4)[x[1]-1]) for x in Lib.comb(15,2,True))
 # p3/cycles = ((o1,o2), (o1,o3), (o1,o23), (o2,o13), (o12,o123), (o2,o3), (o12,o13))
 
 # list(x for x in O.ZeroDivisors(5) if len(x)==y)) y=14/10/6 has len 42/63/105

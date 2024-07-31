@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ################################################################################
-## File: calcCommon.py is the basis for calcR.py and is part of GeoAlg.
+## File: calcLib.py is the basis for calcR.py and is part of GeoAlg.
 ## Copyright (c) 2021, 2023 G.P.Wilmot
 ##
 ## GeoAlg is free software: you can redistribute it and/or modify it under the
@@ -22,16 +22,16 @@
 ## Assumes calc?.py is in the same directory and this has more documentation.
 ## Start with either calcR.py, python calcR.py or see ./calcR.py -h.
 ## This module contains classes (run help for more info):
-##   * Common - miscellaneous functions for all calculators
+##   * Lib     - miscellaneous functions for all calculators
 ##   * Tensor - simple 1&2-D matricies used for testing and algebra elements
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
 ################################################################################
-__version__ = "0.4"
-import math, sys
+__version__ = "0.6"
+import math, sys, os
 
 ################################################################################
-class Common():
+class Lib():
   """Class to provide common resources for basis numbers. Tests are a list of
      strings that can be run in the current calculator with results logged."""
   _EARTH_MAJOR_M = "WGS-84 earth ellipse equatorial radius(m) variable"
@@ -57,7 +57,8 @@ class Common():
   __plotFigure  = 0             # Matplotlib unique figures count
   __lastTime    = 0             # Store epoch for time
   __lastProcTime= 0             # Store program time
-  _memLimitMB   = 50           # Abort if less mem than this
+  __checkMemSrt = True          # checkMem to run procTime at start
+  _memLimitMB   = 500           # Abort if less mem than this
   if sys.version_info.major == 2:
     _basestr = basestring       # Handle unicode
   else:
@@ -86,8 +87,8 @@ class Common():
   def sincos(a):
     """sincos(rad)
        Return sin(rad) & cos(rad)."""
-    Common._checkType(a, (int, float), "sincos")
-    return Common._sincos(a)
+    Lib._checkType(a, (int, float), "sincos")
+    return Lib._sincos(a)
 
   @staticmethod
   def readText(filename):
@@ -100,8 +101,8 @@ class Common():
   def nextFigure():
     """nextFigure()
        Return next Matplotlib unique figure count."""
-    Common.__PlotFigures += 1
-    return Common.__PlotFigure 
+    Lib.__PlotFigures += 1
+    return Lib.__PlotFigure 
 
   @staticmethod
   def getMainDoco(filt="test"): #TBD
@@ -120,18 +121,18 @@ class Common():
     """info se([info])
        Toggle or set info for user reporting."""
     if info is None:
-      info = not Common.__info
-    Common._checkType(info, bool, "info")
-    Common.__info = info
+      info = not Lib.__info
+    Lib._checkType(info, bool, "info")
+    Lib.__info = info
     return verbosity
   @staticmethod
   def verbose(verbosity=None):
     """verbose([verbosity])
        Toggle or set verbosity for logging and traceback reporting."""
     if verbosity is None:
-      verbosity = not Common.__verbose
-    Common._checkType(verbosity, bool, "verbose")
-    Common.__verbose = verbosity
+      verbosity = not Lib.__verbose
+    Lib._checkType(verbosity, bool, "verbose")
+    Lib.__verbose = verbosity
     return verbosity
 
   @staticmethod
@@ -144,9 +145,9 @@ class Common():
       digits = 18
     elif digits < 4:
       digits = 4
-    Common.__resolution = digits
-    Common.__resol_form = "%%0.%dG" %digits
-    Common.__resol_float = "%%0.%df" %digits
+    Lib.__resolution = digits
+    Lib.__resol_form = "%%0.%dG" %digits
+    Lib.__resol_float = "%%0.%df" %digits
 
   @staticmethod
   def precision(precise=None):
@@ -154,19 +155,19 @@ class Common():
        Set equality precision or reset to default e-15."""
     if precise is None:
       precise = 1E-15
-    Common._checkType(precise, float, "precision")
-    Common.__precision = precise
+    Lib._checkType(precise, float, "precision")
+    Lib.__precision = precise
 
   @staticmethod
   def isInfo():
     """isInfo()
        Return true if verbosity is set."""
-    return Common.__info
+    return Lib.__info
   @staticmethod
   def isVerbose():
     """isVerbose()
        Return true if verbosity is set."""
-    return Common.__verbose
+    return Lib.__verbose
   _isVerbose = isVerbose
   @staticmethod
   def getResolNum(val):
@@ -174,10 +175,11 @@ class Common():
        Return int or the float rounded to resolution or in exponent format."""
     num = str(val)
     pos = num.find('.')
-    if pos < 0 or len(num) -pos -1 < Common.__resolution:
+    if pos < 0 or len(num) -pos -1 < Lib.__resolution:
       return num
     else:
-      return Common.__resol_float %val
+      return Lib.__resol_float %val
+
   @staticmethod
   def _checkType(arg, typ, method):
     """Raise exception if not the correct type."""
@@ -195,20 +197,19 @@ class Common():
   @staticmethod
   def _checkList(arg, typ, method, size=None):
     """Raise exception if not a list/tuple of typ types and optional size."""
-    Common._checkType(arg, (list, tuple), method)
+    Lib._checkType(arg, (list, tuple), method)
     for elem in arg:
-      Common._checkType(elem, typ, method)
+      Lib._checkType(elem, typ, method)
     if size and size != len(arg):
       raise Exception("Invalid list length for %s" %method)
-
   @staticmethod
   def _getResolutions():
     """Internal method to return the digits and print format."""
-    return Common.__resolution, Common.__resol_form, Common.__resol_float
+    return Lib.__resolution, Lib.__resol_form, Lib.__resol_float
   @staticmethod
   def _getPrecision():
     """Internal method to return the precision."""
-    return Common.__precision
+    return Lib.__precision
   @staticmethod
   def _resolutionDump(sign, val, basis):
     """Internal method to return a formated number and basis or blank."""
@@ -217,16 +218,16 @@ class Common():
     pos = num.find('.')
     if num[0] == '-' and sign:
       sign = " "
-    if pos < 0 or len(num) -pos -1 < Common.__resolution:
+    if pos < 0 or len(num) -pos -1 < Lib.__resolution:
       if abs(val) == 1 and basis:
         num = "" if val > 0 else "-"
       if val != 0:
         out = "%s%s%s" %(sign, num, basis)
     elif val != 0.0:
-      flt = Common.__resol_form %val
+      flt = Lib.__resol_form %val
       if flt.find(".") < 0:
-        flt = Common.__resol_float %val
-      resolForm = r"%%s%s%%s" %Common.__resol_form
+        flt = Lib.__resol_float %val
+      resolForm = r"%%s%s%%s" %Lib.__resol_form
       out = sign +flt +basis
     return out
   @staticmethod
@@ -274,18 +275,18 @@ class Common():
       else:
         args.extend((val, replace))
     if pairs[0]:
-      Common._checkType(pairs[0], (list, tuple), "_unzipBasis")
-      Common._checkType(pairs[0][0], Common._basestr, "_unzipBasis")
-      Common._checkType(pairs[0][1], int, pairs[0][0])
+      Lib._checkType(pairs[0], (list, tuple), "_unzipBasis")
+      Lib._checkType(pairs[0][0], Lib._basestr, "_unzipBasis")
+      Lib._checkType(pairs[0][1], int, pairs[0][0])
       for val in args:
-        Common._checkType(val, int, pairs[0][0])
+        Lib._checkType(val, int, pairs[0][0])
         if val > pairs[0][1] or val < 0:
           raise Exception("Invalid %s parameter size" %pairs[0][0])
     return args
   @staticmethod
   def _unzipPairs(dim, pairs):
     """Return pairs or sets of pairs as a permutation list."""
-    Common._checkType(pairs, (list, tuple), "_unzipPairs")
+    Lib._checkType(pairs, (list, tuple), "_unzipPairs")
     flat = []
     for pair in pairs:
       if isinstance(pair, (list, tuple)):
@@ -308,7 +309,7 @@ class Common():
   def _morph(basisNames, value, pairs):
     """Internal utility to perform a single basis swap for each pair in a list
        of basis pair names."""
-    Common._checkType(pairs, (list, tuple), "morph")
+    Lib._checkType(pairs, (list, tuple), "morph")
     if isinstance(basisNames, (list, tuple)):
       basisNames = "".join(basisNames)
     if len(pairs) %2:
@@ -317,8 +318,8 @@ class Common():
     out = {}
     for idx in range(len(pairs) //2):
       x,y = pairs[idx *2:idx *2 +2]
-      Common._checkType(x, Common._basestr, "morph")
-      Common._checkType(y, Common._basestr, "morph")
+      Lib._checkType(x, Lib._basestr, "morph")
+      Lib._checkType(y, Lib._basestr, "morph")
       if x in pairs[:idx] or y in pairs[:idx +1]:
         raise Exception("Pairs in morph need to be unique")
       if basisNames == x:
@@ -329,17 +330,49 @@ class Common():
     return out
 
   @staticmethod
+  def freeMemMB():
+    """freeMemMB()
+       Return the amount of free memory left."""
+    if sys.platform == "win32":
+      process = os.popen('systeminfo |find "Available Phys"')
+      result = process.read()
+      process.close()
+      return int(result.split()[4].replace(",",""))
+    return os.sysconf('SC_AVPHYS_PAGES')//256
+  @staticmethod
+  def checkMem(inc=10, mod=10, extra=0, finish=False):
+    """checkMem([inc,mod,extra,finish])
+       Dump progess if !inc%mod and return freeMem<_memLimitMB."""
+    Lib._checkType(inc, (int, float), "checkMem")
+    Lib._checkType(mod, (int, float), "checkMem")
+    Lib._checkType(finish, bool, "checkMem")
+    if Lib.__checkMemSrt:
+      Lib.__checkMemSrt = False
+      Lib.procTime(True)
+      if mod < 1:
+        raise Exception("Invalid mod valid for checkMem")
+    if finish:
+      Lib.__checkMemSrt = True
+      mod = 1
+    return Lib.__checkMem(inc, mod, extra)
+  @staticmethod
+  def __checkMem(inc, mod, extra=0):
+    """Internal version for checkMem. Assumes procTime and finish called."""
+    if inc %mod == 0:
+      sys.stdout.write("%s (%ds) inc=%s extra=%s %dMB\n" %(Lib.date(True),
+                     int(Lib.procTime()), inc, extra, Lib.freeMemMB()))
+      if Lib.freeMemMB() < Lib._memLimitMB and mod > 0:
+        sys.stdout.write("ABORT: Memory limit reached\n")
+        return True
+    return False
+
+  @staticmethod
   def chain(*iterables):
     """chain(list)
        Same as itertools.chain(). Concatenate list of lists or generators."""
     for it in iterables:
       for element in it:
         yield element
-
-  @staticmethod
-  def freeMemMB():
-    import os
-    return os.sysconf('SC_AVPHYS_PAGES')//256
 
   @staticmethod
   def date(noMs=False):
@@ -357,57 +390,81 @@ class Common():
     """time([epoch])
        Return seconds since epoch or difference to previous call as a float."""
     import time
-    if Common.__lastTime == 0 or epoch:
-      Common.__lastTime = time.time()
-    lastTime = Common.__lastTime
-    Common.__lastTime = time.time()
-    return Common.__lastTime -(0 if epoch else lastTime)
+    if Lib.__lastTime == 0 or epoch:
+      Lib.__lastTime = time.time()
+    lastTime = Lib.__lastTime
+    Lib.__lastTime = time.time()
+    return Lib.__lastTime -(0 if epoch else lastTime)
 
   @staticmethod
   def procTime(start=False):
     """procTime([start])
        Return program user+sys seconds since start or diff. to previous call."""
     import time
-    if Common.__lastProcTime == 0 or start:
+    if Lib.__lastProcTime == 0 or start:
       if sys.version_info.major == 2:
-        Common.__lastProcTime = time.time()
+        Lib.__lastProcTime = time.time()
       else:
-        Common.__lastProcTime = time.process_time()
-    lastTime = Common.__lastProcTime
+        Lib.__lastProcTime = time.process_time()
+    lastTime = Lib.__lastProcTime
     if sys.version_info.major == 2:
-      Common.__lastProcTime = time.time()
+      Lib.__lastProcTime = time.time()
     else:
-      Common.__lastProcTime = time.process_time()
-    return Common.__lastProcTime -(0 if start else lastTime)
+      Lib.__lastProcTime = time.process_time()
+    return Lib.__lastProcTime -(0 if start else lastTime)
+
+  @staticmethod
+  def pascalTriangle(n, dump=False):
+    """pascalTriangle(n[dump])
+       Return a list of the first half of Pascal's Triangle at level n."""
+    Lib._checkType(n, int, "pascalTriangle")
+    Lib._checkType(dump, bool, "pascalTriangle")
+    if n < 0:
+      raise Exception("Invalid parameter for comb(%s,%s)" %(n, r))
+    out = []
+    for r in range(n +1):
+      out.append(Lib.comb(n, r))
+    return out
 
   @staticmethod
   def comb(n, r, basis=False, dump=False):
     """comb(n,r,[basis=False,dump])
        Return number of combinations of r in n, basis list or no. generator."""
-    Common._checkType(n, int, "comb")
-    Common._checkType(r, int, "comb")
-    Common._checkType(basis, (bool, list, tuple), "comb")
-    Common._checkType(dump, bool, "comb")
-    if n < r:
+    Lib._checkType(n, int, "comb")
+    Lib._checkType(r, int, "comb")
+    Lib._checkType(basis, (bool, list, tuple), "comb")
+    Lib._checkType(dump, bool, "comb")
+    if n < r or r < 0:
       raise Exception("Invalid parameter for comb(%s,%s)" %(n, r))
     if basis:
       if dump:
         dump = [r,0]
       if basis == True:
-        return Common.__perm(n, [1] *r, 1, dump)
+        return Lib.__perm(n, [1] *r, 1, dump)
       if len(basis) < n:
         raise Exception("Invalid basis length in comb")
-      return list((list(basis[idx -1]  for idx in elem) \
-                   for elem in Common.__perm(n, [1] *r, 1, dump)))
+      return Lib.__comb(n, r, basis, dump)
     return math.factorial(n) /math.factorial(n-r) /math.factorial(r) 
+
+  @staticmethod
+  def __comb(n, r, basis, dump):
+    """Need a yield to substitute basis for the return in comb. Also for speed
+       expands r > n/2 as inverse of first half which needs ordering fixed."""
+    if r > n //2:
+      rng = range(1, len(basis) +1)
+      for elem in reversed(list(Lib.__perm(n, [1] *(n -r), 1, dump))):
+        yield list(basis[idx -1] for idx in rng if idx not in elem) 
+    else:
+      for elem in Lib.__perm(n, [1] *r, 1, dump):
+        yield list(basis[idx -1]  for idx in elem) 
   
   @staticmethod
   def perm(n, r=None):
     """perm(n, [r])
        Return number of permutations of n terms or generator of r in n perms."""
-    Common._checkType(n, int, "perm")
+    Lib._checkType(n, int, "perm")
     if isinstance(r, int) and not isinstance(r, bool):
-      return Common.__perm(n, [1] *r, 0, None)
+      return Lib.__perm(n, [1] *r, 0, None)
     elif r is None:
       return math.factorial(n) 
     raise Exception("Invalid r parameter for perm")
@@ -424,7 +481,7 @@ class Common():
     else:
       for recuse in range(offset if offset else 1, n +1):
         if len(arr) > 1:
-          for more in Common.__perm(n, arr[1:], recuse if offset else 0, dump):
+          for more in Lib.__perm(n, arr[1:], recuse if offset else 0, dump):
             arr = [recuse] +more
             dup = False
             for idx,elem in enumerate(arr):
@@ -433,7 +490,7 @@ class Common():
                 break
             if dump and len(arr) == dump[0] and arr[0] != dump[1]:
               dump[1] = arr[0]
-              sys.stdout.write("%s %s %s\n" %(Common.date(), dup, arr))
+              sys.stdout.write("%s %s %s\n" %(Lib.date(), dup, arr))
             if not dup:
               yield arr
         else:
@@ -443,9 +500,9 @@ class Common():
   def additionTree(dim, split, maxs=()):
     """additionTree(dim,split, [maxs])
        Split dim into split parts with options maxs list."""
-    Common._checkType(dim, int, "additionTree")
-    Common._checkType(split, int, "additionTree")
-    Common._checkType(maxs, (list, tuple), "additionTree")
+    Lib._checkType(dim, int, "additionTree")
+    Lib._checkType(split, int, "additionTree")
+    Lib._checkType(maxs, (list, tuple), "additionTree")
     if dim < 1 or split < 2:
       raise Exception("additionTree has invalid dim or split size")
     if maxs:
@@ -454,7 +511,7 @@ class Common():
     else:
       maxs = [dim] *split
     for val in maxs:
-      Common._checkType(val, int, "additionTree")
+      Lib._checkType(val, int, "additionTree")
       if val < 0:
         raise Exception("additionTree has invalid maxs value")
     out = []
@@ -465,7 +522,7 @@ class Common():
     else:
       splits = [0] *split
       splits[0] = dim
-      Common.__additionTree(splits, out, maxs, 0)
+      Lib.__additionTree(splits, out, maxs, 0)
     return out
 
   @staticmethod
@@ -483,7 +540,7 @@ class Common():
       splits[idx] = old -cnt
       if idx < len(splits) -1:
         splits[idx +1] += cnt
-        Common.__additionTree(splits, out, maxs, idx +1)
+        Lib.__additionTree(splits, out, maxs, idx +1)
         splits[idx +1] -= cnt
     splits[idx] = old
      
@@ -491,10 +548,10 @@ class Common():
   def triads(dim):
     """triads(dim)
        Generate a list of all independent triads for a basis of dim > 2."""
-    Common._checkType(dim, int, "triads")
+    Lib._checkType(dim, int, "triads")
     if dim < 3:
       raise Exception("Invalid triad dimension")
-    pAll = list(Common.comb(dim, 3, True))
+    pAll = list(Lib.comb(dim, 3, True))
     faces = []
     facesLen = 0       # First count the expected independent faces
     for triad in pAll:
@@ -517,7 +574,7 @@ class Common():
     else:
       # Use all combinations of triads and check for independence (cnt <= 1)
       morphs = []
-      for triads in Common.comb(len(pAll), facesLen, True):
+      for triads in Lib.comb(len(pAll), facesLen, True):
         faces = []
         cnt = 0
         for idx in triads:
@@ -537,23 +594,32 @@ class Common():
         if len(faces) == facesLen:
           yield faces
 
-  def dump(name, value, filename):
-    """dump(name, value, filename)
-       Print value into a file."""
+  @staticmethod
+  def save(name, value, filename):
+    """save(name, value, filename)
+       Print value into a file. This should be a Calculator command."""
     if isinstance(value, dict):
       with open(filename, 'w') as fp:
         fp.write("%s = { \\\n" %name)
         for key,var in value.items():
+          if isinstance(key, Lib._basestr):
+            key = '"%s"' %key
+          if isinstance(var, Lib._basestr):
+            var = '"%s"' %var
           fp.write(" %s: %s,\n" %(key, var))
         fp.write("}\n")
-    elif isinstance(value, (list, tuple)):
+    elif isinstance(value, (list, tuple, set)):
       with open(filename, 'w') as fp:
         fp.write("%s = ( \\\n" %name)
         for var in value:
+          if isinstance(var, Lib._basestr):
+            var = '"%s"' %var
           fp.write(" %s,\n" %str(var))
         fp.write(")\n")
     else:
       with open(filename, 'w') as fp:
+        if isinstance(value, Lib._basestr):
+          value = '"%s"' %value
         fp.write("%s = %s\n" %(name, value))
 
   @staticmethod
@@ -562,25 +628,22 @@ class Common():
        Return list for pairFn(list,basis,idx,a,b,(aa,bb,param)) being called for
        all pairs in triadDump() order if set. Dump logs progress and checks
        memory & aborts if too small. cntOnly uses paiFn(None) & returns cnt."""
-    Common._checkType(basis, (list, tuple), "triadPairs")
-    Common._checkType(dump, bool, "triadPairs")
-    Common._checkType(cntOnly, bool, "triadPairs")
+    Lib._checkType(basis, (list, tuple), "triadPairs")
+    Lib._checkType(dump, bool, "triadPairs")
+    Lib._checkType(cntOnly, bool, "triadPairs")
     if not hasattr(pairFn, "__call__"):
       raise Exception("triadPairs pairFn needs to be a function with 5 parameters")
     lr = len(basis)
     out = None if cntOnly else [[]] *(lr *(lr -1))
     cnt = 0
-    Common.procTime()
+    Lib.procTime()
     for a in range(lr):
       aa = basis[a]
-      if dump and a %10 == 0:
-        sys.stdout.write("%s (%ds) %d: total=%s %dMB\n" %(Common.date(True),
-                       int(Common.procTime()), a, cnt, Common.freeMemMB()))
-        if Common.freeMemMB() < Common._memLimitMB:
-          sys.stdout.write("ABORT: Memory limit reached\n")
-          break
+      if dump and Lib.__checkMem(a, 10, cnt):
+        break
       for b in range(a +1, lr):
         params = (aa, basis[b], param)
+        #cnt += pairFn(out, basis, lr, a, b, params) TBD
         tmp = pairFn(out, basis, lr, a, b, params)
         if isinstance(tmp, int):
           cnt += tmp
@@ -589,19 +652,17 @@ class Common():
         else:
           for idx,val in enumerate(tmp):
             cnt[idx] += val
-        #cnt += pairFn(out, basis, lr, a, b, params)
     if dump:
-      sys.stdout.write("%s (%ds): total=%s %dMB\n" %(Common.date(True),
-                       int(Common.procTime()), cnt, Common.freeMemMB()))
+      Lib.checkMem(a, extra=cnt, finish=True)
     return cnt if cntOnly else out
 
   @staticmethod
   def allTriads(basis, dump=False, cntOnly=False):
     """allTriads(basis,[dump,cntOnly])
        Return a list all unique triads (or cnt). See triadDump()."""
-    Common._checkType(basis, (list, tuple), "allTriads")
+    Lib._checkType(basis, (list, tuple), "allTriads")
     lr = len(basis)
-    return Common.triadPairs(Common._NonTriads, basis, dump,
+    return Lib.triadPairs(Lib._NonTriads, basis, dump,
                              [[]] *(lr *(lr-1)), cntOnly)
   @staticmethod
   def _NonTriads(out, basis, lr, b, c, params):
@@ -611,7 +672,7 @@ class Common():
     bb,cc,outIn = params
     if isinstance(outIn, int):
       raise Exception("Can't invert a cntOnly triadPair function")
-    Common._checkType(basis, (list, tuple), "triadDump")
+    Lib._checkType(basis, (list, tuple), "triadDump")
     bufIn = outIn[b *lr +c]
     for d in range(c +1, lr):
       if d not in bufIn:
@@ -624,13 +685,13 @@ class Common():
   @staticmethod
   def triadDump(pairBuf, basis, expand=0):
     """triadDump(pairBuf,basis, [expand=0])
-       Yield pairBuf list from Common.triadPairs() with (a,b) unique pairs of
+       Yield pairBuf list from Lib.triadPairs() with (a,b) unique pairs of
        basis elements for non-empty results as a gen lists depending on expand.
        0: pairs (a,b)(c,...) (use dict(list()),  1: expanded triples (a,b,c),
        2: zero divisors (+-abc +a)(b+c),     3: sorted list (+-abc, a, b, c)."""
-    Common._checkType(basis, (list, tuple), "triadDump")
-    Common._checkType(pairBuf, (list, tuple), "triadDump")
-    Common._checkType(expand, int, "triadDump")
+    Lib._checkType(basis, (list, tuple), "triadDump")
+    Lib._checkType(pairBuf, (list, tuple), "triadDump")
+    Lib._checkType(expand, int, "triadDump")
     lr = len(basis)
     if len(pairBuf) != lr *(lr -1):
       raise Exception("triadDump pairBuf should be result of triadPairs")
@@ -666,6 +727,7 @@ class Common():
               yield tmp
           else:
             raise Exception("Invalid BasisDump parameter: expand")
+Common = Lib
 
 ################################################################################
 class Tensor(list):
@@ -679,7 +741,7 @@ class Tensor(list):
     """Tensor(list)
        Define a nx1 or nxm matrix as a list or list of lists."""
     super(Tensor, self).__init__()
-    Common._checkType(args, (list, tuple), "Tensor")
+    Lib._checkType(args, (list, tuple), "Tensor")
     if not args:
       self.__size = (0, 0)
     else:
@@ -727,14 +789,14 @@ class Tensor(list):
         sep = "("
         for col in row:
           if isinstance(col, float):
-            out += sep +Common.getResolNum(col)
+            out += sep +Lib.getResolNum(col)
           else:
             out += sep +str(col)
           sep = ", "
         out += '),\n'
       else:
         if isinstance(row, float):
-          out += sep +Common.getResolNum(row)
+          out += sep +Lib.getResolNum(row)
         else:
           out += sep +str(row)
         sep = ", "
@@ -746,7 +808,7 @@ class Tensor(list):
       mat = Tensor(mat).reshape(self.__size)
     if self.__size != mat.__size:
       return False
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     for idx1,val1 in enumerate(self):
       if isinstance(val1, (list, tuple)):
         for idx2,val2 in enumerate(val1):
@@ -813,15 +875,15 @@ class Tensor(list):
       if isinstance(val1, (list, tuple)):
         a.append([None] *len(val1))
         for col,val2 in enumerate(val1):
-          if isinstance(mat, Common._basestr):
+          if isinstance(mat, Lib._basestr):
             a[row][col] = self.__mulStr(str(val2), mat)
-          elif isinstance(val2, Common._basestr):
+          elif isinstance(val2, Lib._basestr):
             a[row][col] = self.__mulStr(val2, str(mat))
           else:
             a[row][col] = val2 *mat
-      elif isinstance(mat, Common._basestr):
+      elif isinstance(mat, Lib._basestr):
         a.append(self.__mulStr(str(val1), mat))
-      elif isinstance(val1, Common._basestr):
+      elif isinstance(val1, Lib._basestr):
         a.append(self.__mulStr(val1, str(mat)))
       else:
         a.append(val1 *mat)
@@ -836,15 +898,15 @@ class Tensor(list):
       if isinstance(val1, (list, tuple)):
         a.append([0] *len(val1))
         for col,val2 in enumerate(val1):
-          if isinstance(mat, Common._basestr):
+          if isinstance(mat, Lib._basestr):
             a[row][col] = self.__mulStr(str(val2), mat)
-          elif isinstance(val2, Common._basestr):
+          elif isinstance(val2, Lib._basestr):
             a[row][col] = self.__mulStr(val2, str(mat))
           else:
             a[row][col] = mat * val2
-      elif isinstance(mat, Common._basestr):
+      elif isinstance(mat, Lib._basestr):
         a.append(self.__mulStr(mat, val1))
-      elif isinstance(val1, Common._basestr):
+      elif isinstance(val1, Lib._basestr):
         a.append(self.__mulStr(mat, val1))
       else:
         a.append(mat * val1)
@@ -894,7 +956,7 @@ class Tensor(list):
     out = []
     if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
       mat = Tensor(*mat)
-    Common._checkType(mat, Tensor, "add")
+    Lib._checkType(mat, Tensor, "add")
     if self.__size != mat.__size:
       raise Exception("Invalid Matrix size for add/sub")
     if self and isinstance(self[0], (list, tuple)):
@@ -902,8 +964,8 @@ class Tensor(list):
         out.append([])
         for idx2,val2 in enumerate(val1):
           tmp = mat[idx1][idx2]
-          if isinstance(val2, Common._basestr) or \
-             isinstance(tmp, Common._basestr):
+          if isinstance(val2, Lib._basestr) or \
+             isinstance(tmp, Lib._basestr):
             if str(val2) == "0":
               out[idx1].append(tmp)
             elif str(tmp) == "0":
@@ -926,7 +988,7 @@ class Tensor(list):
     """Subtract 2 matricies."""
     if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
       mat = Tensor(*mat)
-    Common._checkType(mat, Tensor, "sub")
+    Lib._checkType(mat, Tensor, "sub")
     return self.__add__(-mat)
   def __rsub__(self, mat):
     """Subtract matricies"""
@@ -953,7 +1015,7 @@ class Tensor(list):
        Return deep copy at both levels and shape set with optional overwrite."""
     if arr is None:
       arr = self
-    Common._checkType(arr, (list, tuple), "copy")
+    Lib._checkType(arr, (list, tuple), "copy")
     if arr and isinstance(arr[0], (list, tuple)):  # arr.__size > (1,1)
       return Tensor([row[:] for row in arr])
     out = Tensor(*arr)
@@ -983,7 +1045,7 @@ class Tensor(list):
       for idx in range(shape[0]):
         out.append(self[idx][idx])
     else:
-      Common._checkType(vector, (list, tuple) , "diag")
+      Lib._checkType(vector, (list, tuple) , "diag")
       if len(self) != len(vector):
         raise Exception("Vectors for diag must be the same length")
       for idx,val in enumerate(self):
@@ -995,7 +1057,7 @@ class Tensor(list):
     out = []
     if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
       mat = Tensor(*mat)
-    Common._checkType(mat, Tensor, "multiply")
+    Lib._checkType(mat, Tensor, "multiply")
     if self.__size != mat.__size:
       raise Exception("Invalid Matrix sizes for multiply %sx%s" \
                      %(self.__size, mat.__size))
@@ -1015,8 +1077,8 @@ class Tensor(list):
        q1=(p,q); q2=(r,s); q1*q2 = (pr -s*q, sp +qr*) [wikiRule]
        q1=(p,q); q2=(r,s); q1*q2 = (pr -sq*, p*s +rq) [baezRule]."""
     out = []
-    Common._checkType(vector, (list, tuple) , "cayleyDicksonMult")
-    Common._checkType(baezRule, bool , "cayleyDicksonMult")
+    Lib._checkType(vector, (list, tuple) , "cayleyDicksonMult")
+    Lib._checkType(baezRule, bool , "cayleyDicksonMult")
     if len(self) != len(vector) or len(self) != 2:
       raise Exception("Vectors for cayleyDicksonMult must have length two")
     if self and not isinstance(self[0], (list, tuple)):
@@ -1038,10 +1100,10 @@ class Tensor(list):
         out.append([])
       for idx1,val1 in enumerate(self):
         for val2 in val1:
-          out[idx1].append(0.0 if abs(val2) < Common._getPrecision() else val2)
+          out[idx1].append(0.0 if abs(val2) < Lib._getPrecision() else val2)
       return Tensor(*out)
     for idx1,val1 in enumerate(self):
-      out.append(0.0 if abs(val1) < Common._getPrecision() else val1)
+      out.append(0.0 if abs(val1) < Lib._getPrecision() else val1)
     return self.copy(out)
 
   def slice(self, offset, shape=None):
@@ -1049,19 +1111,19 @@ class Tensor(list):
        Return copy of 2-D selection or square if offset, shape are integers."""
     if not isinstance(offset, (list, tuple)):
       offset = (offset, offset)
-    Common._checkType(offset, (list, tuple), "slice")
+    Lib._checkType(offset, (list, tuple), "slice")
     if len(offset) != 2:
       raise Exception("Invalid offset length in slice")
-    Common._checkType(offset[0], int, "slice")
-    Common._checkType(offset[1], int, "slice")
+    Lib._checkType(offset[0], int, "slice")
+    Lib._checkType(offset[1], int, "slice")
     if shape is not None:
       if not isinstance(shape, (list, tuple)):
         shape = (shape, shape)
-      Common._checkType(shape, (list, tuple), "slice")
+      Lib._checkType(shape, (list, tuple), "slice")
       if len(shape) != 2:
         raise Exception("Invalid shape length in slice")
-      Common._checkType(shape[0], int, "slice")
-      Common._checkType(shape[1], int, "slice")
+      Lib._checkType(shape[0], int, "slice")
+      Lib._checkType(shape[1], int, "slice")
     out = []
     if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
       if shape is None:
@@ -1088,13 +1150,13 @@ class Tensor(list):
        Return copy with new 2-D shape or square if shape is integer."""
     if not isinstance(shape, (list, tuple)):
       shape = (shape, shape)
-    Common._checkType(shape, (list, tuple), "reshape")
-    Common._checkType(shape[0], int, "reshape")
+    Lib._checkType(shape, (list, tuple), "reshape")
+    Lib._checkType(shape[0], int, "reshape")
     if len(shape) != 2:
       raise Exception("Invalid shape length in reshape")
     out = []
     if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
-      Common._checkType(shape[1], int, "reshape")
+      Lib._checkType(shape[1], int, "reshape")
       for idx1 in range(max(1,shape[0])):
         out.append([])
       for idx1 in range(max(1,shape[0])):
@@ -1158,7 +1220,7 @@ class Tensor(list):
   def pow(self, exp):
     """pow(exp)
        Return matrix with  power applied to each element of self."""
-    Common._checkType(exp, (int, float), "pow")
+    Lib._checkType(exp, (int, float), "pow")
     out = []
     if self and isinstance(self[0], (list, tuple)):
       for idx1,val1 in enumerate(self):
@@ -1216,19 +1278,19 @@ class Tensor(list):
        Return self morphed using a list of pairs or basis->labels. Pairs are
        string names mapped as first->second. Basis & ones are replaced by
        labels and +-1 of labels type so may be of basis or string type."""
-    Common._checkType(basis, (list, tuple), "morph")
+    Lib._checkType(basis, (list, tuple), "morph")
     if labels is None:
       out = []
       if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
         for idx1,val1 in enumerate(self):
           out.append([])
           for val2 in val1:
-            out.append(Common._morph(val2, 1, basis)[val2])
+            out.append(Lib._morph(val2, 1, basis)[val2])
         return Tensor(*out)
       for idx1,val1 in enumerate(self):
-        out.append(Common._morph(val1, 1, basis)[val1])
+        out.append(Lib._morph(val1, 1, basis)[val1])
       return self.copy(out)
-    Common._checkType(labels, (list, tuple), "morph")
+    Lib._checkType(labels, (list, tuple), "morph")
     if len(basis) != len(labels):
       raise Exception("Swap length is not valid")
     val1 = self[0]
@@ -1245,13 +1307,13 @@ class Tensor(list):
   def __morph(self, basis, labels):
     """Internal routine to return self with basis & ones replaced by labels
        and +-1 of labels type."""
-    isStrBasis = isinstance(basis[0], Common._basestr)
+    isStrBasis = isinstance(basis[0], Lib._basestr)
     if isStrBasis:
       pBasis = (str(x) for x in basis)
       mBasis = list((x[1:] if x[0]=="-" else "-"+x for x in pBasis))
     else:
       mBasis = list((-x for x in basis))
-    isStrLabel = isinstance(labels[0], Common._basestr)
+    isStrLabel = isinstance(labels[0], Lib._basestr)
     if isStrLabel:
       pLabels = (str(x) for x in labels)
       mLabels = list((x[1:] if x[0]=="-" else "-"+x for x in pLabels))
@@ -1313,12 +1375,12 @@ class Tensor(list):
   def differences(self, mat, ignore=None):
     """differences(mat,[ignore])
        Return list of indicies for differences of 2 matricies & ignore value."""
-    Common._checkType(mat, (list, tuple), "diff")
+    Lib._checkType(mat, (list, tuple), "diff")
     out = []
-    isStr = (len(self) > 0 and isinstance(self[0], Common._basestr))
+    isStr = (len(self) > 0 and isinstance(self[0], Lib._basestr))
     for idx1,val1 in enumerate(self):
       if isinstance(val1, (list, tuple)):
-        isStr = (len(self[0]) > 0 and isinstance(self[0][0], Common._basestr))
+        isStr = (len(self[0]) > 0 and isinstance(self[0][0], Lib._basestr))
         for idx2,val2 in enumerate(val1):
           if val2 != ignore:
             diff = (val2 != mat[idx1][idx2])
@@ -1345,14 +1407,14 @@ class Tensor(list):
        Pretty print of Matrix with optional labels."""
     s = t = 0
     if xLabels:
-      Common._checkType(xLabels, (list, tuple), "dump")
+      Lib._checkType(xLabels, (list, tuple), "dump")
       if not self or len(xLabels) != self.__size[1]:
         raise Exception("Invalid xLabels length for Matrix dump")
       if not yLabels and len(xLabels) == self.__size[0]:
         yLabels = xLabels
       s = max(map(lambda x :len(str(x)), xLabels))
     if yLabels:
-      Common._checkType(yLabels, (list, tuple), "dump")
+      Lib._checkType(yLabels, (list, tuple), "dump")
       if len(yLabels) != self.__size[0]:
         raise Exception("Invalid yLabels length for Matrix dump")
       t = max(map(lambda x :len(str(x)), yLabels))
@@ -1384,7 +1446,7 @@ class Tensor(list):
 
   def __checkSquare(self, basis, name, basisName):
     """Internal method to raise exception for invalid Tensor."""
-    Common._checkType(basis, (list, tuple), name)
+    Lib._checkType(basis, (list, tuple), name)
     if len(self) != len(basis) or len(self) == 0:
       raise Exception("Parameter %s length invalid for %s" \
                        %(basisName, name))
@@ -1408,15 +1470,15 @@ class Tensor(list):
        to fix the first part of all permutations such as octonians when
        looking for sedenions. permCycle outputs cycles instead of maps."""
     self.__checkSquare(basis, "search", "basis")
-    Common._checkType(cf, (list, tuple), "search")
+    Lib._checkType(cf, (list, tuple), "search")
     cf = Tensor(*cf)
     if cfBasis:
       cf.__checkSquare(cfBasis, "search", "cf")
-    Common._checkType(num, int, "search")
-    Common._checkType(diffs, int, "search")
-    Common._checkType(cycles, bool, "search")
-    Common._checkType(initPerm, (list, tuple), "search")
-    Common._checkType(permCycle, bool, "search")
+    Lib._checkType(num, int, "search")
+    Lib._checkType(diffs, int, "search")
+    Lib._checkType(cycles, bool, "search")
+    Lib._checkType(initPerm, (list, tuple), "search")
+    Lib._checkType(permCycle, bool, "search")
     chkPerm = list(x for x in sorted(list(abs(y) for y in initPerm)))
     cycPerm = Tensor(list(x+1 for x in range(len(basis))))
     for idx in range(len(initPerm)):
@@ -1438,10 +1500,10 @@ class Tensor(list):
       if not cycles:
         cf = cf.morph(cfBasis, basis)
     dim -= len(initPerm) 
-    perms = Common.perm(dim, dim)
+    perms = Lib.perm(dim, dim)
     difHisto = {}
     difRange = [99999, 0]
-    isStr = isinstance(basis[0], Common._basestr)
+    isStr = isinstance(basis[0], Lib._basestr)
     if isStr:
       mBasis = list((x[1:] if x[:1] == "-" else ("-" +x) for x in basis))
     else:
@@ -1454,7 +1516,7 @@ class Tensor(list):
     cnt = 0
     for p in perms:                # For all permutations
       for n in range(dim +1):      # For all negative sign combinations
-        for sgns in Common.comb(dim, n, True):
+        for sgns in Lib.comb(dim, n, True):
           p0 = list(x +len(initPerm) for x in p)
           for sgn in sgns:
             p0[sgn -1] *= -1
@@ -1506,7 +1568,7 @@ class Tensor(list):
     """cycles(basis, [grade,dump])
        Return or dump a list of multiplication triads for degree using basis."""
     self.__checkSquare(basis, "cycles", "basis")
-    Common._checkType(dump, bool, "cycles")
+    Lib._checkType(dump, bool, "cycles")
     if degree and not hasattr(basis[0], "grades"):
       raise Exception("Parameter grade for cycles needs graded basis")
     pBasis = list((str(x) for x in basis))
@@ -1576,7 +1638,7 @@ class Tensor(list):
       return None
     if not indicies:
       out0 = []
-      isStr = isinstance(basis[0], Common._basestr)
+      isStr = isinstance(basis[0], Lib._basestr)
       for row in out:
         p1 = basis[row[0]-1]
         p2 = basis[row[1]-1]
@@ -1614,18 +1676,18 @@ class Tensor(list):
   def assocTriads(self, basis, nonAssoc=False, alternate=False, dump=False):
     """assocTriads(basis,[nonAssoc,alternate,dump])
        Return assoc traids [a,b,c]=0 or !=0 if nonAssoc. Alternate associativity
-       is [a,b,c] = 0 if any two of a,b,c are equal. See Common.triadDump()."""
+       is [a,b,c] = 0 if any two of a,b,c are equal. See Lib.triadDump()."""
     self.__checkSquare(basis, "assocTriads", "basis")
-    Common._checkType(nonAssoc, bool, "assocTriads")
-    Common._checkType(alternate, bool, "assocTriads")
-    Common._checkType(dump, bool, "assocTriads")
+    Lib._checkType(nonAssoc, bool, "assocTriads")
+    Lib._checkType(alternate, bool, "assocTriads")
+    Lib._checkType(dump, bool, "assocTriads")
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
-    if isinstance(self[0][0], Common._basestr):
+    if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    tmp = Common.triadPairs(self.__assocTriads, basis, dump, (alternate,mBasis))
+    tmp = Lib.triadPairs(self.__assocTriads, basis, dump, (alternate,mBasis))
     if not nonAssoc:  return tmp
-    return Common.triadPairs(Common._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
   def __assocTriads(self, out, basis, lr, a, b, params):
     cnt = 0
     buf = []
@@ -1654,17 +1716,17 @@ class Tensor(list):
   def moufangTriads(self, basis, moufang=0, dump=False):
     """moufangTriads(basis,[moufang,dump])
        Return moufang traids depending on moufang=0-5 where 0 is none and 5 is
-       the sum of all four. See Common.triadDump() for return and other values.
+       the sum of all four. See Lib.triadDump() for return and other values.
          1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
          3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
     self.__checkSquare(basis, "moufangTriads", "basis")
-    Common._checkType(moufang, int, "moufangTriads")
-    Common._checkType(dump, bool, "moufangTriads")
+    Lib._checkType(moufang, int, "moufangTriads")
+    Lib._checkType(dump, bool, "moufangTriads")
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
-    if isinstance(self[0][0], Common._basestr):
+    if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    return Common.triadPairs(self.__moufangTriads, basis, dump, (moufang, mBasis))
+    return Lib.triadPairs(self.__moufangTriads, basis, dump, (moufang, mBasis))
   def __moufangTriads(self, out, basis, lr, a, b, params):
     cnt = 0
     buf = []
@@ -1719,12 +1781,12 @@ class Tensor(list):
        Return all zero divisors (a+b)(c+d) as list of (b,c,d1,d2,...) with
        a=bcd non-scalar and unique where b > c > d range through the table."""
     self.__checkSquare(basis, "zeroTriads", "basis")
-    Common._checkType(dump, bool, "zeroTriads")
+    Lib._checkType(dump, bool, "zeroTriads")
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
-    if isinstance(self[0][0], Common._basestr):
+    if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    return Common.triadPairs(self.__zeroTriads, basis, dump, mBasis)
+    return Lib.triadPairs(self.__zeroTriads, basis, dump, mBasis)
   def __zeroTriads(self, out, basis, lr, b, c, params):
     buf = []
     cnt = 0
@@ -1787,41 +1849,35 @@ class Tensor(list):
   def compare(self, cmp, over=False):
     """compare(cmp,[over])
        Return differences or overlap if over set."""
-    if cmp is not None:
-      Common._checkType(cmp, (list, tuple), "compare")
-    Common._checkType(over, bool, "compare")
-    cnt = 0
+    Lib._checkType(cmp, (list, tuple), "compare")
+    Lib._checkType(over, bool, "compare")
     out = []
-    sout = list(sorted(x) for x in cmp) if cmp else []
+    dups = (not cmp)
     for val in self:
-      cnt += 1
-      sval = sorted(val)
-      if sval in sout:
+      if val in cmp:
         if over:
           out.append(val)
-          if not (over or cmp):
-            sout.append(sval)
       else:
         if not over:
           out.append(val)
-        if not cmp:
-          sout.append(sval)
+        if dups:
+          cmp.append(val)
     return Tensor(*out)
 
   def unique(self, dups=False):
     """unique([dups])
        Return unique or duplicate elements if dups set."""
-    Common._checkType(dups, bool, "unique")
-    return self.compare(None, dups)
+    Lib._checkType(dups, bool, "unique")
+    return self.compare([], dups)
 
   def isomorph(self, basis, perm):
     """isomorph(basis, perm)
        Return self permuted and cells swapped by signed, inverted perm."""
     self.__checkSquare(basis, "isomorph", "basis")
-    Common._checkType(perm, (list, tuple), "isomorph")
+    Lib._checkType(perm, (list, tuple), "isomorph")
     if len(basis) == 0 or len(basis) != len(self) or len(perm) != len(basis):
       raise Exception("Invalid length for isomorph")
-    isStr = isinstance(basis[0], Common._basestr)
+    isStr = isinstance(basis[0], Lib._basestr)
     if isStr:
       mBasis = list((x[1:] if x[:1] == "-" else ("-" +x) for x in basis))
     else:
@@ -1844,13 +1900,13 @@ class Tensor(list):
   def permute(self, perm, invert=False):
     """permute(perm, [invert])
        Return self with rows and columns swapped and signed by perm."""
-    Common._checkType(perm, (list, tuple), "permute")
+    Lib._checkType(perm, (list, tuple), "permute")
     if self.__size[0] <= 1 or self.__size[0] != len(perm):
       raise Exception("Swap parameter length is not valid")
     if not all(map(lambda x:abs(x) in range(1,len(perm) +1), perm)):
       raise Exception("Swap perm index is out of range")
     isStr = isinstance(self[0] if self.__size[1]<2 else self[0][1],
-                       Common._basestr)
+                       Lib._basestr)
     compPerm = Tensor(perm).permInvert() if invert else perm
     rows = []
     for idx in compPerm: # Swap rows
@@ -1948,12 +2004,65 @@ class Tensor(list):
       iso.append(isoRow)
     return Tensor(*sorted(iso))
 
+  def allSigns(self, half=False, dump=False):
+    """allSigns([half,dump])
+       Generate a list of all, half [boolean] or a single indexed term [half=
+       int] of the signed combinations of self, (eg allSigns(e1)=[e1,-e1]).
+       If dump log progress and abort if memory is below the limit."""
+    dim = len(self)
+    if dim > 0 and 1 not in self.__size:
+      raise Exception("Tensor must be a vector for allSigns")
+    if dim > 0 and not hasattr(self, "__sub__"):
+      raise Exception("Tensor needs to be able to subtract for allSigns")
+    stopCnt = -1
+    if not isinstance(half, bool):
+      stopCnt = half
+      half = False
+    Lib._checkType(half, bool, "allSigns")
+    halfStop = (half and dim %2 == 0)
+    halfDim = (int(dim /2) if half else dim)
+    halfComb = int(Lib.comb(dim, halfDim) /2)
+    for n in range(halfDim +1):
+      for cnt,sgns in enumerate(Lib.comb(dim, n, True, dump)): # For n -sign combos
+        if n == halfDim and halfStop and cnt == halfComb:
+          break
+        stopCnt -= 1
+        if stopCnt == -1:
+          break
+        p0 = self[:]
+        for sgn in sgns:
+          p0[sgn -1] *= -1
+        yield p0
+      if stopCnt == -1:
+        break
+
+  def allSignsIndices(self):
+    """allSignsIndices()
+       Return index and minus sign count of self in allSigns."""
+    dim = len(self)
+    if dim > 0 and 1 not in self.__size:
+      raise Exception("Tensor must be a vector for allSigns")
+    if dim > 0 and not hasattr(self, "__sub__"):
+      raise Exception("Tensor needs to be able to subtract for allSigns")
+    cnt,sgns = 0,[]
+    for idx,term in enumerate(self):
+      if term < 0:
+        sgns.append(idx +1)
+      cnt += 1
+    offs = 0
+    for dim in range(len(sgns)):
+      offs += Lib.comb(cnt, dim)
+    for idx,allSgns in enumerate(Lib.comb(cnt, len(sgns), True)):
+      if allSgns == sgns:
+        break
+    return idx +offs, len(sgns)
+
   ############ Other Creators ############
   @staticmethod
   def Resolution(digits):
     """Resolution([digits])
-       Set print format digits or reset to Common.resolution default."""
-    Common.resolution(digits)
+       Set print format digits or reset to Lib.resolution default."""
+    Lib.resolution(digits)
 
   @staticmethod
   def NED(lat, lng):
@@ -1962,10 +2071,10 @@ class Tensor(list):
        North-East-Down returned as a 3x3 Matrix [NT,ET,DT]T. From
        onlinelibrary.wiley.com/doi/pdf/10.1002/9780470099728.app3.
        This is introduced to check NED() by rotating i, j & k."""
-    Common._checkType(lat, (int, float), "NED")
-    Common._checkType(lng, (int, float), "NED")
-    sLat,cLat = Common._sincos(math.radians(lat))
-    sLng,cLng = Common._sincos(math.radians(lng))
+    Lib._checkType(lat, (int, float), "NED")
+    Lib._checkType(lng, (int, float), "NED")
+    sLat,cLat = Lib._sincos(math.radians(lat))
+    sLng,cLng = Lib._sincos(math.radians(lng))
     return Tensor((-cLng *sLat, -sLng *sLat, cLat),
                   (-sLng, cLng, 0),
                   (-cLng *cLat, -sLng *cLat, -sLat))
@@ -1977,8 +2086,8 @@ class Tensor(list):
     out = []
     if rhsBasis is None:
       rhsBasis = basis
-    Common._checkType(basis, (list, tuple), "Table")
-    Common._checkType(rhsBasis, (list, tuple), "Table")
+    Lib._checkType(basis, (list, tuple), "Table")
+    Lib._checkType(rhsBasis, (list, tuple), "Table")
     if len(basis) > 0 and len(rhsBasis) > 0 and not \
           (hasattr(basis[0], "grades") and hasattr(rhsBasis[0], "grades")):
       raise Exception("Table parameter is not a list of basis elements")
@@ -1995,7 +2104,7 @@ class Tensor(list):
     """Diag(diag)
        Return the zero matrix with diag as diagonal entries."""
     out = []
-    Common._checkType(diag, (list, tuple), "Diag")
+    Lib._checkType(diag, (list, tuple), "Diag")
     for ii in range(len(diag)):
       out.append([0] *len(diag))
       if isinstance(diag[ii], (list, tuple)):
@@ -2027,9 +2136,9 @@ class Tensor(list):
   def Triads(triList, basis):
     """Triads(triList, basis)
        Turn triad list into Table using basis of assumed square -1."""
-    Common._checkType(triList, (list, tuple), "Triads")
-    Common._checkType(basis, (list, tuple), "Triads")
-    isStr = isinstance(basis[0], Common._basestr) if len(basis) > 0 else False
+    Lib._checkType(triList, (list, tuple), "Triads")
+    Lib._checkType(basis, (list, tuple), "Triads")
+    isStr = isinstance(basis[0], Lib._basestr) if len(basis) > 0 else False
     if isStr:
       tt = Tensor.Diag(["-1"] *len(basis))
     else:
@@ -2038,7 +2147,7 @@ class Tensor(list):
       if not isinstance(tri, (list, tuple)) or len(tri) < 3:
         raise Exception("Invalid Triads length: %s" %tri)
       for idx,val in enumerate(tri[:3]):
-        Common._checkType(val, int, "Triads")
+        Lib._checkType(val, int, "Triads")
         if abs(val) > len(basis) or val == 0 or (val < 0 and idx < 2):
           raise Exception("Invalid Triads value: %s" %tri)
       if tri[2] < 0:
@@ -2077,7 +2186,7 @@ if "numpy" in sys.modules:
       """Return True if 2 matricies are equal within precision."""
       if not isinstance(mat, (numpy.ndarray, list, tuple, Matrix)):
         return False
-      return ((self - mat) < Common._getPrecision()).all()
+      return ((self - mat) < Lib._getPrecision()).all()
 
     def get(self, x, y):
       """get(x,y)
@@ -2098,15 +2207,15 @@ if "numpy" in sys.modules:
     @staticmethod
     def Resolution(digits):
       """Resolution([digits])
-         Set print format digits or reset to Common.resolution default."""
-      Common.resolution(digits)
-      numpy.set_printoptions(Common._getResolutions()[0])
+         Set print format digits or reset to Lib.resolution default."""
+      Lib.resolution(digits)
+      numpy.set_printoptions(Lib._getResolutions()[0])
 
     @staticmethod
     def Diag(diag):
       """Diag(diag)
          Return the zero matrix with diag as diagonal entries."""
-      Common._checkType(diag, (list, tuple, Matrix), "Diag")
+      Lib._checkType(diag, (list, tuple, Matrix), "Diag")
       size = diag.shape[0] if isinstance(diag, Matrix) else len(diag)
       out = numpy.identity(size)
       for ii in range(size):
@@ -2136,10 +2245,10 @@ class Euler(list):
       idx = names.index(param)
       self[idx] = val
     for val in self:
-      Common._checkType(val, (int, float), "Euler")
+      Lib._checkType(val, (int, float), "Euler")
   def __repr__(self):
     """Overwrite object output using __str__ for print if verbose."""
-    if (Common._isVerbose()):
+    if (Lib._isVerbose()):
       return '<%s.%s object at %s>' % (self.__class__.__module__,
              self.__class__.__name__, hex(id(self)))
     return str(self)
@@ -2150,7 +2259,7 @@ class Euler(list):
     """Return True if 2 Eulers are equal within precision."""
     if not isinstance(cf, Euler) or len(self) != len(cf):
       return False
-    precision = Common._getPrecision()
+    precision = Lib._getPrecision()
     for idx,val in enumerate(self):
       if abs(val -cf[idx]) >= precision:
         return False
@@ -2169,7 +2278,7 @@ class Euler(list):
        Return copy with elements smaller than precision set to zero."""
     angles = self
     for idx,val in enumerate(self):
-      if abs(val) < Common._getPrecision():
+      if abs(val) < Lib._getPrecision():
         angles[idx] = 0.0
     return Euler(*angles)
 
@@ -2183,14 +2292,14 @@ class Euler(list):
        If explicit then order can't have repeats. If inplicit then subsequent
        rotations use the new rotated axis for rotation so default is Rz''y'x.
        Contents can have an x & y index offset."""
-    Common._checkType(order, (list, tuple), "Euler.matrix")
-    Common._checkType(implicit, bool, "Euler.matrix")
+    Lib._checkType(order, (list, tuple), "Euler.matrix")
+    Lib._checkType(implicit, bool, "Euler.matrix")
     rank = len(self)
     if not order:
       if rank == 3 and not implicit and offset == 0:
-        sx,cx = Common._sincos(self[0])
-        sy,cy = Common._sincos(self[1])
-        sz,cz = Common._sincos(self[2])
+        sx,cx = Lib._sincos(self[0])
+        sy,cy = Lib._sincos(self[1])
+        sz,cz = Lib._sincos(self[2])
         return Matrix(\
                  (cz*cy, cz*sy*sx -sz*cx, cz*sy*cx +sz*sx),
                  (sz*cy, sz*sy*sx +cz*cx, sz*sy*cx -cz*sx),
@@ -2212,14 +2321,14 @@ class Euler(list):
     implicitRot = blank.copy()
     store = []
     for key in order:
-      if isinstance(key, Common._basestr):
+      if isinstance(key, Lib._basestr):
         for i,code in enumerate(names):
           if code.find(key) >= 0:
             key = i +1
             break
       if key in store or key not in range(1, len(self) +1):
         raise Exception("Invalid order index for Euler.matrix: %s" %key)
-      sw,cw = Common._sincos(self[key -1])
+      sw,cw = Lib._sincos(self[key -1])
       idx1,idx2 = xyz[key -1]
       idx1 += offset
       idx2 += offset
@@ -2258,11 +2367,11 @@ class Euler(list):
        Rzyx=XYZ=X(X*Y'X)(Y'X)*Z''(Y'X)=Z''Y'X..
        Only handles 3-D matricies. For discriminant see SE(3) transformations at
        https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.468.5407."""
-    Common._checkType(mat, (Matrix, Tensor), "Matrix")
+    Lib._checkType(mat, (Matrix, Tensor), "Matrix")
     rank = len(mat) -offset
     blank = Matrix.Diag([1] *(rank +offset))
     dim = int((math.sqrt(8*(rank -offset) +1) +1) /2 +0.9) # l=comb(dim,2)
-    angles = [0] *(int(Common.comb(rank, 2)))
+    angles = [0] *(int(Lib.comb(rank, 2)))
     cnt = len(angles)
     for jj in reversed(range(4, rank +1)):
       accum = 1.0
@@ -2281,7 +2390,7 @@ class Euler(list):
         else:
           xyz.append((jj -1,ii -1))  # rotated
       for idx in reversed(range(len(xyz))):
-        sw,cw = Common._sincos(angles[cnt +idx])
+        sw,cw = Lib._sincos(angles[cnt +idx])
         idx1,idx2 = xyz[idx]
         idx1 += offset
         idx2 += offset
@@ -2294,25 +2403,24 @@ class Euler(list):
     v0 = mat.get(offset, offset)
     v1 = mat.get(offset +1, offset)
     pitch = -math.atan2(mat.get(offset +2, offset), math.sqrt(v0 *v0 +v1 *v1))
-    angles[1] = Common._piRange(pitch)
-    if abs(abs(pitch) -math.pi /2) < Common._getPrecision():
+    angles[1] = Lib._piRange(pitch)
+    if abs(abs(pitch) -math.pi /2) < Lib._getPrecision():
       sgn = -1.0 if pitch < 0 else 1.0
-      angles[0] = Common._piRange(math.atan2(sgn *mat.get(offset +1, offset +2),
+      angles[0] = Lib._piRange(math.atan2(sgn *mat.get(offset +1, offset +2),
                                              sgn *mat.get(offset,offset +2)))
     else:
-      angles[0] = Common._piRange(math.atan2(mat.get(offset +2, offset +1),
+      angles[0] = Lib._piRange(math.atan2(mat.get(offset +2, offset +1),
                                              mat.get(offset +2, offset +2)))
-      angles[2] = Common._piRange(math.atan2(v1, v0))
+      angles[2] = Lib._piRange(math.atan2(v1, v0))
     return Euler(*angles)
 
 ################################################################################
 if __name__ == '__main__': # Might as well run calcR
   import traceback
-  import sys, os
   from math import *
   from calcR import *
-  exp = Common.exp
-  log = Common.log
+  exp = Lib.exp
+  log = Lib.log
   try:
     import importlib
   except:
@@ -2325,5 +2433,5 @@ elif sys.version_info.major != 2:  # Python 3
   def execfile(fName):
     """To match Python2's execfile need: from pathlib import Path
        exec(Path(fName).read_text())."""
-    exec(Common.readText(fName))
+    exec(Lib.readText(fName))
 

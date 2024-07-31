@@ -3,9 +3,9 @@
 """Package for Calc. For Python versions older than 2.7.13.
 """
 
-__all__ = ["Common", "Matrix", "Tensor", "Euler"]
+__all__ = ["Lib", "Matrix", "Tensor", "Euler"]
 
-#from .calcCommon import Common
-#from .calcCommon import Matrix
-#from .calcCommon import Tensor
-#from .calcCommon import Euler
+#from .calcLib import Lib
+#from .calcLib import Matrix
+#from .calcLib import Tensor
+#from .calcLib import Euler

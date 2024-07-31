@@ -4,7 +4,7 @@ This project provides 5 calculators interpreted by Python to allow basis element
 * calcCA - Clifford Algebra calculator to understand and extend quaternions
 * calcQ - Quaternion calculator that covers complex numbers
 * calcO - Octonion extended calculator includes split octonions and sedenions to multiple levels
-* calcR - Real numbers only but the basis for other calculators along with calcCommon
+* calcR - Real numbers only but the basis for other calculators along with calcLib
 * calcS - Symbolic expansion only used to test n-D CA rotations and sedenion products
 
 Any calculator can be started from the command line or commands entered directly. For example
@@ -17,7 +17,7 @@ Commands include maintaining macro files and switching to other calculators from
 These basis classes offer libraries to perform many functions. Foremost is rotations and due to the axial formulation of quaternion rotations and the confusion between vectors and versors, these are easier to understand in CA and then convert back to Q. 
 
 The common library has the following classes:
-* Common - Physics parameters and utilities such as permutation and combination expansions
+* Lib    - Physics parameters and utilities such as permutation and combination expansions
 * Matrix - Interface to numpy if it exists otherwise set to Tensor
 * Tensor - Simple list based 1 & 2-D matricies for testing and basis multiplication tables
 * Euler  - Multi-dimensional Euler angles to rotation matries in any order, optionally implicit
@@ -34,5 +34,5 @@ The octonions are included in this list of geometric algebras because it is prov
 * calcCA - Allow duotridecimal basis (hex+) numbers (0..V) to support CA(31)
 * calcCA - Change to bit wise multiplication instead of string manipulation using previous CA work
 * calcO - Investigate deriving matrices for rotations and Euler angles for > 3-D
-* Common - Combinations optimisation using previous CA work
+* Lib - Combinations optimisation using previous CA work
 
