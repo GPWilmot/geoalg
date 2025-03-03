@@ -229,16 +229,17 @@ class Calculator:
   __USEFUL_FILE   = ("show", "clear", "load", "save")  # Ordered filename words
   __PYTHON_WORDS  = ("print", "raise", "from", "with", # Exec not eval
                      "with", "global", "raise", "import",
-                     "for", "while")
+                     "for", "while", "exec", "eval", "del")
   __PYTHON_FUNCS  = ("def",)                          # Exec & no expand fn
-  __PYTHON_STARTS = ("in", "lambda",)                 # No expand 'til!.,
+  #__PYTHON_STARTS = ("in", "lambda",)                 # No expand 'til!., TBD
   __oldCls = {}                                # Previous __inCls's
   __classList = ["Lib", "Euler", "Matrix", "Tensor"]  # From calcLib
   __moduleList = []                            # Calc classes loaded
   __promptList = []                            # Subordinate modules
   __history = []                               # For saving and showing
-  __lastCmd = ""                               # Add load at end
+  __lastCmd = ""                               # Add load & test at end
   __prompt = ""                                # Current calculator name
+  __saveVar = None                             # Variable passed to save
 
   def __init__(self, clsType, tests=[], indent=None):
     """Singleton calculator for basis numbers."""
@@ -311,15 +312,20 @@ class Calculator:
     LibTest.logResults()
 
   @staticmethod
-  def test(number, firstTest):
-    """Run test number or all tests."""
+  def test(numbers, firstTest):
+    """Run test numbers or all tests."""
     name = Calculator.__firstCls.__name__
     name = "R" if name == "Real" else name
     if Calculator.__prompt not in Calculator.__promptList +[name]:
       raise Exception("Invalid calculator for %s tests" %name)
-    tst = number.strip() if number else ""
-    Calculator.__lastCmd = "test(%s)" %tst
-    code = LibTest.getTestLines(tst, firstTest)
+    code = ""
+    for number in numbers.split(','):
+      tst = number.strip() if number else ""
+      Calculator.__lastCmd = "test(%s)" %tst
+      if code:
+        code += "\n"
+      code += LibTest.getTestLines(tst, firstTest)
+      firstTest = False
     for line in code.splitlines():
       Calculator.__history.append(line)
     return code
@@ -328,6 +334,11 @@ class Calculator:
     """Don't report exceptions outside exec() if already reported inside.
        Force raising of this exception instead to catch it outside."""
     pass
+
+  @staticmethod
+  def fixFilename(filename):
+    return Lib.fixFilename(filename, os.path.dirname(__file__),
+                     os.path.splitext(Calculator.__default)[1])
 
   @staticmethod
   def quit(filename=None):
@@ -344,33 +355,35 @@ class Calculator:
       sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") +'\n')
 
   @staticmethod
-  def load(filename=None, noError=False):
-    """Load filename or default file and add to history."""
-    if not filename:
-      raise Exception("No filename entered")
-    code = Lib.readText(filename)
-    if not code:
-      if not noError:
-        raise Exception("File empty")
-    else:
-      #for line in code.splitlines():
-      #  Calculator.__history.append(line)
-      if Lib._isVerbose():
-        if readline:
-          readline.read_history_file(filename)
-        Calculator.__lastCmd = "load(%s)" %filename
+  def load(filenames=None, noError=False):
+    """Load filenames or default file and add to history."""
+    if not filenames:
+      filenames = Calculator.__default
+    for filename in filenames.split(','):
+      code = Lib.readText(Calculator.fixFilename(filename))
+      if not code:
+        if not noError:
+          raise Exception("File %s is empty" %filename)
+      elif Lib._isVerbose() and readline:
+        readline.read_history_file(Calculator.fixFilename(filename))
+    if Lib._isVerbose():
+      Calculator.__lastCmd = "load(%s)" %filenames
     return code
 
   @staticmethod
-  def save(filename=None):
-    """Save history to filename or to default file."""
+  def save(filename=None, varname=None):
+    """Save history or variable to filename or history to default file."""
     if not filename:
-      raise Exception("No filename entered")
-    with open(filename, "a") as fp:
-      for line in Calculator.__history:
-        if line.strip()[:4] not in Calculator.__USEFUL_WORDS:
-          fp.write(line +'\n')
-      sys.stdout.write("File saved\n")
+      filename = Calculator.__default
+    if varname is not None:
+      Lib._save(filename, varname, Calculator.__saveVar,
+          os.path.dirname(__file__), os.path.splitext(Calculator.__default)[1])
+    else:
+      with open(Calculator.fixFilename(filename), "a") as fp:
+        for line in Calculator.__history:
+          if line.strip()[:4] not in Calculator.__USEFUL_WORDS:
+            fp.write(line +'\n')
+    sys.stdout.write("File saved\n")
 
   @staticmethod
   def clear(filename=None):
@@ -462,8 +475,8 @@ class Calculator:
         opt += "\nPIP: readline not installed - no command line history"
       if not ply_lex:
         opt += "\nPIP: ply not installed - no parsing of basis numbers"
-      test = "" if LibTest.testCnt()==0 else "%9s test or test(1..%d)%s\n"\
-             %("", LibTest.testCnt(), "  - run all tests or just one")
+      test = "" if LibTest.testCnt()==0 else "%9s test or test(1..%d,..)%s\n"\
+             %("", LibTest.testCnt(), " - run all tests or just some")
       extra = ""
       for more in Calculator.__oldCls.values():
         if more and more != Calculator.__inCls:
@@ -471,14 +484,15 @@ class Calculator:
             extra += '           %s\n' %Calculator.__eHelp
       sys.stdout.write('%s\n' %Calculator.__cHelp +extra \
           +'Commands: help or help(%s)\n'%"|".join(Calculator.__classList) \
-          +'          calc or calc(<calc>) - list or change calculator\n'  \
-          +'          show or show(<file>) - display %s\n' %(tmp %(",", "()"))\
-          +'          load or load(<file>) - load %s\n' %(tmp %(" from", ext))\
-          +'          save or save(<file>) - append %s\n' %(tmp %(" to", ext))\
-          +test \
+          +'          calc or calc(<calcs>) - list or add calculators\n'  \
+          +'          show or show(<file>)  - display %s\n' %(tmp %(",", "()"))\
           +'          clear or clear<file>) - clear %s\n' %(tmp %(" or", ext))\
+          +'          load or load(<files>) - load %s\n' %(tmp %(" from", ext))\
+          +'          save or save(<file>)  - append %s\n' %(tmp %(" to", ext))\
+          +'            or save(<file>,var) - save var to file\n'\
           +'          vars                  - list local variables/functions\n'\
-          +'          quit or exit or control-d - exit\n' \
+          +test \
+          +'          quit or exit or control-d[z/CR] - exit[Windows]\n' \
           +'          precision, resolution, verbose, version - see help' \
           +'(Lib)' +opt +'\n')
       if path:
@@ -521,6 +535,8 @@ class Calculator:
                          "No documentation for this method." +'\n')
       else:
         sys.stdout.write("Method does not exist.\n")
+    elif not cls.__doc__:
+      sys.stdout.write(cls.__name__ +" has no help\n")
     else:
       sys.stdout.write(cls.__name__ +'\n')
       sys.stdout.write("     " +cls.__doc__ +'\n')
@@ -582,7 +598,7 @@ class Calculator:
     pline = line.replace(word, "").strip()
     pos1 = pline.find("(")
     pos2 = pline.find(")")
-    param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else None
+    param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else ""
     extra = pline[pos2 +1:].strip()                # Anything after word or )
     if word and extra:
       if line.find(word) == 0:
@@ -596,19 +612,20 @@ class Calculator:
            param[0] == "'" and param[-1] == "'":
           param = param[1:-1]
       if word in self.__USEFUL_FILE:  # File cmds can use default filename
+        extra = ""
         if word == "load" and param == "noError=True":
           param = ""
           doFirstLoad = True
-        if param:                     # Maybe use default filename extension
-          if not os.path.splitext(param)[1]:
-            param += os.path.splitext(Calculator.__default)[1]
-        elif pos1 >= 0 or word in self.__USEFUL_FILE[2:]: # Use default file
-          param = Calculator.__default
+        if word == "save":
+          buf = param.split(',')
+          if len(buf) > 1:
+            if len(buf) > 2:
+              raise Exception("Too many variables to save")
+            param = buf[0]
+            extra = ",'%s'" %buf[1]
+            Calculator.__saveVar = self.__processExec((True, buf[1]))
         if param:
-          if not os.path.dirname(param):   # Use default path
-            path = os.path.dirname(__file__)
-            param = os.path.join(path, param)
-          pline = "('%s')" %param
+          pline = "('%s'%s)" %(param, extra)
       elif word == "calc" and param:
         pline = "('%s')" %param.upper()
       elif word == "vars":
@@ -618,12 +635,12 @@ class Calculator:
           pos1 = param.find(".")
           if pos1 > 0:
             pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
+          elif param in self.__USEFUL_WORDS:
+            pline = "()"
         else:
           path = os.path.dirname(__file__)
           ext = os.path.splitext(Calculator.__default)[1]
-          pline = "(path='%s%s*%s')" %(path, os.path.sep, ext)
-          if sys.platform == "win32":
-            pline = pline.replace("\\", "\\\\")
+          pline = "(path='%s')" %self.fixFilename("*")
       if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
         if word == "load":    # Need extra large files setup
           loadLine = Calculator.load(param, noError=doFirstLoad)
@@ -637,7 +654,7 @@ class Calculator:
               pline += ",'%s',%s.version()" %(mod, mod)
           loadLine = "Calculator." +word +"(%s)" %pline
         self.__lexer.reset(loadLine)
-        bufs = self.__parseTokens(False, isAns) # No usefulwords in scripts
+        bufs = self.__parseTokens(False, isAns) # No eval words in scripts
         if len(bufs) != 1:
           if len(bufs) != 0:
             raise Exception("Command word processing error: %s" %line)
@@ -800,12 +817,11 @@ class Calculator:
             ansAssigns.append(token.lexpos)
             token.value = 'eval("ans")'
             isAnsAssign = True
-          elif token.value in self.__PYTHON_STARTS:
-            state.startLine = True
+          #elif token.value in self.__PYTHON_STARTS:
+          #  state.startLine = True
           elif state.startLine:
             if token.value in self.__USEFUL_WORDS:
               if isUsefulWord:
-                #raise Exception("Multiple commands are not allowed")
                 doUsefulWord = token.value
                 doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
@@ -865,6 +881,7 @@ class Calculator:
         if Lib._isVerbose():
           sys.stdout.write("LOG: " +buf[1] +'\n')
         self.__processExec(self.__parseUsefulWord(*buf))  # Ignore the ans
+        Calculator.__saveVar = None
       else:
         out.append(buf[:3])
     return out
@@ -962,7 +979,7 @@ class Calculator:
                 sys.stdout.write("ans = %s\n" %ans)
               elif tmpAns is not None:
                 ans = tmpAns
-                if isinstance(ans, tuple) and len(ans) > 1:
+                if isinstance(ans, tuple):
                   ans = (ans,)
                 sys.stdout.write("ans = %s\n" %ans)
           if anyAssign:
@@ -973,9 +990,8 @@ class Calculator:
                                 assignAns[idx], self.__line[pos+3:])
             if readline:        # Push to cmdline history
               readline.add_history(self.__line)
-          if not anyAns:
-            Calculator.__history.append(self.__line)
-            self.__line = ""
+          Calculator.__history.append(self.__line)
+          self.__line = ""
         except Calculator.ExecError as e:
           pass  # Already reported
         except KeyboardInterrupt:

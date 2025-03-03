@@ -2,48 +2,38 @@
 ## Extend G2 construction to Spin(15)
 ## File: spin15.ca - G.P.Wilmot
 ####################################
-# This file is a work in progress starting from a hand generated Triads15 3-form.
-f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fA", "fB", "fC", "fD", "fE", "fF"))
+from multiprocessing import Process
+import time
+try:
+  from multiprocessing import shared_memory
+except:
+  shared_memory = None
+
+# From CA(15) find 64.8E6 14-simplex primaries to iuncover sub-sedenion algs.
+Triads15gen = (CA.Eval(x) for x in Lib.triads(15)) # Too big and slow hence:
+# Create Triads15[0] and rotate using triads15build() to find the first 105
+# rotations 106 unique primaries stored in Triads15 (= tris0).
+# Decode using str2tri() and encode with tri2str() to save RAM.
+# Then use triads15parts(path="data") to build and save the rest.
+# Load all these primaries with triads15load(path="data") from files
+# spin15-triads{1,2,3?,4?,5?,6}.ca where ?=a,b,c... as 2E6 primaries each
+# due to Windows can't load more in a timely fashion. This is actually a nice
+# chunk size to generate new primaries and then use nacs15parts(path="data")
+# to find sedonions and the 100 sub-sedenion algebras.
+# Trying to read triads & expand 100k is >20MB and python exec blows up RAM
+# more than size of structure! Hence use tri2str to store. Too big is > 13E6.
+# so chunk files.
+#
+# On the Adelaide Uni Pheonix HPC iceman system with 72 nodes triads15parts()
+# takes 2.8 days and nacs15parts() takes 1.6 days.
+#
+
+f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9",
+                   "fA", "fB", "fC", "fD", "fE", "fF"))
  
-# From CA(15) find 12000+ tetrahedron faces selected to define sub-sedenion algebras.
-Triads15gen = (CA.Eval(x) for x in Lib.triads(15)) # Too big and slow - store using tri2str()
-# Trying to read & expand 100k is >20MB and python exec blows up RAM more than size of structure!
-# Hence use tri2str to store. Too big is > 13e6.
-# First 106 Triads15 here - use triads15Load to load spin15-triads?? for the rest
-# and decode using str2tri(). First one is made manually, then repeat swap(for all Basis(15,0,2))
-# to get 106 sorted, then repeat 4 times so far.
-
-def triads15load(code=0):
-  """triads15load([code=0])
-     Loads spin15-triads<code>.ca to extend Triads15 with level=code (a0=all)
-     from triads15Build() with cardinality code=1: 126190, 2=1768755, 3=13097003
-     4=... where 3 is files 3a-3g and 4 is 4a-4? TBD - work in progress."""
-  global Triads15
-  global Triads15parts
-  loading, Triads15parts = [], [tris0]
-  if code in (0, 1):
-    loading += ["spin15-triads1.ca"]
-  if code in (0, 2):
-    loading += ["spin15-triads2.ca"]
-  if code in (0, 3):
-    loading += map(lambda x: "spin15-triads%s.ca" %x, ("3a", "3b", "3c", "3d", "3e", "3f", "3g"))
-  for filename in loading:
-    buf = Lib.readText(filename)
-    exec(buf)
-  if code in (0, 1):
-    Triads15parts.append(tris1)
-  if code in (0, 2):
-    Triads15parts.append(tris2)
-  if code in (0, 3):
-    Triads15parts.extend([tris3a, tris3b, tris3c, tris3d, tris3e, tris3f, tris3g])
-  Triads15 = sorted(Triads15)
-  return len(Triads15)
-
-Triads15_0 = e123+e145+e167+e189+e1AB+e1CD+e1EF+e246+e257+e28A+e29B+e2CE+e2DF+e347+e356+e38B+e39A \
-            +e3CF+e3DE+e48C+e49D+e4AE+e4BF+e58D+e59C+e5AF+e5BE+e68E+e69F+e6AC+e6BD+e78F+e79E+e7AD+e7BC
-Nac15Map_0 = (
-  (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224, 200, 208, 208, 208, 208,
-   208, 208, 252, 228, 204, 180, 236, 236, 188, 188, 220, 196, 220, 196, 204, 204, 204, 204),)
+Triads15_0 = e123+e145+e167+e189+e1AB+e1CD+e1EF+e246+e257+e28A+e29B+e2CE+e2DF \
+            +e347+e356+e38B+e39A+e3CF+e3DE+e48C+e49D+e4AE+e4BF+e58D+e59C+e5AF \
+            +e5BE+e68E+e69F+e6AC+e6BD+e78F+e79E+e7AD+e7BC
 
 if "Triads15" in globals():
   Backup15 = Triads15
@@ -155,61 +145,677 @@ Triads15 = [ \
  "12F13E1451671891AB1CD23D24A25B2682792CE34735638B39A3CF46E48C49D4BF57E58D59C5AF69F6AC6BD78F7AD7BC8AE9BEDEF",
  "12F13E14915816B17A1CD23D24625728A29B2CE34735638B39A3CF45D48C4AE4BF59C5AF5BE67D68E69F6AC78F79E7BC89DABDDEF",
 ]
-tris0 = Triads15
-Triads15parts = [tris0]
+tris0 = Triads15[:]
+# Triads15parts[part] is the [offset, size of this part in Triads15].
+# Part0=triads15build(Triads15[:1]) and Part1 is two iterations (4795+121395).
+Triads15parts = [[0,106], [106, 126190], [126296, 1760332], [1886628, 12925668],
+                [14812296, 29403912], [44216208, 19385232], [63601440, 1263360],
+                [64864800, 0]]
 
-def triads15build(triads, offs=0, maxs=105, name=None):
-  """triads15build(triads, [offs, maxs, name])
-     Extend Triads15 with rotations[offs:maxs] of triads."""
+def tri2str(tri):
+  """tri2str(str)
+     Return a string of 1 char for each 3-form terms. See tri2str()."""
+  return "".join(list(x[0][1:] for x in tri.copyTerms()))
+
+def str2tri(str):
+  """str2tri(str)
+     Return triad15 from a string of 105 hex-digits. See str2tri()."""
+  ca = CA()
+  for x in range(0,len(str),3):
+    ca += CA.Eval(("e" +str[x:x+3],1))
+  return ca
+
+def triads15load(codes=[0], path=None, lastVars=False):
+  """triads15load([codes=[0],path,lastVars=False])
+     Loads spin15-triads<codes>.ca to extend Triads15 with level=code([0]=all)
+     from triads15build() with cardinality given by Triads15parts. All needs
+     32GB. Lastvars makes the last levels files global for further building."""
   global Triads15
-  if not name:
-    name = "outs%02d-%02d" %(offs, max)
-  Triads15 = set(Triads15)
-  Lib.checkMem(len(Triads15),1)
+  global Triads15parts
+  loading = []
+  filename = "spin15-triads%s"
+  lastPart = sum(map(lambda x: bool(x[1]>0), Triads15parts)) +1
+  codes = [codes] if isinstance(codes, int) else codes
+  parts = codes if codes != [0] else range(1, lastPart)
+  for part in parts:
+    if part not in range(lastPart):
+      raise Exception("Invalid codes for triads15load)")
+  Lib.checkMem(len(Triads15), 1)
+  for idx in parts:
+    if Triads15parts[idx][1]:
+      out = set()
+      beg = len(Triads15)
+      siz = (Triads15parts[idx][1] +2000000 -1) //2000000
+      loading = list("%d%s" %(idx, "" if siz == 1 else chr(ch +97)) \
+                     for ch in range(siz))
+      for load in loading:
+        if Lib.checkMem(len(Triads15), 1, extra=load):
+          break
+        isGlobal = (lastVars and idx == parts[-1])
+        out = loadCa(filename %load, "tris%s" %load, path, isGlobal)
+        if isinstance(Triads15, set):
+          Triads15.update(out)
+        else:
+          Triads15.extend(out)
+        out = None
+      if Triads15parts[idx][0] != beg or Triads15parts[idx][1] != len(Triads15) -beg:
+        sys.stderr.write("Triads15parts[%d] != start:size=%d:%d\n" \
+                        %(idx, beg, len(Triads15) -beg))
+  Lib.checkMem(len(Triads15), finish=True)
+  return len(Triads15)
+
+def loadCa(filename, varname, path=None, isGlobal=False):
+  """loadCa(filename, varname, [path,isGlobal])
+     Check file existance and return the loaded varname, optionally global."""
+  if not path:
+    path = os.path.dirname(__file__)
+  loadfile = Lib.fixFilename(filename, path, ".ca")
+  if not os.path.isfile(loadfile):
+    raise Exception("Missing file: %s" %loadfile)
+  global out
+  try:
+    buf = ("global %s\n" %varname) if isGlobal else ""
+    buf += Lib.readText(loadfile)
+    buf += "\nglobal out\nout = %s\n" %varname
+    exec(buf, globals())
+  except BaseException as e:
+    sys.stdout.write("Problem with file: %s\n" %filename)
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+    raise e
+  return out
+
+def saveCa(basename, varname, var, path="", dump=False):
+  """saveCa(basename, varname, var, [path,dump])
+     Save files <basename>a,b,....ca as <varname>a,b,... in 2M steps of var."""
+  Lib._checkType(basename, Lib._basestr, "saveCa")
+  Lib._checkType(varname, Lib._basestr, "saveCa")
+  Lib._checkType(var, (list, tuple), "saveCa")
+  step = 2000000
+  if len(var) <= step:
+    cnt = 1
+    Lib.save(basename, varname, out, path, ".ca")
+  else:
+    cnt = 0
+    for idx in range(0, len(var), step):
+      if cnt > 25 or dump:
+        sys.stdout.write("Saving %d in file %s%s.ca\n" %(cnt, basename,
+                          chr(97 +cnt)))
+      Lib.save(basename +"%s" %chr(97 +cnt), varname +"%s" %chr(97 +cnt),
+               var[idx:idx +step], path, ".ca")
+      cnt += 1
+  return cnt
+
+# Windows needs to copy this function into calcCA.py due to a scoping bug.
+def taskTriads15build(triads, allTriads, values=list(range(105)), path=None,
+                      name="tmp", offs=0, siz=0, status=None, pos=0):
+  """triads15build(triads,allTriads,[values,path,name,offs,siz,status,pos])
+     Output allTriads updates for values[=0..105] rotation indices of
+     triads[offs:siz] via a file with filename <name[=<offs>_<siz>.ca."""
+  if siz == 0:
+    siz = len(triads)
+  outname = "%s%d" %(name, pos)
+  errname = "error" +outname +".txt"
   rrr = CA.Basis(15,0,2)
   rr = 0
   out = set()
-  for idx in range(offs, maxs):
-    rr = rrr[idx]
-    for tt in triads:
-      nxt = tri2str(abs(str2tri(tt).swap(rr)))
-      if nxt not in Triads15:
-        out.add(nxt)
-    if Lib.checkMem(len(out), 1, extra=rr):
-      break
-  Triads15.update(out)
-  Lib.save(name, out, name +".ca")
-  Lib.checkMem(len(Triads15), extra=rr, finish=True)
+  try:
+    if status:
+      status[pos] = offs
+    for idx,tt in enumerate(triads[offs:offs +siz]):
+      tri = CA.str2tri(tt)
+      for r in values:
+        rr = rrr[r]
+        nxt = CA.tri2str(abs(tri.swap(rr)))
+        if nxt not in allTriads:
+          out.add(nxt)
+      if status:
+        status[pos] = offs +idx
+        if Lib.freeMemMB() < Lib._memLimitMB:
+          status[pos] = -1
+          Lib.save(errname, "err", "%d %d: %s"%(pos, idx,
+                                           Lib.freeMemMB()), ".", mode="a")
+          break
+      elif idx % 100 == 0:
+        if Lib.checkMem(offs +idx, 1, extra=len(out)):
+          Lib.save(errname, "err", "%d %d: %s"%(pos, idx,
+                                          Lib.freeMemMB()), ".", mode="a")
+          break
+    Lib.save(outname, outname, out, path, ".ca")
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+    Lib.save(errname, "err", '%s: %s' %(type(e).__name__,e), ".", mode="a")
+    if status:
+      status[pos] = -2
+  if status:
+    status.shm.close()
   return out
 
-def nac15subalg(tri, pos=None):
-  """nac15subalg(tri, [pos])
-     Return non-associative cnt for tri or str2tri(tri).allSigns()[pos] sub-algebra."""
+def triads15build(triads, cpus=1, path=None, name="tmp", values=None):
+  """triads15build(triads, [cpus=1, path,name="tmp",values=(0..105)])
+     Output Triads15 updates for triads with cpus tasks via out files."""
+  if not values:
+    values = list(range(105))
+  out=set()
+  allTriads = set(Triads15)
+  status = oldStatus = None
+  Lib.checkMem(len(Triads15), 1)
+  try:
+    size = len(triads)
+    step = (size +cpus -1) //cpus
+    last = (size +step -1) //step
+    if cpus == 1:
+      out = taskTriads15build(triads, allTriads, values, path, name)
+    elif cpus > 1:
+      process = []
+      if shared_memory:
+        status = shared_memory.ShareableList([0] *cpus)
+      else:
+        sys.stderr.write("Shared memory is not available for status logging\n")
+      for start in range(0, size, step):
+        idx = start //step
+        process.append(Process(target=taskTriads15build, args=(triads,
+                   allTriads, values, path, name, start, step, status, idx)))
+      for proc in process:
+        proc.start()
+      time.sleep(10)
+      for pos,task in enumerate(process):
+        while task.is_alive():
+          tmp = list(status[idx] for idx in range(cpus)) if status else None
+          if tmp == oldStatus or pos == 0:
+            Lib.checkMem(pos, 1, extra=tmp)
+            sys.stdout.flush()
+            oldStatus = tmp
+          task.join(1800)
+        else:
+          task.join()
+      time.sleep(10)
+      sys.stdout.write("Read files %s[0..%d].ca\n" %(name, last -1))
+      sys.stdout.flush()
+      for idx in range(last):
+        outname = name +"%d" %idx
+        buf = Lib.readText(Lib.fixFilename(outname, path, ".ca"))
+        buf += "\nout.update(%s)\n" %outname
+        exec(buf, locals())
+      for idx in range(last):
+        os.remove(Lib.fixFilename("%s%d.ca" %(name, idx), path, ".ca"))
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+  if status:
+    status.shm.close()
+    status.shm.unlink()
+  Lib.checkMem(len(out), finish=True)
+  return list(out)
+
+def triads15parts(code, cpus=2, redo=[], path=""):
+  """triads15parts(code, [cpus=2,redo=[],path])
+     Extend Triads15 with level code (0=all) using triads15build/load.
+     For code>1 assumes triads15load(code=0 and code-1,True) has been run.
+     For code>2 can do file indices listed in redo. If redo contains -1 
+     or is blank then at the end accumulate all outs files and write sorted
+     2M rows as spin15-triads<code?> files ?=a,b,c... if rows > 2M."""
+  if isinstance(redo, int):
+    redo = [redo]
+  Lib._checkType(code, int, "triads15parts")
+  Lib._checkType(cpus, int, "triads15parts")
+  Lib._checkType(redo, (list, tuple), "triads15parts")
+  Lib._checkType(path, Lib._basestr, "triads15parts")
+  if code not in range(len(Triads15parts) +1):
+    raise Exception("Invalid value for code in triads15parts")
+  parts = [code] if code else range(1, len(Triads15parts) +1)
+  triname = "spin15-triads%d%s"
+  outname = "out%d%s"
+  tmpname = "tmp%d%s"       # Used for subtask files
+  global Triads15
+  if len(Triads15) < Triads15parts[parts[-1] -1][1] and redo != [-1]:
+    raise Exception("Need to load triads for level %d" %(parts[-1] -1))
+  Triads15 = set(Triads15)
+  for part in parts:
+    beg = len(Triads15)
+    codes = Triads15parts[part -1]
+    size = (codes[1] +2000000 -1) //2000000
+    for idx in range(size):
+      out = []
+      subpart = "" if size == 1 else chr(97 +idx)
+      if part == 1:  # Part 1 has 2 sub-parts
+        sys.stdout.write("Use tris0 twice to build %s.ca\n" \
+                                          %outname %(part, ""))
+        Triads15 = set(tris0)
+        triads = triads15build(tris0, cpus, path, tmpname %(0, ""))
+        out = triads +triads15build(triads, cpus, path, tmpname %(1, ""))
+      elif code == 0:
+        triads = loadCa(triname %(part -1, subpart), 
+                        "tris%d%s" %(part -1, subpart), path)
+        sys.stdout.write("Use %s.ca to build %s.ca\n" %(triname %(part -1,
+                                subpart), outname %(part, subpart)))
+        out = triads15build(triads, cpus, path, tmpname %(part, subpart))
+      elif idx in redo or not redo:
+        sys.stdout.write("Use tris%d%s to build %s\n" %(part -1, subpart,
+                                  outname %(part, subpart)))
+        triads = eval("tris%d%s" %(part -1, subpart))
+        out = triads15build(triads, cpus, path, tmpname %(part, subpart))
+      siz = saveCa(outname %(part, subpart), outname %(part, subpart), out,path)
+      sys.stdout.write("Saved %s%s.ca\n" %(outname %(part, subpart),
+                      ("[a..%s]" %chr(97 +siz -1)) if siz>1 else ""))
+      sys.stdout.flush()
+    triads = set()
+    if -1 in redo or not redo:
+      subpart = "" if size == 1 else ("[a..%s]" %chr(97 +size -1))
+      sys.stdout.write("Reload %s.ca to save %s.ca\n" %(outname %(part,
+                       subpart), triname %(part, "")))
+      Lib.checkMem()
+      for idx in range(size):
+        subpart = "" if size == 1 else chr(97 +idx)
+        cnt = 0
+        tmpname = outname %(part, subpart)
+        while os.path.isfile(Lib.fixFilename(tmpname +chr(97 +cnt), path,
+                             ".ca")):
+          triads.update(loadCa(tmpname +chr(97 +cnt), tmpname +chr(97 +cnt),
+                               path))
+          cnt += 1
+        if cnt == 0:
+          triads.update(loadCa(tmpname, tmpname, path))
+        subparts = "%s%s" %(outname %(part, subpart), 
+                         ("[a..%s]" %chr(97 +cnt -1) if cnt else ""))
+        if Lib.checkMem(idx, 1, extra=subparts):
+          break
+        sys.stdout.flush()
+      siz = saveCa(triname %(part, ""), "tris%d" %part,
+                   list(sorted(triads)), path)
+      Triads15.update(triads)
+      Lib.checkMem(len(out), finish=True)
+      fin = len(Triads15)
+      sys.stdout.write("%s.ca has %d file%s, %d offset & size %d\n" %(triname\
+               %(part, ""), siz, ("s" if siz>1 else ""), beg, fin -beg))
+      if part < len(Triads15parts) and Triads15parts[part] != [beg, fin -beg]:
+        sys.stdout.write("Triads15parts[%d]=%s\n" %(part, Triads15parts[part]))
+      if fin > beg:
+        Triads15parts[part] = [beg, fin -beg]
+  Triads15 = list(Triads15)
+
+
+# Nacs15 is the unique sub-sedonion algebras. Nacs15Names provides the first
+# occurance name, code, index and signed combination. Check with nacs15map().
+
+Nacs15map_0 = (
+  (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224, 200, 208,
+   208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188, 220, 196,
+   220, 196, 204, 204, 204, 204),)
+
+# Dictionary of non-assoc. cnt to (sub-algebra name, first example part, idx
+# and allSign position (282:I6=Sedenions). There are 101 S +sub-sedenions.
+# all(list(Nacs15[z[0]]==Triads15parts[z[1][1][1]][z[1][1][2]] \
+#     for z in (x for x in enumerate(Nacs15names.items())))) == True
+Nacs15names = {
+ 128: ('A1',3,6793710,4), 130: ('A2',2,1106227,4), 132: ('A3',3,7643461,4),
+ 134: ('A4',3,6980279,22),136: ('A5',2,476144,17), 138: ('A6',2,973626,3),
+ 140: ('A7',1,89116,16),  142: ('A8',1,70147,3),   144: ('A9',0,67,26),
+ 146: ('B1',1,22193,30),  148: ('B2',1,10210,10),  150: ('B3',1,2742,30),
+ 152: ('B4',0,67,29),     154: ('B5',1,2743,30),   156: ('B6',1,3045,30),
+ 158: ('B7',1,755,24),    160: ('B8',0,67,12),     162: ('B9',0,58,23),
+ 164: ('C1',0,39,23),     166: ('C2',0,84,22),     168: ('C3',0,60,23),
+ 170: ('C4',0,58,13),     172: ('C5',0,39,27),     174: ('C6',0,33,23),
+ 176: ('C7',0,39,13),     178: ('C8',0,34,23),     180: ('C9',0,0,23),
+ 182: ('D1',0,32,23),     184: ('D2',0,36,28),     186: ('D3',0,33,14),
+ 188: ('D4',0,0,26),      190: ('D5',0,12,11),     192: ('D6',0,33,7),
+ 194: ('D7',0,32,9),      196: ('D8',0,0,29),      198: ('D9',0,12,16),
+ 200: ('E1',0,0,9),       202: ('E2',0,32,14),     204: ('E3',0,0,22),
+ 206: ('E4',0,12,30),     208: ('E5',0,0,14),      210: ('E6',0,0,0),
+ 212: ('E7',0,8,21),      214: ('E8',0,14,18),     216: ('E9',0,36,4),
+ 218: ('F1',0,32,8),      220: ('F2',0,0,28),      222: ('F3',0,12,18),
+ 224: ('F4',0,0,8),       226: ('F5',0,33,10),     228: ('F6',0,0,21),
+ 230: ('F7',0,32,25),     232: ('F8',0,43,32),     234: ('F9',0,32,10),
+ 236: ('G1',0,0,24),      238: ('G2',0,12,12),     240: ('G3',0,40,28),
+ 242: ('G4',0,43,29),     244: ('G5',0,43,21),     246: ('G6',0,35,10),
+ 248: ('G7',0,43,8),      250: ('G8',0,41,21),     252: ('G9',0,0,20),
+ 254: ('H1',0,57,24),     256: ('H2',0,41,15),     258: ('H3',0,38,32),
+ 260: ('H4',0,64,5),      262: ('H5',0,64,0),      264: ('H6',0,43,15),
+ 266: ('H7',0,64,4),      268: ('H8',1,228,10),    270: ('H9',1,224,15),
+ 272: ('I1',1,224,11),    274: ('I2',0,64,11),     276: ('I3',1,228,20),
+ 278: ('I4',1,224,13),    280: ('I5',1,224,5),     282: ('I6',1,224,32),
+ 284: ('I7',1,3254,27),   286: ('I8',1,224,8),     288: ('I9',1,224,17),
+ 290: ('J1',0,64,26),     292: ('J2',1,3491,10),   294: ('J3',1,224,19),
+ 296: ('J4',1,10360,21),  298: ('J5',1,12741,31),  300: ('J6',1,13316,21),
+ 302: ('J7',1,10311,32),  304: ('J8',0,64,21),     306: ('J9',1,7728,21),
+ 308: ('K1',1,4781,27),   310: ('K2',1,8269,23),   312: ('K3',1,115784,27),
+ 314: ('K4',2,517043,12), 316: ('K5',1,82648,7),   318: ('K6',1,35372,14),
+ 320: ('K7',1,224,31),    322: ('K8',1,35370,14),  324: ('K9',2,193266,30),
+ 326: ('L1',3,3600142,7), 328: ('L2',3,8667056,7)}
+
+def nacs15subalg(tri, pos=None):
+  """nacs15subalg(tri, [pos])
+     Return non-assoc. cnt for tri or str2tri(tri).allSigns()[pos] sub-alg."""
   if pos is not None:
-    if pos not in range(36):
-      raise Exception("Invalid nac15subalg signed position")
-    tri = list(str2tri(tri).allSigns(36))[pos]
+    if pos not in range(105):
+      raise Exception("Invalid nacs15subalg signed position")
+    tri = list(CA.str2tri(tri).allSigns(36))[pos]
   return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f15Basis)) \
                      .assocTriads(f15Basis,True),f15Basis,1)))
 
-# Sign combination indices for mirrors from the first 36 combinations (add all 32363-idx)
-Nac15Mirrors = []
+# First nacs15subalg() triads in Nacs15names order extracted from Triads15parts
+Nacs15 = [ \
+ "12913B14A15F16E17D18C23425C26728F2AB2DE35E36F37839A3CD45D46847F49B4CE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
+ "12A13B14915F16E17D18C23425D26827F29B2CE35E36F37839A3CD45C46748F4AB4DE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
+ "12A13914B15F16E17D18C23425D26827F29B2CE35C36738F3AB3DE45E46F47849A4CD56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
+ "12913D14C15F16718A1BE23425627F28E2AB2CD35B36A37839C3EF45A46B47E48F49D57958C5DE68D69F6CE7AD7BC89B9AEACFBDF",
+ "12513814B16917C1AD1EF23F24926B27D28E2AC34C35E36D37B39A4564784AF4DE57A58F59B5CD67F68A6CE79E89D8BC9CFABEBDF",
+ "12913814F15E16C17B1AD23D24B25627F28A2CE34C35736F39A3BE45A4684794DE58B59C5DF67D69E6AB78E7AC89D8CF9BFAEFBCD",
+ "12B13514D1671891AC1EF23924625827D2AF2CE34F36A37C38B3DE45E47B48C49A56C57A59B5DF68E69F6BD78F79E8AD9CDABEBCF",
+ "12813914F15E16D17C1AB23B24C25627F29A2DE34D35736F38A3CE45A4694784BE58D59C5BF67B68E6AC79E7AD89B8CF9DFAEFBCD",
+ "12314E15F1671891AB1CD24D25726F28A29B2CE34C35637F38B39A3DE45A4694784BF58D59C5BE68E6AC6BD79E7AD7BC8CF9DFAEF",
+ "12314A15B1671891CF1DE24625827A29B2CD2EF34735936A38B3CE3DF45F48E49D4BC56E57D5AC68F69C6BD78C79F7BE8AD9AEABF",
+ "12314516F17C1891AB1DE24E25D26C27F28B29A34D35E36738A39B3CF46B47948C4AF56A57859C5BF68E69D7AE7BD8DF9EFACDBCE",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46E48F4AD4BC56F58E5AC5BD67D69C78C7AE7BF89D9AF9BE",
+ "12314E15F1671891AB1CD24D25726F28A29B2CE34C35637F38B39A3DE45A4694784BF58D59C5BE68E6AC6BD79E7AD7BC8CF9DFAEF",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46F48E4AC4BD56E58F5AD5BC67C69D78D7AF7BE89C9AE9BF",
+ "12314516817A19B1CD1EF24725A26928B2CF2DE34A35736B3893CE3DF46E48F49D4BC56F58E59C5BD67D6AC78C79E7BF8AD9AFABE",
+ "12314516718A19B1CD1EF24825A26927B2CE2DF34A35836B3793CF3DE46F47E49D4BC56E57F59C5BD68D6AC78C7AD89F8BE9AEABF",
+ "12314E15F1671891AB1CD24D25726F28A29B2CE34C35637F38B39A3DE45A4694784BF58D59C5BE68E6AC6BD79E7AD7BC8CF9DFAEF",
+ "12314A15B1671891CD1EF24625827A29B2CE2DF34735936A38B3CF3DE45E48C49D4BF56C57D5AF68E69F6BD78F79E7BC8AD9ACABE",
+ "12314516B17A1891CD1EF24A25726829B2CE2DF34735A36938B3CF3DE46E48C49D4BF56F58D59C5BE67D6AC78F79E7BC8AE9AFABD",
+ "12813914E15F16C17D1AB23A24625729B2CE2DF34735638B3CF3DE45A48C49D4BF58D59C5BE67A68E69F6BD78F79E7BC89AACDAEF",
+ "12314B15A1671891CD1EF24625927B28A2CE2DF34735836B39A3CF3DE45F48C49D4AE56D57C5BE68E69F6AC78F79E7AD8BD9BCABF",
+ "12314A15B1671891CD1EF24625827A29B2CE2DF34735936A38B3CF3DE45E48C49D4BF56C57D5AF68E69F6BD78F79E7BC8AD9ACABE",
+ "12314516B17A1891CD1EF24A25726829B2CE2DF34735A36938B3CF3DE46E48C49D4BF56F58D59C5BE67D6AC78F79E7BC8AE9AFABD",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46D48C4AE4BF56C58D5AF5BE67E69F78F7AD7BC89E9AC9BD",
+ "12314516B17A1891CD1EF24A25726829B2CE2DF34735A36938B3CF3DE46E48C49D4BF56F58D59C5BE67D6AC78F79E7BC8AE9AFABD",
+ "1231451691781AB1CD1EF24625927B28A2CE2DF34935637A38B3CF3DE47D48C4AE4BF57C58D5AF5BE67F68E6AC6BD79E89F9AD9BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "12314516A17B1891CD1EF24625A27829B2CE2DF34A35637938B3CF3DE47E48C49D4BF57F58D59C5BE67C68E69F6BD7AD8AF9AEABC",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46D48C4AE4BF56C58D5AF5BE67E69F78F7AD7BC89E9AC9BD",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46D48C4AE4BF56C58D5AF5BE67E69F78F7AD7BC89E9AC9BD",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AB1CE1DF24625728A29B2CD2EF34735638B39A3CF3DE48C49E4AD4BF58E59C5AF5BD68D69F6AC6BE78F79D7AE7BC",
+ "1231451671891AD1BC1EF24625728A29D2BF2CE34735638D39A3BE3CF48C49B4AE4DF58B59C5AF5DE68E69F6AC6BD78F79E7AB7CD",
+ "12314516A17B1891CD1EF24625A27829B2CE2DF34A35637938B3CF3DE47E48C49D4BF57F58D59C5BE67C68E69F6BD7AD8AF9AEABC",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451681791AB1CD1EF24925726B28A2CE2DF34735936A38B3CF3DE46D48C4AE4BF56C58D5AF5BE67E69F78F7AD7BC89E9AC9BD",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "12314516D17C1891AB1EF24C25726E28A29B2DF34735C36F38B39A3DE46849D4AE4BF56958D5AF5BE67B6AC78F79E7AD8CE9CFBCD",
+ "1231451681791AB1CD1EF24625827A29B2CE2DF34835637B39A3CF3DE47C49D4AE4BF57D59C5AF5BE67E69F6AC6BD78F89E8AD8BC",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
+ "12314516C17D1891AB1EF24625C27E28A29B2DF34C35637F38B39A3DE47849D4AE4BF57958D5AF5BE67A68E69F6BD7BC8CF9CEACD",
+ "12314516D17C1891AB1EF24C25726E28A29B2DF34735C36F38B39A3DE46849D4AE4BF56958D5AF5BE67B6AC78F79E7AD8CE9CFBCD",
+ "12314516D17C1891AB1EF24C25726E28A29B2DF34735C36F38B39A3DE46849D4AE4BF56958D5AF5BE67B6AC78F79E7AD8CE9CFBCD",
+ "1231451691781AB1CD1EF24825726A29B2CE2DF34735836B39A3CF3DE46C49D4AE4BF56D59C5AF5BE67F68E79E7AD7BC89F8AC8BD",
+ "12314516D17C1891AB1EF24C25726E28A29B2DF34735C36F38B39A3DE46849D4AE4BF56958D5AF5BE67B6AC78F79E7AD8CE9CFBCD",
+ "12314516C17D1891AB1EF24D25726F28A29B2CE34735D36E38B39A3CF46948C4AE4BF56859C5AF5BE67A6BD78F79E7BC8DE9DFACD",
+ "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
+ "1231491581671AB1CD1EF24A25726829B2CE2DF34B35637839A3CF3DE45D46E47F48C59C5AF5BE69F6AC6BD79E7AD7BC89D8AE8BF",
+ "12314516C17D1891AB1EF24D25726F28A29B2CE34735D36E38B39A3CF46948C4AE4BF56859C5AF5BE67A6BD78F79E7BC8DE9DFACD",
+ "12314516B17A1891CD1EF24625B27928A2CE2DF34B35637839A3CF3DE47F48C49D4AE57E58D59C5AF67D68E69F6AC7BC8BF9BEABD",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "12314516D17C1891AB1EF24C25726E28A29B2DF34735C36F38B39A3DE46849D4AE4BF56958D5AF5BE67B6AC78F79E7AD8CE9CFBCD",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "1231451671891AC1BD1EF24D25B2682792AF2CE34B35D3693783AE3CF46E47F48C49A56F57E58A59C6AB6CD7AD7BC8BF8DE9BE9DF",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "1231451671891AC1BD1EF24D25B2682792AF2CE34B35D3693783AE3CF46E47F48C49A56F57E58A59C6AB6CD7AD7BC8BF8DE9BE9DF",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "12314516817B19F1AE1CD24B25726928F2AD2CE34735B36F3893AC3DE46D48C49A4EF56C58D59E5AF67E6AB78A79C7DF8BE9BDBCF",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "12314516817E19A1BF1CD24925A26B27D28F2CE34A35936F37C38B3DE46D47B48C4EF56C57F58D5BE6796AE78A89E9BD9CFABCADF",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "12314516F17D18A19B1CE24D25726C2892AB2EF34735D36E38B39A3CF46948C4AE4BF56B58E59F5AC67A68D78F79E7BC9CDADFBDE",
+ "12314615C17A1891BD1EF24526C27928A2BE2DF34C35637839A3BF3DE47F48B49D4AE57D58E59F5AB67E68D69B6AF7BC8CF9CEACD",
+ "12314615E17D18A19B1CF24D25C2672892AB2EF34735F36D38B39A3CE45948C4AF4BE56B57A58D68F69E6AC78E79F7BC9CDADEBDF",
+ "12314516F17D1891AB1CE24D25726C28B29A2EF34735D36E38A39B3CF46849F4AE4BC56958F5AC5BE67A6BD78E79C7BF8CD9DEADF",
+ "12314D15C1671891AB1EF24625F27D28A29B2CE34735E36D38B39A3CF45948C4AE4BF56B57A58D68E69F6AC78F79E7BC9CDADFBDE",
+ "12314516D17819A1BC1EF24825726E29B2AC2DF34735836F39C3AB3DE46A49D4BF4CE5695AD5BE5CF67B68C79E7AF7CD89F8AE8BD",
+ "12314516A17819C1BD1EF24B25D26728A29F2CE34D35B36837A39E3CF46F47948C4AE56E57C5895AF69B6CD7BF7DE8BE8DF9ADABC",
+ "12314516D17C1891AF1BE24725C26E28A29F2BD34C35736B38F39A3DE46849D4AE4BF56958D5AB5EF67A6CF78E79B7DF8BC9CEACD",
+ "12E13D14815916C17B1AF23C24F25726D28A29B34735F36E38B39A45C4694AE4BD5685AD5BE67A6BF78D79E7CF89C8EF9DFABCCDE",
+ "12513C14D1691781AF1BE23724628C29D2AE2BF34B35836F39A3DE45947F48A4CE56D57C5AB5EF67B68E6AC79E7AD89B8DF9CFBCD",
+ "12A13714E15618C19D1BF23D24F25C2682792BE34536E38B39A3CF4674894AB4CD57E58A59B5DF69F6AC6BD78F7AD7BC8DE9CEAEF",
+ "1241351671891AB1CD1EF23D25C2682792AF2BE34C36E37F38B39A45D4694784AE4BF56F57E58A59B6AC6BD7AD7BC8CF8DE9CE9DF",
+ "1231451671891AC1BD1EF24B25D2692782AF2CE34D35B3683793AE3CF46F47E48C49A56E57F58A59C6AB6CD7AD7BC8BE8DF9BF9DE",
+ "1241351671891AB1CD1EF23C25D2692782AF2BE34D36F37E38B39A45C4684794AE4BF56E57F58A59B6AC6BD7AD7BC8CE8DF9CF9DE",
+ "12314B15916718F1AE1CD24D25627928A2BC2EF34C35736938E3AF3BD45E46F47849A58C5AB5DF68B6AC6DE7AD7BF7CE89D9BE9CF",
+ "12613714E15F18B19C1AD23425827E29A2BF2CD35936E38A3BD3CF45A4674894BC4DF56B57C5DE68F69D6AC78D79F7AB8CE9BEAEF",
+ "12B13A14715618D19C1EF23F24C25D2682792AE34D35C3693783BE45F46E48A49B57E58B59A67F6AC6BD7AD7BC89F8CE9DEABFCDF"]
 
-def nac15mirrors(idx):
-  """nac15mirrors(idx)
-     Check Triads15[idx] first 36 signed combination have the same mirror indices."""
-  if idx < 0 or idx >= len(Triads15):
-    raise Exception("Invalid nac15subalg signed position")
-  #global Triads15
-  #global Nac15Mirrors
+def nacs15map(code=0):
+  """nacs15map([code=0=all])
+     Return invalid Nacs15names checking Nacs15 after triads15load(code)."""
+  idx = 0
+  out = {}
+  for sa,nac in Nacs15names.items():
+    tri = ""
+    if code in (0, nac[1]):
+      if nac[1] >= len(Triads15parts) or \
+         Triads15parts[nac[1]][0] +nac[2] >= len(Triads15):
+        raise Exception("Triads15parts[%d] needed for %d\n" %(nac[1], sa))
+      else:
+        tri = Triads15[Triads15parts[nac[1]][0] +nac[2]]
+        tmp = nacs15subalg(tri, nac[3])
+        if tri != Nacs15[idx] or tmp != sa:
+          out[sa] = (tmp, idx)
+    idx += 1
+  return out
+
+# Windows needs to copy this function into calcCA.py due to a scoping bug.
+def taskNacs15build(triads, nacs15keys, offs=0, siz=0,
+                    path="", name="nactmp", status=None, pos=0):
+  """taskNacs15build(triads,nacs15keys,[offs,siz,path,name,status,pos])
+     Output new Nacs15 signed sub-sedenion algs from 36 signed triads if cnt==1
+     else use cnt tasks via outnacs*.ca files."""
+  if siz == 0:
+    siz = len(triads)
+  outname = "%s%d" %(name, pos)
+  errname = "error" +outname +".txt"
   out = []
-  triad = str2tri(Triads15[idx])
+  cnt = 0
+  bas = list("f%s" %chr(x+49 if x<9 else x+56) for x in range(15))
+  try:
+    for idx,triad in enumerate(triads[offs:offs +siz]):
+      for sgn,tri in enumerate(CA.str2tri(triad).allSigns(36)):
+        tmp = len(list(Lib.triadDump(Tensor.Triads(*(tri).spin(bas)) \
+                               .assocTriads(bas,True), bas, 1)))
+        if tmp not in nacs15keys:
+          cnt += 1
+          nacs15keys.add(tmp)
+          out.append((tmp, offs +idx, sgn, triad))
+          if not status:
+            sys.stdout.write("Not in Nacs15 %d: %d,%d\n" %(cnt, offs +idx, sgn))
+      if status:
+        status[pos] = offs +idx
+        if Lib.freeMemMB() < Lib._memLimitMB:
+          Lib.save(errname, "err", "%d %d: %s"%(pos, idx,
+                   Lib.freeMemMB()), ".", mode="a")
+          status[pos] = -1
+          break
+      elif Lib.checkMem(offs +idx, 10000, extra=cnt):
+        Lib.save(errname, "err", "%d %d: %s"%(pos, idx,
+                 Lib.freeMemMB()), ".", mode="a")
+        break
+    Lib.save(outname, outname, out, path, ".ca")
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+    Lib.save(errname, "err", '%s: %s' %(type(e).__name__,e), ".", mode="a")
+    if status:
+      status[pos] = -2
+  if status:
+    status.shm.close()
+  return out
+
+def nacs15build(triads, cpus=1, path="", name="nactmp"):
+  """nacs15build(triads,[cpus=1,path,name="nactmp"])
+     Output new Nacs15 signed sub-sedenion algs from 36 signed triads."""
+  nacs15keys = set(Nacs15names.keys())
+  out = []
+  Lib.checkMem()
+  status = oldStatus = None
+  try:
+    size = len(triads)
+    step = (size +cpus -1) //cpus
+    last = (size +step -1) //step
+    if cpus == 1:
+      out = taskNacs15build(triads, nacs15keys)
+    elif cpus > 1:
+      process = []
+      if shared_memory:
+        status = shared_memory.ShareableList([0] *cpus)
+      else:
+        sys.stderr.write("Shared memory is not available for status logging\n")
+      for start in range(0, size, step):
+        idx = start //step
+        process.append(Process(target=taskNacs15build,
+                 args=(triads, nacs15keys, start, step, 
+                       path, name, status, idx)))
+      for cnt,proc in enumerate(process):
+        proc.start()
+      time.sleep(10)
+      for pos,task in enumerate(process):
+        while task.is_alive():
+          tmp = list(status[idx] for idx in range(cpus)) if status else None
+          if tmp == oldStatus or pos == 0:
+            Lib.checkMem(pos, 1, extra=tmp)
+            sys.stdout.flush()
+            oldStatus = tmp
+          task.join(1800)
+        else:
+          task.join()
+      time.sleep(10)
+      sys.stdout.write("Read files %s0..%d.ca\n" %(name, last -1))
+      sys.stdout.flush()
+      newKeys = set()
+      for idx in range(last):
+        outname = name +"%d" %idx
+        tmp = loadCa(outname, outname, path, ".ca")
+        for nac in tmp:
+          if nac[0] not in newKeys:
+            newKeys.add(nac[0])
+            out.append(nac)
+      for idx in range(last):
+        os.remove(Lib.fixFilename("%s%d.ca" %(name, idx), path, ".ca"))
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+  if status:
+    status.shm.close()
+    status.shm.unlink()
+  Lib.checkMem(len(out), finish=True)
+  return out
+
+def nacs15parts(code, cpus=2, redo=[], path="."):
+  """nacs15parts(code, [cpus=2,redo=[],path="."])
+     Extend Nacs15 and Nacs15names with level code (0=all) using nacs15build.
+     For code>2 can do file indices listed in redo. If redo contains -1 then at
+     the end accumulate all outnacs files and write spin15-nacs<code> file.
+     Code==1 does both parts 0 and 1."""
+  global Nacs15names
+  global Nacs15
+  if isinstance(redo, int):
+    redo = [redo]
+  Lib._checkType(code, int, "nacs15parts")
+  Lib._checkType(cpus, int, "nacs15parts")
+  Lib._checkType(redo, (list, tuple), "nacs15parts")
+  Lib._checkType(path, Lib._basestr, "nacs15parts")
+  if code not in range(len(Triads15parts) +1):
+    raise Exception("Invalid value for code in nacs15parts")
+  parts = [code] if code else range(1, len(Triads15parts))
+  triname = "spin15-triads%d%s"
+  tmpname = "nactmp%d%s"     # Used by tasks
+  outname = "nacout%s"
+  sizePart0 = 0
+  out = []
+  newKeys = set()
+  for part in parts:
+    codes = Triads15parts[part]
+    size = (codes[1] +2000000 -1) //2000000
+    for idx in range(size):
+      if idx in redo or not redo:
+        tmp = []
+        subpart = "" if size == 1 else chr(97 +idx)
+        if part == 1:  # Part 1 has 2 sub-parts
+          sys.stdout.write("Use tris0 to generate %s\n" %tmpname %(0, ""))
+          tmp = nacs15build(tris0, cpus, path, tmpname %(0, ""))
+          sizePart0 = len(tmp)
+          sys.stdout.write("Part 0 size is %d\n" %sizePart0)
+          sys.stdout.flush()
+        sys.stdout.write("Use %s to generate %s\n" %(triname %(part,
+                                subpart), tmpname %(part, subpart)))
+        sys.stdout.flush()
+        triads = loadCa(triname %(part, subpart), "tris%d%s" %(part, subpart),
+                        path, ".ca")
+        tmp += nacs15build(triads, cpus, path, tmpname %(part, subpart))
+        Lib.save(tmpname %(part, subpart), tmpname %(part, subpart),
+                 tmp, path, ".ca")
+    if (-1 in redo or not redo) and size > 0:
+      codes = Triads15parts[part]
+      subpart = "" if size == 1 else ("[a..%s]" %chr(97 +size -1))
+      sys.stdout.write("Reload %s.ca to save %s.ca\n" %(tmpname %(part,
+                       subpart), outname %part))
+      sys.stdout.flush()
+      for idx in range(size):
+        subpart = "" if size == 1 else chr(97 +idx)
+        tmp = tmpname %(part, subpart)
+        for pos,nac in enumerate(loadCa(tmp, tmp, path, ".ca")):
+          if nac[0] not in newKeys:
+            newPart = 0 if part == 1 and pos < sizePart0 else part
+            newKeys.add(nac[0])
+            out.append(nac)
+            offs = idx *2000000
+            Nacs15names[nac[0]] = ("", newPart, offs +nac[1], nac[2])
+            Nacs15.append(nac[3])
+      Lib.save(outname %part, outname %part, out, path, ".ca")
+  if -1 in redo or not redo:
+    Lib.save(outname %"names.ca", "nacs15names", Nacs15names, path, ".ca")
+    Lib.save(outname %"triads.ca", "nacs15", Nacs15, path, ".ca")
+  return len(Nacs15)
+
+# TBD: Triads7 reflections have the same structure for each primary
+# This is easy to just check the remainder. CA(15) doesn't have the equivalent.
+Nacs15mirrors = []
+
+def nacs15mirrors(idx):
+  """nacs15mirrors(idx)
+     Check Triads15[idx] first 36 signed combos have the same mirror indices."""
+  if idx < 0 or idx >= len(Triads15):
+    raise Exception("Invalid nacs15subalg signed position")
+  triad = CA.str2tri(Triads15[idx])
   cmp = []
   for cnt,tri in enumerate(triad.allSigns(36)):
     buf = [cnt]
     for ref in CA.Basis(15,0,1):
       #idx32768,parity = ref.reflect(tri).allSignsIndices()
-      terms = Tensor(*list(CA(**dict((x,))) for x in ref.reflect(tri).copyTerms()))
+      terms = Tensor(*list(CA(**dict((x,))) \
+              for x in ref.reflect(tri).copyTerms()))
       cnt = 0
       sgns = []
       for idx,term in enumerate(terms):
@@ -220,216 +826,21 @@ def nac15mirrors(idx):
       #buf.append(idx32768)
       #buf.append(32768 -idx32768)
     cmp.append(buf)#sorted(buf)[:36])
-  #if cmp != Nac15Mirrors:
+  #if cmp != Nacs15mirrors:
   #  print("NOT EQUAL", idx)
   #  return cmp
   #return []
   return cmp
 
-# Non-assoc cnt to sub-algebra name & first example idx and allSign position (B1=S)
-# There are 100 so far but expect more from tris4 series. Names may change - TBD - work in progress.
-Nac15Names = {\
- 128: ('A0', 6, 894627, 4),   130: ('A1', 2, 288103, 4),   134: ('A2', 6, 1082660, 22),
- 136: ('A3', 2, 947618, 17),  138: ('A4', 4, 503345, 6),   140: ('A5', 5, 67414, 20),
- 142: ('A6', 2, 1760331, 32), 144: ('A7', 3, 808028, 18),  146: ('A8', 3, 173137, 30),
- 148: ('A9', 3, 30098, 30),   150: ('B0', 2, 1333629, 22), 152: ('B1', 2, 985089, 30),
- 154: ('B2', 2, 1311416, 22), 156: ('B3', 2, 1311252, 29), 158: ('B4', 1, 755, 24),
- 160: ('B5', 2, 1311252, 11), 162: ('B6', 2, 1311252, 0),  164: ('B7', 2, 1311252, 21),
- 166: ('B8', 2, 1333539, 6),  168: ('B9', 2, 1311252, 16), 170: ('C0', 1, 115, 0),
- 172: ('C1', 2, 1311252, 24), 174: ('C2', 2, 1200956, 18), 176: ('C3', 1, 38, 13),
- 178: ('C4', 2, 1044090, 0),  180: ('C5', 3, 0, 23),       182: ('C6', 2, 1287006, 18),
- 184: ('C7', 1, 38, 9),       186: ('C8', 1, 114, 0),      188: ('C9', 3, 0, 26),
- 190: ('D0', 3, 396, 11),     192: ('D1', 1, 38, 14),      194: ('D2', 1, 38, 0),
- 196: ('D3', 3, 0, 29),       198: ('D4', 3, 396, 16),     200: ('D5', 3, 0, 9),
- 202: ('D6', 1, 118, 0),      204: ('D7', 3, 0, 22),       206: ('D8', 3, 396, 30),
- 208: ('D9', 3, 0, 14),       210: ('E0', 3, 0, 0),        212: ('E1', 1, 38, 20),
- 214: ('E2', 1, 182, 24),     216: ('E3', 1, 38, 11),      218: ('E4', 1, 119, 0),
- 220: ('E5', 3, 0, 28),       222: ('E6', 3, 396, 18),     224: ('E7', 3, 0, 8),
- 226: ('E8', 2, 1311254, 0),  228: ('E9', 3, 0, 21),       230: ('F0', 1, 222, 12),
- 232: ('F1', 2, 1311254, 12), 234: ('F2', 2, 1260558, 17), 236: ('F3', 3, 0, 24),
- 238: ('F4', 3, 396, 12),     240: ('F5', 1, 38, 10),      242: ('F6', 2, 1311289, 22),
- 244: ('F7', 2, 1354012, 22), 246: ('F8', 2, 1260559, 10), 248: ('F9', 2, 1311254, 26),
- 250: ('G0', 2, 1260558, 10), 252: ('G1', 3, 0, 20),       254: ('G2', 2, 1311289, 25),
- 256: ('G3', 1, 119, 27),     258: ('G4', 1, 222, 28),     260: ('G5', 2, 1354017, 12),
- 262: ('G6', 2, 1354021, 14), 264: ('G7', 2, 1311254, 22), 266: ('G8', 2, 1354017, 34),
- 268: ('G9', 2, 1354018, 10), 270: ('H0', 2, 1354017, 15), 272: ('H1', 2, 1044092, 33),
- 274: ('H2', 2, 1354017, 22), 276: ('H3', 2, 1044092, 11), 278: ('H4', 2, 1354017, 13),
- 280: ('H5', 2, 1044092, 9),  282: ('H6', 2, 1354017, 32), 284: ('H7', 2, 1044092, 13),
- 286: ('H8', 2, 1354017, 8),  288: ('H9', 2, 1044092, 14), 290: ('I0', 2, 1354017, 0),
- 292: ('I1', 2, 1044092, 18), 294: ('I2', 2, 1354017, 19), 296: ('I3', 2, 1044092, 32),
- 298: ('I4', 3, 12557, 29),   300: ('I5', 2, 1044092, 10), 302: ('I6', 3, 6076, 10),
- 304: ('I7', 2, 1044092, 8),  306: ('I8', 2, 1232305, 15), 308: ('I9', 2, 1044092, 12),
- 310: ('J0', 2, 1373335, 17), 312: ('J1', 3, 1712545, 25), 314: ('J2', 2, 331735, 12),
- 316: ('J3', 2, 1100937, 30), 318: ('J4', 2, 1090178, 14), 320: ('J5', 2, 1354017, 29),
- 322: ('J6', 2, 1044092, 0),  324: ('J7', 2, 1595386, 30), 326: ('J8', 7, 544285, 14),
- 328: ('J9', 7, 1752867, 28)}
-
-# Nac15Names extracted from Triads15parts in increasing order == triads15subalg().
-Nacs15 = ( \
- "12913B14A15F16E17D18C23425C26728F2AB2DE35E36F37839A3CD45D46847F49B4CE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
- "12A13B14915F16E17D18C23425D26827F29B2CE35E36F37839A3CD45C46748F4AB4DE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
- "12913D14C15F16718A1BE23425627F28E2AB2CD35B36A37839C3EF45A46B47E48F49D57958C5DE68D69F6CE7AD7BC89B9AEACFBDF",
- "12513814B16917C1AD1EF23F24926B27D28E2AC34C35E36D37B39A4564784AF4DE57A58F59B5CD67F68A6CE79E89D8BC9CFABEBDF",
- "12513614718B19C1AF1DE23E24B26D27829F2AC34C35D37938F3AB4584694AE4DF56E57B59A5CF67C68A6BF7AD7EF89E8CD9BDBCE",
- "12613C14F15E17819A1BD23A24527B28D29C2EF34735B36938F3DE46E48C49D4AB56F57A5895CD67D68B6AC79E7CF8AE9BFADFBCE",
- "12314D15F1671891AE1BC24C25726F28A29E2BD34B35637F38E39A3CD45A4694784EF58C59B5DE68D6AB6CE79D7AC7BE8BF9CFADF",
- "12314B15617F18D19A1CE24E25F2672892AD2BC34C35736F38A39D3BE45A4694784DF58C59B5DE68E6AB6CD79E7AC7BD8BF9CFAEF",
- "12314615817A19B1CD1EF24725926A28B2CE2DF34A35B3673893CF3DE45F48E49D4BC56E57D5AC68F69C6BD78C79F7BE8AD9AEABF",
- "12314516817F19A1BC1DE24725F26A2892BE2CD34F35736938A3BD3CE46D48E49B4AC56E58D59C5AB67C6BF78B79E7AD8CF9DFAEF",
- "12314516718C19F1AB1DE24925F26B27A28D2CE34F35936A37B38E3CD46D47E48B4AC56E57D58A5BC6896CF78F79C9AE9BDADFBEF",
- "12314516817A19B1CD1EF24725A26928B2CE2DF34A35736B3893CF3DE46F48E49D4BC56E58F59C5BD67D6AC78C79F7BE8AD9AEABF",
- "12314516718C19F1AB1DE24F25926A27B28D2CE34935F36B37A38E3CD46E47D48B4AC56D57E58A5BC6896CF78F79C9AD9BEAEFBDF",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "12314516718A19B1CD1EF24825A26927B2CE2DF34A35836B3793CF3DE46F47E49D4BC56E57F59C5BD68D6AC78C7AD89F8BE9AEABF",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "1231451671891AC1BE1DF24925826C27A2BD2EF34835936A37C3BF3DE46E47B4AD4CF56B57E5AF5CD68D69F78F79D8AE8BC9AB9CE",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "1231451671891AB1CE1DF24825926A27B2CD2EF34935836B37A3CF3DE46F47D4AE4BC56D57F5AC5BE68E69C78C79E8AF8BD9AD9BF",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46E47F4AC4BD56F57E5AD5BC68C69D78D79C8AE8BF9AF9BE",
- "1231451671891AC1BD1EF24A25C26E27F28D29B34C35A36F37E38B39D4684794BF4DE5695785BE5DF6AD6BC7AB7CD8AE8CF9AF9CE",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AB1CD1EF24A25B26E27F28C29D34B35A36F37E38D39C4684794CE4DF5695785CF5DE6AC6BD7AD7BC8AE8BF9AF9BE",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24825926A27C2BF2DE34935836C37A3BE3DF46B47D4AF4CE56D57B5AE5CF68F69E78E79F8AB8CD9AD9BC",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AB1CE1DF24825926A27B2CD2EF34935836B37A3CF3DE46C47E4AD4BF56E57C5AF5BD68D69F78F79D8AC8BE9AE9BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AB1CE1DF24A25B2682792CD2EF34B35A3693783CF3DE46D47F48C49E56F57D58E59C6AC6BE7AE7BC8AD8BF9AF9BD",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48D49B4AF4CE58B59D5AE5CF68F69E6AD6BC78E79F7AB7CD",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AB1CE1DF24A25B2682792CD2EF34B35A3693783CF3DE46E47C48F49D56C57E58D59F6AF6BD7AD7BF8AE8BC9AC9BE",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AB1CD1EF24A25B2682792CE2DF34B35A3693783CF3DE46C47D48E49F56D57C58F59E6AE6BF7AF7BE8AC8BD9AD9BC",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24A25C2682792BE2DF34C35A3693783BF3DE46E47F48B49D56F57E58D59B6AB6CD7AD7BC8AE8CF9AF9CE",
- "1231451671891AB1CD1EF24A25B2682792CE2DF34B35A3693783CF3DE46C47D48E49F56D57C58F59E6AE6BF7AF7BE8AC8BD9AD9BC",
- "1231451671891AC1BD1EF24E25F26A27C28D29B34F35E36C37A38B39D46B47D48C49A56D57B58A59C68F69E78E79FABEADFBCFCDE",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BD1EF24625728A29C2BE2DF34735638C39A3BF3DE48B49D4AE4CF58D59B5AF5CE68E69F6AB6CD78F79E7AD7BC",
- "1231451671891AB1CD1EF24825926A27B2CE2DF34935836B37A3CF3DE46C47D4AE4BF56D57C5AF5BE68E69F78F79E8AC8BD9AD9BC",
- "1231451671891AC1BE1DF24825926D27F2AB2CE34935836F37D3AE3BC46C47A4BF4DE56A57C5BD5EF68E69B78B79E8AF8CD9AD9CF",
- "1231451671891AB1CE1DF24A25B2682792CF2DE34B35A3693783CD3EF46E47C48D49F56C57E58F59D6AD6BF7AF7BD8AE8BC9AC9BE",
- "1231451671891AC1BD1EF24E25F26A27C28D29B34F35E36C37A38B39D46D47B48A49C56B57D58C59A68E69F78F79EABFADEBCECDF",
- "1231451671891AB1CD1EF24A25B2682792CE2DF34B35A3693783CF3DE46C47D48E49F56D57C58F59E6AE6BF7AF7BE8AC8BD9AD9BC",
- "1231451671891AC1BD1EF24E25F26A27C28D29B34F35E36C37A38B39D46B47D48C49A56D57B58A59C68F69E78E79FABEADFBCFCDE",
- "1231451671891AB1CD1EF24625728A29B2CE2DF34735638B39A3CF3DE48C49D4AE4BF58D59C5AF5BE68E69F6AC6BD78F79E7AD7BC",
- "1231451671891AC1BE1DF24825926D27F2AB2CE34935836F37D3AE3BC46C47A4BF4DE56A57C5BD5EF68E69B78B79E8AF8CD9AD9CF",
- "1231451671891AB1CE1DF24A25B2682792CD2EF34B35A3693783CF3DE46E47C48F49D56C57E58D59F6AF6BD7AD7BF8AE8BC9AC9BE",
- "1231451671891AC1BD1EF24A25C2682792BE2DF34C35A3693783BF3DE46E47F48B49D56F57E58D59B6AB6CD7AD7BC8AE8CF9AF9CE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AC1BD1EF24D25B2682792AE2CF34B35D3693783AF3CE46E47F48A49C56F57E58C59A6AD6BC7AB7CD8BF8DE9BE9DF",
- "1231451671891AB1CD1EF24A25B2682792CE2DF34B35A3693783CF3DE46C47D48E49F56D57C58F59E6AE6BF7AF7BE8AC8BD9AD9BC",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46F47E48A49C56E57F58C59A6AB6CD7AD7BC8BF8DE9BE9DF",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "12314516718F19A1BC1DE24F25826D27E29B2AC34835F36E37D39C3AB46947A4BD4CE56A5795BE5CD68C6BF78B7CF89E8AD9DFAEF",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "12314516718B19F1AC1DE24B25826927F2AD2CE34835B36F3793AE3CD46A47C49D4EF56C57A59E5DF68E6BD78D7BE89C8AF9ABBCF",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "12314516718D19A1BC1EF24D25826F27E29B2AC34835D36E37F39C3AB46947A4BF4CE56A5795BE5CF68C6BD78B7CD89E8AF9DFADE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "12314516718D19A1BC1EF24B25C26D27829F2AE34C35B36837D39E3AF46F47E48A49D56E57F5895AD69B6AC79C7AB8BE8CFBDFCDE",
- "12413815617D19A1BC1EF23D25926A2782BE2CF34735F36E39C3AB45A46948D4BF4CE57B58E5CD67C68F6BD79E7AF89B8AC9DFADE",
- "12513C14D1691781AF1BE23724628C29D2AE2BF34B35836F39A3DE45947F48A4CE56D57C5AB5EF67B68E6AC79E7AD89B8DF9CFBCD",
- "12413B15916718F1AE1CD23C25726928E2AF2BD34D35E36F37839A45647948A4BC4EF58C5AB5DF68B6AC6DE7AD7BF7CE89D9BE9CF",
- "1241351671891AB1CD1EF23D25C2682792AE2BF34C36E37F38A39B45D4694784AF4BE56F57E58B59A6AD6BC7AC7BD8CF8DE9CE9DF",
- "1231451671891AC1BD1EF24B25D2682792AF2CE34D35B3693783AE3CF46E47F48C49A56F57E58A59C6AD6BC7AB7CD8BE8DF9BF9DE",
- "1231451671891AB1CD1EF24C25D2682792AE2BF34D35C3693783AF3BE46E47F48A49B56F57E58B59A6AC6BD7AD7BC8CE8DF9CF9DE",
- "12314B15916718F1AE1CD24D25627928A2BC2EF34C35736938E3AF3BD45E46F47849A58C5AB5DF68B6AC6DE7AD7BF7CE89D9BE9CF",
- "12B13714A15618D19C1EF23C24E25D2682792AF34D35E36F38A39B45C4694784BF57F58B59A67E6AC6BD7AD7BC89E8CF9DFABECDE",
- "12C13A14715618D19B1EF23E24D25B2692782AF34B35D3683793CF45E46F48C49A57F58A59C67E6AD6BC7AB7CD89E8BF9DFACEBDE")
-
-def nacs15build():
-  """nacs15build()
-     Build Nacs15 from Nac15Names for examples of each subalgebra."""
-  nacList = []
-  for sa,nac in Nac15Names.items():
-    if nac[1] >= len(Triads15parts):
-      print("Triads15Load needed for %d at %d" %(sa, nac[1]))
-      tri = ""
-    else:
-      tri = Triads15parts[nac[1]][nac[2]]
-      triad = list(str2tri(tri).allSigns(36))[nac[3]]
-      tmp = len(list(Lib.triadDump(Tensor.Triads(*triad.spin(f15Basis)) \
-            .assocTriads(f15Basis,True),f15Basis,1)))
-      if tmp != sa:
-        print("Triads15 for %d is invalid %d" %(sa, tmp))
-        tri = ""
-    nacList.append(tri)
-  return nacList
-
-def nac15map(triads):
-  """nac15map(triads)
-     Don't have remainders so just check all signed triads subalgs in nac15Names."""
-  if idx < 0 or idx >= len(Triads15):
-    raise Exception("Invalid nac15Map Triads15 index")
-  global Nac15Name
-  nacMap = set(Nac15Name.keys())
-  nac = {}
-  cnt = len(nacMap)
-  for idx,triad in enumerate(triads):
-    if Lib.checkMem(idx, 1000, extra=cnt):
-      break
-    for sgn,tri in str2tri(triad).allSigns(36):
-      tmp = len(list(Lib.triadDump(Tensor.Triads(*(tri).spin(f15Basis)) \
-                             .assocTriads(f15Basis,True),f15Basis,1)))
-      if tmp not in nacMap:
-        cnt += 1
-        nacMap.append(tmp)
-        found = -1
-        pos = idx
-        for offs,var in enumerate(Triads15parts):
-          if triad in var:
-            found = offs
-            pos = var.index(triad)
-            break
-        nac[tmp] = ("", found, pos, sgn)
-        print("Not in Map", tmp, nac[tmp])
-  Lib.checkMem(idx, extra=cnt, finish=True)
-  return nac
-
-def tri2str(tri):
-  return "".join(list(x[0][1:] for x in tri.copyTerms()))
-
-def str2tri(str):
-  ca = CA()
-  for x in range(0,len(str),3):
-    ca += CA.Eval(("e" +str[x:x+3],1))
-  return ca
-
+# Enabling algebra
 PS15 = CA.Basis(15,0,15)[0]
 F15 = list(CA.Eval(term) for term in str2tri(tris0[0]).copyTerms())
 FF15 = -PS15 *Tensor(F15)
-P15 = e12478BDE +e12479ACF +e12568BCF +e12569ADE +e13468ADF +e13469BCE +e13578ACE \
-     +e13579BDF +e234589EF +e2345ABCD +e236789CD +e2367ABEF +e456789AB +e4567CDEF +e89ABCDEF 
+P15 = e12478BDE +e12479ACF +e12568BCF +e12569ADE +e13468ADF +e13469BCE \
+     +e13578ACE +e13579BDF +e234589EF +e2345ABCD +e236789CD +e2367ABEF \
+     +e456789AB +e4567CDEF +e89ABCDEF 
+PP15 = -e123456789ABCDEF *P15
+# ((7-P15)/8)**2 == 1 & ((7e123456789ABCDEF +PP15)/8)**2 == -1
 
 # Octonians have f*f+7==+-6e1234567*f. Spin7R is a Spin(7) subset.
 # with f*f+7 == +-2*f' +<one term>
@@ -438,7 +849,7 @@ def triadsShalf(idx):
      Yield Sedenion Triads15[idx].allSigns(<64), 64..127 are minus these."""
   if idx < 0 or idx >= len(Triads15):
     raise Exception("Invalid triadsShalf Triads15 index")
-  for phi in str2tri(Triads15[idx]).allSigns(True):
+  for phi in CA.str2tri(Triads15[idx]).allSigns(True):
     if len(list(Lib.triadDump(Tensor.Triads(*phi.spin(f15Basis)) \
                           .assocTriads(f15Basis,True), f15Basis,1))) == 252:
       yield phi
@@ -450,7 +861,7 @@ def triads15all(idx, pos=0):
   Lib._checkType(pos, int, "triads15all")
   if idx <0 or idx > len(Triads15) or pos < 0 or pos > 32767:
     raise Exception("Invalid input range in triads15all: %d,%d" %(idx,pos))
-  return list(str2tri(Triads15[idx]).allSigns(36))[pos]
+  return list(CA.str2tri(Triads15[idx]).allSigns(36))[pos]
 
 def triads15terms(idx, pos=0):
   """triads15terms(idx, [pos])
@@ -472,14 +883,14 @@ def triads15class(phi, id=False):
      Classify phi as <class=R/S/T/U/V/W/O> with parity & index in 30:128."""
   Lib._checkType(phi, CA, "triads15class")
   Lib._checkType(id, bool, "triads15class")
-  aPhi = tri2str(abs(phi))
+  aPhi = CA.tri2str(abs(phi))
   if aPhi not in Triads15:
     raise Exception("Abs. input phi to triads15class not found in Triads15")
   idx = Triads15.index(aPhi)
   idxSign,parity = phi.allSignsIndices()
   sgn = -1 if parity %2 else 1
-  nac = nac15subalg(aPhi, idxSign)
-  clsName = Nac15Name[nac]
+  nac = nacs15subalg(aPhi, idxSign)
+  clsName = Nacs15Name[nac]
   if id:
     return (clsName, -sgn, idx, int(idxSign))
   return "%s%s:%0.5f" %(clsName, "-" if parity %2 else "+", idx +idxSign/100000.0)

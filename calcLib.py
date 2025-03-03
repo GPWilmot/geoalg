@@ -27,8 +27,9 @@
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
 ################################################################################
-__version__ = "0.6"
+__version__ = "0.7"
 import math, sys, os
+import time, datetime
 
 ################################################################################
 class Lib():
@@ -56,7 +57,7 @@ class Lib():
   __info        = False         # User info logging
   __plotFigure  = 0             # Matplotlib unique figures count
   __lastTime    = 0             # Store epoch for time
-  __lastProcTime= 0             # Store program time
+  __lastProcTime= 0             # Store program time float seconds
   __checkMemSrt = True          # checkMem to run procTime at start
   _memLimitMB   = 500           # Abort if less mem than this
   if sys.version_info.major == 2:
@@ -106,7 +107,7 @@ class Lib():
 
   @staticmethod
   def getMainDoco(filt="test"): #TBD
-    """inDoco([filt])
+    """getMainDoco([filt])
        For tests defined as functions return the doco strings."""
     lines = ""
     for name in dir(sys.modules["__main__"]):
@@ -118,7 +119,7 @@ class Lib():
 
   @staticmethod
   def info(info=None):
-    """info se([info])
+    """info([info])
        Toggle or set info for user reporting."""
     if info is None:
       info = not Lib.__info
@@ -183,8 +184,8 @@ class Lib():
   @staticmethod
   def _checkType(arg, typ, method):
     """Raise exception if not the correct type."""
-    if isinstance(arg, bool):
-      if not isinstance(False, typ):   # Filter out int for bool or bool in list
+    if typ == int:
+      if isinstance(arg, bool):   # Filter out int for bool or bool in list
         tmp = str(arg)
         if len(tmp) > 9:
           tmp = str(type(arg))
@@ -195,13 +196,24 @@ class Lib():
         tmp = str(type(arg))
       raise Exception("Invalid parameter type (%s) for %s" %(tmp, method))
   @staticmethod
-  def _checkList(arg, typ, method, size=None):
-    """Raise exception if not a list/tuple of typ types and optional size."""
+  def _checkList(arg, typ, method, size=[]):
+    """Raise exception if not a list/tuple of typ types and optional size as 
+       int or range with (x,0) meaning length at least x."""
     Lib._checkType(arg, (list, tuple), method)
+    Lib._checkType(size, (int, list, tuple), method)
+    if size:
+      if isinstance(size, int):
+        if size != len(arg):
+          raise Exception("Invalid list length !=%d for %s" %(size, method))
+      elif isinstance(size, (list,tuple)):
+        if len(size) == 2 and (len(arg) < size[0] or \
+              (size[1] > 0 and len(arg) > size[1])):
+          raise Exception("Invalid list length !in [%d,%s] for %s" %(size[0],
+                           size[1] if size[1] else "..", method))
+      elif size:
+        raise Exception("Invalid checkList parameters in %s" %method)
     for elem in arg:
       Lib._checkType(elem, typ, method)
-    if size and size != len(arg):
-      raise Exception("Invalid list length for %s" %method)
   @staticmethod
   def _getResolutions():
     """Internal method to return the digits and print format."""
@@ -334,13 +346,13 @@ class Lib():
     """freeMemMB()
        Return the amount of free memory left."""
     if sys.platform == "win32":
-      process = os.popen('systeminfo |find "Available Phys"')
+      process = os.popen('systeminfo 2>nul |find "Available Phys"')
       result = process.read()
       process.close()
-      return int(result.split()[4].replace(",",""))
+      return int(result.split()[3].replace(",",""))
     return os.sysconf('SC_AVPHYS_PAGES')//256
   @staticmethod
-  def checkMem(inc=10, mod=10, extra=0, finish=False):
+  def checkMem(inc=0, mod=1, extra=0, finish=False):
     """checkMem([inc,mod,extra,finish])
        Dump progess if !inc%mod and return freeMem<_memLimitMB."""
     Lib._checkType(inc, (int, float), "checkMem")
@@ -352,15 +364,15 @@ class Lib():
       if mod < 1:
         raise Exception("Invalid mod valid for checkMem")
     if finish:
-      Lib.__checkMemSrt = True
+      Lib._checkMemSrt = True
       mod = 1
-    return Lib.__checkMem(inc, mod, extra)
+    return Lib._checkMem(inc, mod, extra)
   @staticmethod
-  def __checkMem(inc, mod, extra=0):
+  def _checkMem(inc, mod, extra=0):
     """Internal version for checkMem. Assumes procTime and finish called."""
     if inc %mod == 0:
-      sys.stdout.write("%s (%ds) inc=%s extra=%s %dMB\n" %(Lib.date(True),
-                     int(Lib.procTime()), inc, extra, Lib.freeMemMB()))
+      sys.stdout.write("%s (%0.1fs) inc=%s extra=%s %dMB\n" %(Lib.date(True),
+                     int(Lib._procTime()), inc, extra, Lib.freeMemMB()))
       if Lib.freeMemMB() < Lib._memLimitMB and mod > 0:
         sys.stdout.write("ABORT: Memory limit reached\n")
         return True
@@ -378,7 +390,6 @@ class Lib():
   def date(noMs=False):
     """date([noMs=False])
        Return the datetime object for now with str() formated as date_time."""
-    import datetime
     now = str(datetime.datetime.today())
     if noMs:
       idx = now.find(".")
@@ -388,35 +399,34 @@ class Lib():
   @staticmethod
   def time(epoch=False):
     """time([epoch])
-       Return seconds since epoch or difference to previous call as a float."""
-    import time
-    if Lib.__lastTime == 0 or epoch:
-      Lib.__lastTime = time.time()
-    lastTime = Lib.__lastTime
+       Return hours since epoch or difference to previous call as a float."""
+    lastTime = 0 if Lib.__lastTime == 0 or epoch else Lib.__lastTime
     Lib.__lastTime = time.time()
-    return Lib.__lastTime -(0 if epoch else lastTime)
+    return Lib.__lastTime -lastTime
 
   @staticmethod
   def procTime(start=False):
     """procTime([start])
        Return program user+sys seconds since start or diff. to previous call."""
-    import time
     if Lib.__lastProcTime == 0 or start:
       if sys.version_info.major == 2:
         Lib.__lastProcTime = time.time()
       else:
         Lib.__lastProcTime = time.process_time()
+    return Lib._procTime()
+  @staticmethod
+  def _procTime():
     lastTime = Lib.__lastProcTime
     if sys.version_info.major == 2:
       Lib.__lastProcTime = time.time()
     else:
       Lib.__lastProcTime = time.process_time()
-    return Lib.__lastProcTime -(0 if start else lastTime)
+    return Lib.__lastProcTime -lastTime
 
   @staticmethod
-  def pascalTriangle(n, dump=False):
-    """pascalTriangle(n[dump])
-       Return a list of the first half of Pascal's Triangle at level n."""
+  def pascalsTriangle(n, dump=False):
+    """pascal[sTriangle](n, [dump])
+       Return a list of the n-th row of Pascal's Triangle starting at 0."""
     Lib._checkType(n, int, "pascalTriangle")
     Lib._checkType(dump, bool, "pascalTriangle")
     if n < 0:
@@ -425,13 +435,14 @@ class Lib():
     for r in range(n +1):
       out.append(Lib.comb(n, r))
     return out
+  pascal = pascalsTriangle
 
   @staticmethod
-  def comb(n, r, basis=False, dump=False):
-    """comb(n,r,[basis=False,dump])
-       Return number of combinations of r in n, basis list or no. generator."""
-    Lib._checkType(n, int, "comb")
-    Lib._checkType(r, int, "comb")
+  def combinations(n, r, basis=False, dump=False):
+    """comb[inations]/choose/binom(n,r,[basis=False,dump])
+       Return number of combinations of r in n, basis list or list generator."""
+    Lib._checkType(n, (int,float), "comb")
+    Lib._checkType(r, (int,float), "comb")
     Lib._checkType(basis, (bool, list, tuple), "comb")
     Lib._checkType(dump, bool, "comb")
     if n < r or r < 0:
@@ -445,6 +456,9 @@ class Lib():
         raise Exception("Invalid basis length in comb")
       return Lib.__comb(n, r, basis, dump)
     return math.factorial(n) /math.factorial(n-r) /math.factorial(r) 
+  comb = combinations
+  choose = combinations
+  binom = combinations
 
   @staticmethod
   def __comb(n, r, basis, dump):
@@ -453,16 +467,16 @@ class Lib():
     if r > n //2:
       rng = range(1, len(basis) +1)
       for elem in reversed(list(Lib.__perm(n, [1] *(n -r), 1, dump))):
-        yield list(basis[idx -1] for idx in rng if idx not in elem) 
+        yield tuple(basis[idx -1] for idx in rng if idx not in elem) 
     else:
       for elem in Lib.__perm(n, [1] *r, 1, dump):
-        yield list(basis[idx -1]  for idx in elem) 
+        yield tuple(basis[idx -1]  for idx in elem) 
   
   @staticmethod
   def perm(n, r=None):
     """perm(n, [r])
        Return number of permutations of n terms or generator of r in n perms."""
-    Lib._checkType(n, int, "perm")
+    Lib._checkType(n, (int, float), "perm")
     if isinstance(r, int) and not isinstance(r, bool):
       return Lib.__perm(n, [1] *r, 0, None)
     elif r is None:
@@ -595,11 +609,27 @@ class Lib():
           yield faces
 
   @staticmethod
-  def save(name, value, filename):
-    """save(name, value, filename)
-       Print value into a file. This should be a Calculator command."""
-    if isinstance(value, dict):
-      with open(filename, 'w') as fp:
+  def fixFilename(filename, dirname=None, extname=None):
+    """fixFilename(filename, [dirname, extname])
+       Fix Windows path separators and optionally add dir and ext."""
+    if dirname and not os.path.dirname(filename):   # Use default path
+      filename = os.path.join(dirname, filename)
+    if extname and not os.path.splitext(filename)[1]:
+      filename += extname
+    if sys.platform == "win32":
+      filename = filename.replace("\\", "\\\\")
+    return filename
+
+  @staticmethod
+  def _save(filename, name, value, path="", ext="", mode="w"):
+    """save(filename, name, value,[path,ext,mode="w"])
+       Print value into a file which needs an extension. Used by Calculator."""
+    Lib._checkType(filename, Lib._basestr, "save")
+    Lib._checkType(name, Lib._basestr, "save")
+    Lib._checkType(path, Lib._basestr, "save")
+    Lib._checkType(ext, Lib._basestr, "save")
+    with open(Lib.fixFilename(filename, path, ext), mode) as fp:
+      if isinstance(value, dict):
         fp.write("%s = { \\\n" %name)
         for key,var in value.items():
           if isinstance(key, Lib._basestr):
@@ -608,19 +638,18 @@ class Lib():
             var = '"%s"' %var
           fp.write(" %s: %s,\n" %(key, var))
         fp.write("}\n")
-    elif isinstance(value, (list, tuple, set)):
-      with open(filename, 'w') as fp:
+      elif isinstance(value, (list, tuple, set)):
         fp.write("%s = ( \\\n" %name)
         for var in value:
           if isinstance(var, Lib._basestr):
             var = '"%s"' %var
           fp.write(" %s,\n" %str(var))
         fp.write(")\n")
-    else:
-      with open(filename, 'w') as fp:
+      else:
         if isinstance(value, Lib._basestr):
           value = '"%s"' %value
         fp.write("%s = %s\n" %(name, value))
+  save=_save
 
   @staticmethod
   def triadPairs(pairFn, basis, dump=False, param=None, cntOnly=False):

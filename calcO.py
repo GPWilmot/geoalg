@@ -33,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.4"
+__version__ = "0.5"
 import math
 from calcLib import *
 
@@ -548,30 +548,42 @@ class O():
     cfIdx = 0
     idx = 0
     order = 0
+    res = True
     while True:
       base = self.__g[idx] if idx < len(self.__g) else None
       cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
       if not (base and cfBase):
         if not base:
           if not cfBase:
-            return oper(self.w, cf.w)
-          return oper(0.0, cfBase.value)
-        return oper(base.value, 0.0)
-      order = base.order(cfBase)
-      if order < 0 or not base:
-        if not oper(0.0, cfBase.value):
-          return False
-        idx += 1
-      elif order > 0 or not cfBase:
-        if not oper(base.value, 0.0):
-          return False
-        cfIdx += 1
+            if (self.w or cf.w) and not oper(self.w, cf.w):
+              res = False
+            return res
+          if not oper(0.0, cfBase.value):
+            res = False
+          cfIdx += 1
+        else:
+          if not oper(base.value, 0.0):
+            res = False
+          idx += 1
       else:
-        if not oper(base.value, cfBase.value):
-          return False
-        idx += 1
-        cfIdx += 1
-    return True
+        order = base.order(cfBase)
+        if order == 0:
+          if not oper(base.value, cfBase.value):
+            res = False
+          idx += 1
+          cfIdx += 1
+        else:
+          if (base.value < 0) != (cfBase.value < 0):
+            if not (oper(base.value, 0.0) and oper(0.0, cfBase.value)):
+              return False
+          if order < 0:
+            if not oper(0.0, cfBase.value):
+              res = False
+            idx += 1
+          else:
+            if not oper(base.value, 0.0):
+              res = False
+            cfIdx += 1
 
   def __add(self, grade):
     """Add a single O term to self placing it in the correct order."""
@@ -809,6 +821,19 @@ class O():
         basis.append(int(ch, self.__HEX_BASIS +1))
       out3.append(basis)
     return out1,out2,out3
+  
+  def cycles(self, c):
+    """cycles(y):
+       Return ((b,c),(b,bc),(c,bc)), b=self, bc=abs(b*c), Fast Lib.cycles()."""
+    b,c,bc = sorted((self, c, abs(self *c)))
+    return ((b, c), (b, bc), (c, bc))
+
+  def cyclesType(self, c, d):
+    """cyclesType(c, d)
+       Return 3 chars of nonAssocType() for the self.cycles(c) with d."""
+    Lib._checkType(c, O, "cyclesType")
+    Lib._checkType(d, O, "cyclesType")
+    return "".join(x[0].nonAssocType(x[1], d) for x in self.cycles(c))
 
   def trim(self, precision=None):
     """trim([precision])
@@ -930,10 +955,9 @@ class O():
     return math.sqrt(n2)
 
   def conjugate(self, split=False):
-    """conjugate([split])
-       Return copy of self with basis negated (except units if split)."""
+    """conj[ugate]([split])
+       Return copy of self with pure parts negated (imaginary only if split)."""
     out = self.dup()
-    out.__entered0 = self.__entered0
     if split:
       for grade in out.__g:
         sgnVal = grade.copy(1)
@@ -943,6 +967,7 @@ class O():
       for grade in out.__g:
         grade.value = -grade.value
     return out
+  conj = conjugate
 
   def norm(self):
     """norm()
@@ -1013,7 +1038,7 @@ class O():
     Lib._checkType(q, O, "associator")
     Lib._checkType(alternate, bool, "associator")
     accum = []
-    out = (self * p) *q  -self *(p * q) 
+    out = self.__assoc(p, q)
     if out and alternate:
       none = True
       for y in ((p, self, q), (p, q, self), (self, q, p)):
@@ -1024,6 +1049,8 @@ class O():
         out = 0
     return out
   assoc = associator
+  def __assoc(self, p, q):
+    return (self * p) *q  -self *(p * q) 
 
   def moufang(self, p, q, number=0):
     """moufang(p,q,[number])
@@ -1047,26 +1074,26 @@ class O():
     return out
 
   def abcAssociator(self, c, d, abc=0):
-    """abcAssoc[iator](basis,[abc=0])
-       Return [a,b,c] or [b,c,d] or [c,b,d]==0 for abc=1-3 and
-       all associative for abc=0 where b=self and a=b*c*d."""
+    """abcAssoc[iator](basis,c,d,[abc=0])
+       Return [b,d,c] or [b,c,d] or [c,b,d] for abc=1-3 and all associative
+       (ie all==0) for abc=0 where b=self. This is the same associativity as
+       [b,a,c], [a,b,c], or [a,c,b] where a=b*c*d."""
     Lib._checkType(c, O, "abcAssociator")
     Lib._checkType(d, O, "abcAssociator")
     Lib._checkType(abc, int, "abcAssociator")
     anyAssoc = (abc == 0 or abs(abc) == 4)
     if abc < 0 or abc > 3:
       raise Exception("Invalid abc parameter for abcAssociator")
-    a = self *c *d
     if abc <= 1:
-      ass = a.assoc(self, c)
+      ass = self.__assoc(d, c)
       if ass or abc == 1:
         return ass
     if abc in (0, 2):
-      ass = self.assoc(c, d)
+      ass = self.__assoc(c, d)
       if ass or abc == 2:
         return ass
     if abc in (0, 3):
-      ass = c.assoc(self, d)
+      ass = c.__assoc(self, d)
       if ass or abc == 3:
         return ass
     return 0

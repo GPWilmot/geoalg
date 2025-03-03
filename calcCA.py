@@ -448,30 +448,42 @@ class CA():
     cfIdx = 0
     idx = 0
     order = 0
+    res = True
     while True:
       base = self.__g[idx] if idx < len(self.__g) else None
       cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
       if not (base and cfBase):
         if not base:
           if not cfBase:
-            return oper(self.w, cf.w)
-          return oper(0.0, cfBase.value)
-        return oper(base.value, 0.0)
-      order = base.order(cfBase)
-      if order < 0 or not base:
-        if not oper(0.0, cfBase.value):
-          return False
-        idx += 1
-      elif order > 0 or not cfBase:
-        if not oper(base.value, 0.0):
-          return False
-        cfIdx += 1
+            if (self.w or cf.w) and not oper(self.w, cf.w):
+              res = False
+            return res
+          if not oper(0.0, cfBase.value):
+            res = False
+          cfIdx += 1
+        else:
+          if not oper(base.value, 0.0):
+            res = False
+          idx += 1
       else:
-        if not oper(base.value, cfBase.value):
-          return False
-        idx += 1
-        cfIdx += 1
-    return True
+        order = base.order(cfBase)
+        if order == 0:
+          if not oper(base.value, cfBase.value):
+            res = False
+          idx += 1
+          cfIdx += 1
+        else:
+          if (base.value < 0) != (cfBase.value < 0):
+            if not (oper(base.value, 0.0) and oper(0.0, cfBase.value)):
+              return False
+          if order < 0:
+            if not oper(0.0, cfBase.value):
+              res = False
+            idx += 1
+          else:
+            if not oper(base.value, 0.0):
+              res = False
+            cfIdx += 1
 
   def __add(self, grade):
     """Add a single CA term to self placing it in the correct order. Optimise
@@ -504,8 +516,6 @@ class CA():
     if grade.value:
       self.__currentAdd = pos
       self.__g.insert(pos, grade)
-      if not self.__g and self.__currentAdd > 0:
-        raise Exception("XXX")
 
   def __copy(self):
     """Used by copy() to turn the basis into a kwargs dictionary."""
@@ -906,20 +916,61 @@ class CA():
       return -math.sqrt(-n2)
     return math.sqrt(n2)
 
-  def conjugate(self, unsplit=False):
-    """conjugate([unsplit])
-       Return copy of self with imaginary parts negated (all if unsplit)."""
+  def conjugate(self, split=False):
+    """conj[ugate]([split])
+       Return copy of self with pure parts negated (imaginary only if split)."""
     out = self.dup()
     out.__entered0 = self.__entered0
-    if unsplit:
-      for grade in out.__g:
-        grade.value = -grade.value
-    else:
+    if split:
       for grade in out.__g:
         sgnVal = grade.copy(1)
         sgnVal = sgnVal.mergeBasis(1, grade.bases())
         grade.value *= sgnVal.value
+    else:
+      for grade in out.__g:
+          grade.value = -grade.value
     return out
+  conj = conjugate
+
+  def canonical(self):
+    """canon[ical]()
+       Return canonical involution copy of self with basis parts negated. This
+       is an automorphism of the algebra denoted with a tilde (~ accent) by
+       R.Harvey so the tilde() method can be used (or conjugate(True).
+       Grades p%4=(0123) have negation (+-+-)."""
+    return self.conjugate(True)
+  canon = canonical
+  tilde = canonical
+
+  def reverse(self):
+    """rev[erse]()
+       Return reversal involution copy of self with basis parts reversed. This
+       is an anti-automorphism of the algebra denoted with a check (v accent)
+       by R.Harvey so the check() method can be used. Grades p%4=(0123) have
+       negation (++--)."""
+    out = self.dup()
+    out.__entered0 = self.__entered0
+    for grade in out.__g:
+      if sum(grade.lens()) %4 > 1:
+        grade.value = -grade.value
+    return out
+  rev = reverse
+  check = reverse
+
+  def composite(self):
+    """compo[site]()
+       Return composite involution copy of self applying canonical and reverse
+       involutions. This is an anti-automorphism of the algebra denoted with a
+       hat (^ accent) by R.Harvey so the hat() method can be used. Grades
+       p%4=(0123) have negation (+--+)."""
+    out = self.dup()
+    out.__entered0 = self.__entered0
+    for grade in out.__g:
+      if (sum(grade.lens()) +1) %4 > 1:
+        grade.value = -grade.value
+    return out
+  compo = composite
+  hat = composite
 
   def norm(self):
     """norm()
@@ -1788,6 +1839,20 @@ class CA():
             sgn *= -1
         terms[base] = sgn
     return CA(scalar, **terms)
+
+  @staticmethod
+  def tri2str(tri):
+    """tri2str(str)
+       Return a string of 105 hex-digits from a triad15. See tri2str()."""
+    return "".join(list(x[0][1:] for x in tri.copyTerms()))
+  @staticmethod
+  def str2tri(str, ):
+    """str2tri(str)
+       Return triad15 from a string of 105 hex-digits. See str2tri()."""
+    ca = CA()
+    for x in range(0,len(str),3):
+      ca += CA.Eval(("e" +str[x:x+3],1))
+    return ca
 
   @staticmethod
   def Q(*args):
