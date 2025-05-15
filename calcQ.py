@@ -643,7 +643,7 @@ class Q():
           = (w +v)r(w -v),      where v=a sin(W/2).
        Rodrigues vector is
        r' = r cosW +(axr)sinW +a(a.r)(1-cosW) from
-       r  = r|| +r\/ = (r.a)a -ax(axr)  so
+       r  = r|| +r\\/ = (r.a)a -ax(axr)  so
        r' = r +sinW (aX)r +(1-cosW)(aX)(aX)r where aX is cross-
        product matrix so (aX)r=axr and (aX)(aX)r=ax(axr).
        So return I +sinW aX +(1 -cosW)(aX)(aX) [verified].
@@ -997,7 +997,7 @@ if __name__ == '__main__':
        Calculator.log(store == Euler(*test), store)""",
     """# Test 10 Geodetic distance = acos(p.w *q.w +p.dot(q)).
        p = Q.Euler(e); q=(d45+q).versor(); store = p.distance(q)
-       test = math.acos(p.w *q.w -p.dot(q))
+       test = Q(math.acos(p.w *q.w -p.dot(q)))
        Calculator.log(store == test, store)""",
     """# Test 11 Length *2 == dot(self +self).
        store = (q *2).norm(); test = math.sqrt(-(q +q).dot(q +q))

@@ -9,6 +9,16 @@ try:
 except:
   shared_memory = None
 
+_spin15 = """Module contains variables:
+   f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nacs15map_0,
+   Nacs15names, Nacs15, Nacs15mirrors, PS15, F15, FF15, P!%, PP15, S15, SS15,
+   na15, F(*3,4,5)1520, SE15, SO15, phi15
+   and functions:
+   tri2str, str2tri, triads15load, loadCa, saveCa, taskTriads15build,
+   triads15build, triads15parts, nacs15subalg, nacs15map, taskNacs15build,
+   nacs15build, nacs15parts, nacs15mirrors, triadsShalf, triads15all,
+   triads15terms, triads15remain, triads15class."""
+
 # From CA(15) find 64.8E6 14-simplex primaries to iuncover sub-sedenion algs.
 Triads15gen = (CA.Eval(x) for x in Lib.triads(15)) # Too big and slow hence:
 # Create Triads15[0] and rotate using triads15build() to find the first 105

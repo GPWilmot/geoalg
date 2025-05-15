@@ -33,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.5"
+__version__ = "0.6"
 import math
 from calcLib import *
 
@@ -67,7 +67,7 @@ class O():
   __CA_CHARS    = ('e', 'i')             # CA basis chars only
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
   __allChars    = ['o', 'u']             # Include CA & Quaternions
-  __maxBasis    = ['0', '0']             # Store the max dimensions
+  __maxBasis    = ['', '']               # Store the dimension characters
   __useQuat     = False                  # Q class is loaded
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
@@ -178,7 +178,6 @@ class O():
       self.__pBase = bases[0]
       self.__oBase = bases[1]
       self.__uBase = bases[2]
-      self.__unitaryErr = "Can't mix octonian signatures with same index"
     def bases(self):
       return (self.__pBase, self.__oBase, self.__uBase)
     def lens(self):
@@ -248,10 +247,10 @@ class O():
 
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs as one row due to the definition of
-         the product. This is done row by row of the table using successive
-         integer values to separate index positions. Rows are cached and the
-         order doesn't change as rows and columns increase is size, This works
-         for the sparse multiplication used by the graded lists."""
+         the product. This is done row by row of the table so as to not rebuild
+         the whole cache at the start. Rows are cached and the order doesn't
+         change as rows and columns increase is size, This works for the sparse
+         multiplication used by the graded lists."""
       value *= self.value
       lhs = self.bases()
       xyz = None
@@ -285,21 +284,11 @@ class O():
           bases[1] = self.__mergeStr(lhs[1], rhs[1])[0]
 
           if hasU:   # Split multiplication
-            bases[2],cnt = self.__mergeStr(lhs[2], rhs[2])
-            if cnt %2 == 1:
+            bases[2],sgn = self.__mergeStr(lhs[2], rhs[2])
+            if sgn %2 == 1:
               value = -value
-            for lCh in lhs[2]:
-              if rhs[1].find(lCh) >= 0:
-                raise Exception(self.__unitaryErr)
-            for rCh in rhs[2]:
-              if lhs[1].find(rCh) >= 0:
-                raise Exception(self.__unitaryErr)
         else:
           bases = rhs
-          if hasU:
-            for rCh in rhs[2]:
-              if lhs[1].find(rCh) >= 0:
-                raise Exception(self.__unitaryErr)
       else:
         bases = lhs
       return O.Grade(value, bases)
@@ -327,8 +316,6 @@ class O():
         Lib._checkType(val, (int, float), "O")
         if val:
           self.__g.append(O.Grade(val, [idx +1, xyz[idx +1], ""]))
-        if xyz[idx][-1:] > O.__maxBasis[0]:
-          O.__maxBasis[0] = xyz[idx][-1]
     for key,value in kwargs.items():
       Lib._checkType(value, (int, float), "O")
       if value:
@@ -338,40 +325,59 @@ class O():
   @staticmethod
   def _init(key, value, baseChars):
     """Return the Grade for basis string key. Separate o & u parts."""
+    lGrade = O.Grade(value, (0, "", ""))  # Base for o and u, resp
+    rBases = [0, "", ""]
     typ = None
-    bases = [0, "", ""]
-    base = ""
-    pBase = ""
-    typ = None
-    lastChar = '0'
+    digit = False
+    lastChar = ''
     for char in key:
-      offset = int(typ == baseChars[1]) # o==0, u==1
-      if char in pBase:
-        raise Exception("Invalid basis duplication: %s" %key)
+      if (char.isdigit() or char in O.__HEX_CHARS) and char > lastChar:
+        lastChar = char
+    xyz = O._basisArray(lastChar)[0]
+    lastChar = ['', '']
+    for char in key:
+      offset = int(typ == baseChars[1]) # o==1, u==2
       if typ and char.isdigit():
-        base += char
-        pBase += char
+        if char in O.__maxBasis[1 -offset]:
+          raise Exception("Invalid basis duplication: %s%s" %(typ, char))
+        if char <= lastChar[offset]:
+          rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
+          #lastChar[offset] = lGrade.bases()[offset +1][-1]
+          rBases = [0, "", ""]
+        else:
+          lastChar[offset] = char
+        if char not in O.__maxBasis[offset]:
+          O.__maxBasis[offset] += char
+        rBases[offset +1] += char
+        digit = True
       elif typ and char in O.__HEX_CHARS:
-        base += char
-        pBase += char
+        if char in O.__maxBasis[1 -offset]:
+          raise Exception("Invalid basis: %s%s" %(typ, char))
+        if char <= lastChar[offset]:
+          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
+          #lastChar[offset] = lGrade.bases()[offset +1][-1]
+          rBases = [0, "", ""]
+        else:
+          lastChar[offset] = char
+        if char not in O.__maxBasis[offset]:
+          O.__maxBasis[offset] += char
+        rBases[offset +1] += char
+        digit = True
       elif char in baseChars:
-        bases[offset +1] += base
-        base = ""
+        if rBases[1] +rBases[2]:
+          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
+          rBases = [0, "", ""]
         typ = char
+        digit = False
       else:
         raise Exception("Invalid basis: %s" %key)
-    if not pBase:
-      raise Exception("Invalid basis: %s" %key)
-    bases[offset +1] += base
-    bases[1] = "".join(sorted(bases[1]))
-    bases[2] = "".join(sorted(bases[2]))
-    pBase = "".join(sorted(pBase))
-    lastChar = pBase[-1]
-    if lastChar > O.__maxBasis[offset]:
-      O.__maxBasis[offset] = lastChar
-    xyz = O._basisArray(lastChar)[0]
-    bases[0] = xyz.index(pBase)
-    return O.Grade(value, bases)
+    if typ and not digit:
+      raise Exception("Invalid last basis: %s" %key)
+    rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+    return lGrade.mergeBasis(1, rBases)
 
   def __float__(self):
     return float(self.w)
@@ -539,9 +545,11 @@ class O():
       if not self.__g:
         if not oper(self.w, cf):
           res = False
-      for g in self.__g:
-        if not oper(g.value, 0.0):
-          res = False
+      if res:
+        for g in self.__g:
+          if not oper(g.value, 0.0):
+            res = False
+            break
       return res
     elif not isinstance(cf, O):
       raise Exception("Invalid comparison for O: %s" %type(cf))
@@ -671,9 +679,9 @@ class O():
         return conj *tmp.inverse(False)
     return 0
 
-  def __vectorSizes(self):
+  def __vectorSizes(self, local=False):
     """Return the Octonian vector sizes. Can't handle negative signatures."""
-    dims = self.basis()
+    dims = self.basis(local)
     if dims[0] == 1:
       dims[0] = 2
     xyz = O.BasisArgs(*dims)
@@ -681,41 +689,75 @@ class O():
     return dim, xyz
 
   @staticmethod
-  def _basisArray(dim=0):
+  def _basisArray(dim=0, exact=False):
     """Used by Grade, BasisArgs and other calcs and matches Grade.order.
        Returns basis digits list for current max dim = oDim + uDim,
        current max (increasing if dim > max dim) and multiplication rule."""
     if isinstance(dim, Lib._basestr):
       dim = int(dim, O.__HEX_BASIS +1)
-    if dim > O.__basisDim:
+    if dim > O.__basisDim or (exact and dim < O.__basisDim):
       out = [""]
       for ii in range(1, dim +1):
         form = "%X" %ii
         for val in out[:]:
           out.append(val +form)
-      O.__basisXyz = out
-      O.__basisDim = dim
+      if dim > O.__basisDim:
+        O.__basisXyz = out
+        O.__basisDim = dim
     else:
       out = O.__basisXyz
     return out, O.__basisDim, O.__baezMulRule
 
   @staticmethod
-  def _BasisArgs(oDim, uDim, och="o", uch="u"):
+  def _BasisArgs(oDim, uDim, och="o", uch="u", dims=None):
     """Used by BasisArgs and externally to return the basis strs."""
-    arr = O._basisArray(oDim +uDim)[0]
+    if dims is None:
+      dims = O.__maxBasis
+    pDim = max(oDim, len(dims[0])) +max(uDim, len(dims[1])) 
+    xyz = O._basisArray(pDim, True)[0]
+    typs = [och] *pDim                    # Setup maxBasis o/u types
+    for idx in dims[1]:
+      typs[int(idx, O.__HEX_BASIS +1) -1] = uch
+    if oDim > len(dims[0]) or uDim > len(dims[1]):
+      missing = []                        # Add needed oDim/uDim positions
+      for pos in range(1, pDim +1):
+        if "%X" %pos not in dims[0] +dims[1]:
+          missing.append(pos -1)
+      pos = 0
+      for idx in range(oDim -len(dims[0])):
+        typs[missing[pos]] = och
+        pos += 1
+      for idx in range(uDim -len(dims[1])):
+        typs[missing[pos]] = uch
+        pos += 1
+    xyzMap = list("%X" %pos for pos in range(1, pDim +1))
+    if oDim +uDim < pDim:                # Remove excess basis elements
+      xyz = O._basisArray(oDim +uDim, True)[0]
+      xyzMap = []
+      typsNew = []
+      oPos = uPos = 0
+      for idx,ch in enumerate(typs):
+        if ch == och and oPos < oDim:
+          typsNew.append(och)
+          xyzMap.append("%X" %(idx +1))
+          oPos += 1
+        elif ch == uch and uPos < uDim:
+          typsNew.append(uch)
+          xyzMap.append("%X" %(idx +1))
+          uPos += 1
+      typs = typsNew
     out = []
-    oMax = "%X" %oDim
-    for base in arr[1:int(pow(2, oDim +uDim))]:
-      if base:
-        if base[0] > oMax:
-          out.append(uch +base)
-        elif base[-1] <= oMax:
-          out.append(och +base)
+    for base in xyz[1:]:
+      tmp = ""
+      typ = ""
+      for ch in base:
+        idx = int(ch, O.__HEX_BASIS +1) -1
+        if typ != typs[idx]:
+          typ = typs[idx]
+          tmp += typ +xyzMap[idx]
         else:
-          for idx in range(len(base)):
-            if base[idx] > oMax:
-              out.append("%s%s%s%s" %(och, base[:idx], uch, base[idx:]))
-              break
+          tmp += xyzMap[idx]
+      out.append(tmp)
     return out
 
   @staticmethod
@@ -903,31 +945,19 @@ class O():
         b = '0'
     return g
 
-  def basis(self, *maxBasis):
-    """basis([maxBasis,...])
-       Return the signature or maximum dimension basis of basis elements.
-       Optionally set the maxBasis for matrix output. The basis is of form
-       ('1','F') or integer and remaining values are set to zero."""
+  def basis(self, local=False):
+    """basis([local])
+       Return the local signature or max. dimension basis of basis elements."""
     dims = self.__class__.__maxBasis
-    if maxBasis:
-      if len(maxBasis) > len(dims):
-        raise Exception("Invalid grade(): %s" %maxBasis)
-      for idx in range(len(dims)):
-        dims[idx] = '0'
-      for idx,val in enumerate(maxBasis):
-        if isinstance(val, int):
-          val = hex(val).upper()[2:]
-        if isinstance(val, Lib._basestr) and len(val) == 1 and \
-              (val.isdigit or val in self.__HEX_CHARS):
-          dims[idx] = val
-        else:
-          raise Exception("Invalid grade(): %s" %val)
-    for grade in self.__g:
-      bases = grade.strs()
-      dims[0] = max(dims[0], bases[0][-1:])
-      dims[1] = max(dims[1], bases[1][-1:])
-    out0 = int(dims[0], self.__HEX_BASIS +1) # Convert max char to hex-digit
-    out1 = int(dims[1], self.__HEX_BASIS +1) # Convert max char to hex-digit
+    if local:
+      dims = ['',''] 
+      for grade in self.__g:
+        bases = grade.strs()
+        dims[0] = max(dims[0], bases[0][-1:])
+        dims[1] = max(dims[1], bases[1][-1:])
+    # Convert max. char to hex-digit
+    out0 = int(dims[0][-1], self.__HEX_BASIS +1) if dims[0] else 0
+    out1 = int(dims[1][-1], self.__HEX_BASIS +1) if dims[1] else 0
     return [out0, out1]
 
   def len(self):
@@ -1050,7 +1080,15 @@ class O():
     return out
   assoc = associator
   def __assoc(self, p, q):
-    return (self * p) *q  -self *(p * q) 
+    return (self * p) *q  -self *(p * q)
+
+  def jacobiAssociator(self, c, d, abc=0):
+    """jabobiAssoc[iator](c,d)
+       Return [b,d,c]+[b,c,d]+[c,b,d]. 0 if associative else non-associative."""
+    Lib._checkType(c, O, "jabociAssociator")
+    Lib._checkType(d, O, "jabociAssociator")
+    return self.__assoc(d,c) +self.__assoc(c,d) + c.__assoc(self,d)
+  jacobiAssoc = jacobiAssociator
 
   def moufang(self, p, q, number=0):
     """moufang(p,q,[number])
@@ -1073,8 +1111,15 @@ class O():
           + (q*self) *(p*q) -q *((self*p) *q)
     return out
 
+  def malcev(self, p, q):
+    """malcev(p,q) x=s y=p z=q
+       Return (sp)(sq)-((sp)q)s -((pq)s)s -((qs)s)p, s=self."""
+    Lib._checkType(p, O, "malcev")
+    Lib._checkType(q, O, "malcev")
+    return self *p *(self *q) -self *p *q *self -p *q *self *self -q *self *self *p
+
   def abcAssociator(self, c, d, abc=0):
-    """abcAssoc[iator](basis,c,d,[abc=0])
+    """abcAssoc[iator](c,d,[abc=0])
        Return [b,d,c] or [b,c,d] or [c,b,d] for abc=1-3 and all associative
        (ie all==0) for abc=0 where b=self. This is the same associativity as
        [b,a,c], [a,b,c], or [a,c,b] where a=b*c*d."""
@@ -1098,6 +1143,82 @@ class O():
         return ass
     return 0
   abcAssoc = abcAssociator
+
+  def nonAssocType(self, c, d):
+    """nonAssocType(c, d)
+       Return character from "ABCXs." for triad with ABC: abc non-associativity,
+       X: completely non-associative, s:scalar, .: repeated elements. Since 
+       associtivity is paired (ab,bc,ac) then non-associativive is (C,A,B),
+       respectively, or all (X), trivial (.) or quaternion-like (s)."""
+    Lib._checkType(c, O, "nonAssocType")
+    Lib._checkType(d, O, "nonAssocType")
+    a = self *c *d
+    if self == c or d in (self,c):
+      out = "."
+    elif a.isScalar():
+      out = "s"
+    else:
+      out = ""
+      if self.__assoc(a, c) != 0:
+        out += "A"
+      if a.__assoc(self, c) != 0:
+        out += "B"
+      if a.__assoc(c, self) != 0:
+        out += "C"
+      if len(out) == 3:
+        out = "X"
+    return out
+
+  def nonAssocMode(self, c, d, mode=0):
+    """nonAssocMode(c, d, [mode=0])
+       Return b',c',d' for (b,c,d),(b,c,a),(b,c,db),(b,c,a') where a=b*c*d, db=d*b
+       and a'=b*c*db which are Prim, Dual, Extended or Both for mode=0,1,2,3. Or
+       return a',b',c',d' ordered for zero divisor uniquness for mode+=4."""
+    Lib._checkType(c, O, "nonAssocMode")
+    Lib._checkType(d, O, "nonAssocMode")
+    Lib._checkType(mode, int, "nonAssocMode")
+    abcMode = mode if mode < 4 else mode -4
+    a = self *c *d
+    if abcMode == 0:
+      out = (self,c,d)
+    elif abcMode == 1:
+      out = (self,c,a)
+    else:
+      db = abs(d *self)
+      aa = abs(self *c *db)
+      if abcMode == 2:
+        out = (self,c,db)
+      elif abcMode == 3:
+        out = (self,c,aa)
+      else:
+        raise Exception("Invalid value for mode in nonAssocMode")
+    if mode > 3:
+      b,c,d = out
+      a = b *c *d
+      if abs(a) > abs(b): a,b = b,a
+      if abs(c) > abs(d): c,d = d,c
+      if d < 0: c,d = -c,-d
+      if b < 0: a,b = -a,-b
+      if abs(a) > abs(c):
+        a,b,c,d = c,d,a,b
+      if c < 0: a = -a; c = -c
+      out =  (a,b,c,d)
+    return out
+
+  def nonAssocModeType(self, c, d):
+    """nonAssocModeType(c, d)
+       Return nonAssocType for (a+b)(c+d),(-d+b)(c+a),(a'+b)(c+db),(-db+b)(c+a')
+       where b=self, a=b*c*d, db=d*b and a'=a*b*db as "p?d?e?b?". This is Primary,
+       Dual, Extended and Both which is extended dual. See nonAssocMode()."""
+    Lib._checkType(c, O, "nonAssocModeType")
+    Lib._checkType(d, O, "nonAssocModeType")
+    a = self *c *d
+    db = abs(d *self)
+    aa = self *c *db
+    zeroDivMap = (("p", a, self, c, d),   ("d", -d, self, c, a),
+                  ("e", aa, self, c, db), ("b", -db, self, c, aa))
+    return "".join(map(lambda x: ((x[0] +x[2].nonAssocType(x[3], x[4])) \
+                   if (x[1]+x[2])*(x[3]+x[4]) == 0 else ""), zeroDivMap))
 
   def projects(self, q):
     """projects(q)
@@ -1491,9 +1612,9 @@ class O():
        Return unique O.assoc(...) traids or not. See Lib.triadDump."""
     Lib._checkType(nonAssoc, bool, "AssocTriads")
     Lib._checkType(alternate, bool, "AssocTriads")
-    tmp = Lib.triadPairs(O.__AssocTriads, basis, dump, alternate, cntOnly)
+    tmp = Lib.triadPairs(O.__AssocTriads, basis, "AssocTriads", dump, alternate, cntOnly)
     if not nonAssoc: return tmp
-    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._allTriads, basis, "AssocTriads", dump, tmp)
   @staticmethod
   def __AssocTriads(out, basis, lr, a, b, params):
     cnt = 0
@@ -1514,9 +1635,12 @@ class O():
        Return unique O.moufang() or non traids. See Lib.triadDump."""
     Lib._checkType(number, int, "MoufangTriads")
     Lib._checkType(nonMoufang, bool, "MoufangTriads")
-    tmp = Lib.triadPairs(O.__MoufangTriads, basis, dump, number, cntOnly)
+    if cntOnly and nonMoufang:
+      raise Exception("MoufangTriads cntOnly and nonMoufang is invalid")
+    tmp = Lib.triadPairs(O.__MoufangTriads, basis, "MoufangTriads", dump,
+                         number, cntOnly)
     if not nonMoufang: return tmp
-    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib.inverseTriads, basis, "MoufangTriads", dump, tmp, cntOnly)
   @staticmethod
   def __MoufangTriads(out, basis, lr, a, b, params):
     cnt = 0
@@ -1537,9 +1661,11 @@ class O():
        Return unique abcAssoc() traids or !=0. See Lib.triadDump."""
     Lib._checkType(abc, int, "AbcTriads")
     Lib._checkType(nonAssoc, bool, "AbcTriads")
-    tmp = Lib.triadPairs(O.__AbcTriads, basis, dump, abc, cntOnly)
+    if cntOnly and nonMoufang:
+      raise Exception("AbcTriads cntOnly and abc is invalid")
+    tmp = Lib.triadPairs(O.__AbcTriads, basis, "AbcTriads", dump, abc, cntOnly)
     if not nonAssoc: return tmp
-    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib.inverseTriads, basis, "AbcTriads", dump, tmp, cntOnly)
   @staticmethod
   def __AbcTriads(out,basis,lr,a,b, params):
     cnt = 0
@@ -1554,52 +1680,47 @@ class O():
     return cnt
 
   @staticmethod
-  def ZeroTriads(basis, nonZero=False, dump=False):
-    """ZeroTriads(basis,[nonZero,dump])
-       Return zero divisors (+-abc+a)(b+c)=0 or not. See Lib.triadDump."""
-    tmp = Lib.triadPairs(O.__ZeroTriads, basis, dump)
-    if not nonZero: return tmp
-    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
+  def ZeroDivisors(basis, dump=False, cntonly=False):
+    """zeroDivisors(basis,[dump,cntonly])
+       Return zero divisors (abc+a)(b+c)=0 as triadPairs. See Lib.triadDump."""
+    Lib._checkType(basis, (list, tuple), "zeroDivisors")
+    return Lib.triadPairs(O.__ZeroDivisors, basis, "zeroDivisors", dump,
+                             None, cntonly)
   @staticmethod
-  def __ZeroTriads(out, basis, lr, b, c, params):
-    buf = []
+  def __ZeroDivisors(out, basis, lr, b, c, params):
+    """Could use c-associativity but (a+b)*(c+d)==0 is quicker."""
     cnt = 0
+    br = b *lr
+    cr = c *lr
+    bufout = []
     bb,cc,dummy = params
-    for d in range(c +1, lr):
+    for d in range(lr):
+      dr = d *lr
       dd = basis[d]
       aa = bb *cc *dd
+      aaa = abs(aa)
       if not aa.isScalar():
-        aaa = abs(aa)
         a = basis.index(aaa)
-        if d not in buf and \
-           ((aa +bb) *(cc +dd) == 0 or (-aa +bb) *(cc +dd) == 0):
+        if a not in (b,c) and ((aa +bb) *(cc +dd) == 0 or \
+           (aa +bb) *(cc -dd)==0):  # For split signature
           addit = True
-          acBuf = out[a *lr +c if a < c else c *lr +a]
-          if b in acBuf or d in acBuf:
+          bd = br +d if b < d else dr +b
+          if a in out[bd] or c in out[bd]:
             addit = False
           else:
-            bdBuf = out[b *lr +d]
-            if a in bdBuf or c in bdBuf:
+            ar = a *lr
+            ac = ar +c if a < c else cr +a
+            if a in out[ac] or d in out[ac]:
               addit = False
+            else:
+              ad = ar +d if a < d else dr +a
+              if b in out[ad] or c in out[ad]:
+                addit = False
           if addit:
-            buf.append(d)
+            bufout.append(d)
             cnt += 1
-        ddd = bb *cc *aa
-        if a not in buf and \
-           ((ddd +bb) *(cc +aa) == 0 or (-ddd +bb) *(cc +aa) == 0):
-          d0 = basis.index(abs(ddd))
-          addit = True
-          abBuf = out[a *lr +b if a < b else b *lr +a]
-          if c in abBuf or d0 in abBuf:
-            addit = False
-          else:
-            cdBuf = out[c *lr +d0 if c < d0 else d0 *lr +c]
-            if a in cdBuf or b in cdBuf:
-              addit = False
-          if addit:
-            buf.append(a)
-            cnt += 1
-    out[b *lr +c] = buf
+    if out and bufout:
+      out[br +c] = tuple(bufout)
     return cnt
 
   @staticmethod
@@ -1824,7 +1945,7 @@ if __name__ == '__main__':
   # Can only test 2-D rotations until euler stuff is updated. TBD
   Tests = [\
     """d30=radians(30); d60=radians(60); d45=radians(45); d90=radians(90)
-       e=Euler(pi/6,pi/4,pi/2); c=o1+2o2+3o12; c.basis(0)""",
+       e=Euler(pi/6,pi/4,pi/2); c=o1+2o2+3o12""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
        Rx=d60-o12; rx=(d60 -o12).versor()
        test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()

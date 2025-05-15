@@ -2,9 +2,18 @@
 ## G2 connection to Octonians via Spin(7)
 ## File: spin7_g2.ca - G.P.Wilmot
 ########################################
-## This file for calcCA defines the Triads7[30] 3-forms for Spin7, triads7*
-## functions to process allSign() elements and makeG2(i,j) to generate globals
-## A, B,...,N for octonian representations.
+
+_spin7_g2 = """This module for calcCA defines the Triads7[30] 3-forms for Spin7, triads7
+   functions to process allSign() elements and makeG2(i,j) to generate globals
+   A, B,...,N for octonian representations. The variables are:
+   Triads7gen, Triads7, PP1, PPP1, PP1p, P1o, PP1o, S1, SS1, TriadsG2, S1o, SS1o,
+   f7Basis, Spin7O, Spin7R, Nac7Mirrors, Nac7Map, AutoTriads7, AutoTriadsO,
+   ?0/1/2/3(?=A-N), G2?, G2?2, G2?, G2?2/3(?=0,1,2,3), TableG2, g??, G0?, Gn? matrices
+   and functions:
+   nac7subalg, nac7mirrors, nac7map, triadsOhalf, triads7all, triads7terms,
+   triads7remain, triads7class, triads7test, triads7parity, triads7autos,
+   tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
+
 # From CA(7)+ find 30 tetrahedron faces selected to define sub-algebras of CA(7).
 Triads7gen = (CA.Eval(x) for x in Lib.triads(7))
 # Triads7 = list(Triads7gen) [takes 2.3 minutes]
@@ -118,7 +127,7 @@ def nac7subalg(tri, pos=None):
       raise Exception("Invalid nac7subalg signed position")
     tri = list(Triads7[idx].allSigns(8))[pos]
   return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f7Basis)) \
-                 .assocTriads(f7Basis,True),f7Basis,1)))
+                 .assocTriads(f7Basis,True),f7Basis)))
 
 # Map algebras to remainders with repeats shown with *,#,$
 # S4:  [e123, e567]
@@ -168,7 +177,7 @@ def nac7map(idx):
       nac[abs(tmp)] = triads7all(idx,offs)
   for pos in sorted(nac.keys()):
     tmp = len(list(Lib.triadDump(Tensor.Triads(*(nac[pos]).spin(f7Basis)) \
-                           .assocTriads(f7Basis,True),f7Basis,1)))
+                           .assocTriads(f7Basis,True),f7Basis)))
     if tmp not in nacMap:
       nacMap.append(tmp)
       Nac15Name[tmp] = ("", idx, sgn)
@@ -518,7 +527,7 @@ L3 = Matrix.Diag([0]*7); L3[5][2]=-1; L3[2][5]=+1; L3[6][1]=-1; L3[1][6]=+1
 M3 = -M0; N3 = -N0
 G23 = (A3, B3, C3, D3, E3, F3, G3, H3, I3, J3, K3, L3, M3, N3)
 G232 = (A3+H3, B3+I3, C3+J3, C3-J3, D3+K3, D3-K3, F3+M3, G3+N3, G3-N3, K3+M3, L3-E3, L3-M3)
-G232 = (A3+H3, B3+I3, C3+J3, D3+K3, F3+M3, G3+N3, L3-E3)
+G233 = (A3+H3, B3+I3, C3+J3, D3+K3, F3+M3, G3+N3, L3-E3)
 
 # tableG2().dump() == tableG2(G21,G212,G2n+G2n2).dump() == TableG2
 # The full table is tableG2(G21+G212,(),G2n+G2n2).dump(G2n+G2n2)

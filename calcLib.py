@@ -95,8 +95,12 @@ class Lib():
   def readText(filename):
     """readTest(filename)
        Local read_text(filename) to return contents of a text file."""
-    with open(filename) as fp:
-      return fp.read()
+    try:
+      with open(filename) as fp:
+        return fp.read()
+    except Exception:
+      typ,var,tb = sys.exc_info()
+      raise typ(str(var).replace("\\\\\\\\", "\\"))
 
   @staticmethod
   def nextFigure():
@@ -134,7 +138,7 @@ class Lib():
       verbosity = not Lib.__verbose
     Lib._checkType(verbosity, bool, "verbose")
     Lib.__verbose = verbosity
-    return verbosity
+    return ("on" if verbosity else "off")
 
   @staticmethod
   def resolution(digits=0):
@@ -149,6 +153,7 @@ class Lib():
     Lib.__resolution = digits
     Lib.__resol_form = "%%0.%dG" %digits
     Lib.__resol_float = "%%0.%df" %digits
+    return digits
 
   @staticmethod
   def precision(precise=None):
@@ -158,6 +163,7 @@ class Lib():
       precise = 1E-15
     Lib._checkType(precise, float, "precision")
     Lib.__precision = precise
+    return precise
 
   @staticmethod
   def isInfo():
@@ -174,6 +180,7 @@ class Lib():
   def getResolNum(val):
     """getResolNum(val)
        Return int or the float rounded to resolution or in exponent format."""
+    #print("XXX",type(val))
     num = str(val)
     pos = num.find('.')
     if pos < 0 or len(num) -pos -1 < Lib.__resolution:
@@ -182,8 +189,8 @@ class Lib():
       return Lib.__resol_float %val
 
   @staticmethod
-  def _checkType(arg, typ, method):
-    """Raise exception if not the correct type."""
+  def _checkType(arg, typ, method, size=[]):
+    """Raise exception if arg not the correct type in method for size."""
     if typ == int:
       if isinstance(arg, bool):   # Filter out int for bool or bool in list
         tmp = str(arg)
@@ -195,6 +202,8 @@ class Lib():
       if len(tmp) > 9:
         tmp = str(type(arg))
       raise Exception("Invalid parameter type (%s) for %s" %(tmp, method))
+    if size:
+      Lib._checkSize(size, arg, method, "value")
   @staticmethod
   def _checkList(arg, typ, method, size=[]):
     """Raise exception if not a list/tuple of typ types and optional size as 
@@ -202,18 +211,22 @@ class Lib():
     Lib._checkType(arg, (list, tuple), method)
     Lib._checkType(size, (int, list, tuple), method)
     if size:
-      if isinstance(size, int):
-        if size != len(arg):
-          raise Exception("Invalid list length !=%d for %s" %(size, method))
-      elif isinstance(size, (list,tuple)):
-        if len(size) == 2 and (len(arg) < size[0] or \
-              (size[1] > 0 and len(arg) > size[1])):
-          raise Exception("Invalid list length !in [%d,%s] for %s" %(size[0],
-                           size[1] if size[1] else "..", method))
-      elif size:
-        raise Exception("Invalid checkList parameters in %s" %method)
+      Lib._checkSize(size, len(arg), method, "list length")
     for elem in arg:
       Lib._checkType(elem, typ, method)
+  @staticmethod
+  def _checkSize(size, val, method, src):
+      if isinstance(size, int):
+        if size != val:
+          raise Exception("Invalid %s !=%d for %s" %(src, size, method))
+      elif isinstance(size, (list,tuple)):
+        if len(size) == 2 and (val < size[0] or \
+              (size[1] > 0 and val > size[1])):
+          raise Exception("Invalid %s !in [%d,%s] for %s" %(src, size[0],
+                           size[1] if size[1] else "..", method))
+      elif size:
+        raise Exception("Invalid check %s parameters in %s" %(src, method))
+
   @staticmethod
   def _getResolutions():
     """Internal method to return the digits and print format."""
@@ -343,7 +356,7 @@ class Lib():
 
   @staticmethod
   def freeMemMB():
-    """freeMemMB()
+    """free[MemMB]()
        Return the amount of free memory left."""
     if sys.platform == "win32":
       process = os.popen('systeminfo 2>nul |find "Available Phys"')
@@ -351,6 +364,7 @@ class Lib():
       process.close()
       return int(result.split()[3].replace(",",""))
     return os.sysconf('SC_AVPHYS_PAGES')//256
+  free=freeMemMB
   @staticmethod
   def checkMem(inc=0, mod=1, extra=0, finish=False):
     """checkMem([inc,mod,extra,finish])
@@ -650,29 +664,54 @@ class Lib():
           value = '"%s"' %value
         fp.write("%s = %s\n" %(name, value))
   save=_save
+  
+  @staticmethod
+  def cycles(x,y=None, xy=None):
+    """cycles(x, [y,xy]):
+       Return list ((b,c),(b,bc),(c,bc)) where x or x,y=(b,c,...) & bc=xy or
+       abs(b*c). These are cycles of non-associative triads."""
+    if not isinstance(x, (list, tuple)):
+      x = [x]
+    if y is not None:
+      if not isinstance(y, (list, tuple)):
+        y = [y]
+      x = list(x) +list(y)
+    if len(x) < 2:
+      raise Exception("Invalid Lib.cycles array length not >= 2")
+    if xy is None:
+      xy = abs(x[0] *x[1])
+    d = list(x[2:])
+    b,c,bc = sorted((x[0], x[1], xy))
+    out = [tuple([b, c] +d)]
+    out.append(tuple([b, bc] +d))
+    out.append(tuple([c, bc] +d))
+    return out
 
   @staticmethod
-  def triadPairs(pairFn, basis, dump=False, param=None, cntOnly=False):
+  def triadPairs(pairFn, basis, name, dump=False, param=None, cntOnly=False):
     """triadPairs(pairFn,basis,[dump,param,cntOnly])
        Return list for pairFn(list,basis,idx,a,b,(aa,bb,param)) being called for
        all pairs in triadDump() order if set. Dump logs progress and checks
        memory & aborts if too small. cntOnly uses paiFn(None) & returns cnt."""
-    Lib._checkType(basis, (list, tuple), "triadPairs")
-    Lib._checkType(dump, bool, "triadPairs")
-    Lib._checkType(cntOnly, bool, "triadPairs")
+    Lib._checkType(basis, (list, tuple), name)
+    Lib._checkType(dump, bool, name)
+    Lib._checkType(cntOnly, bool, name)
     if not hasattr(pairFn, "__call__"):
-      raise Exception("triadPairs pairFn needs to be a function with 5 parameters")
+      raise Exception("%s triadPairs pairFn needs to be a function" %name)
+    if cntOnly and pairFn == Lib.inverseTriads:
+      raise Exception("%s inverse triads can't have cntOnly" %name)
     lr = len(basis)
-    out = None if cntOnly else [[]] *(lr *(lr -1))
+    out = None if cntOnly else [[]] *(lr *(lr -1)) # Overwrite [] if non-empty
     cnt = 0
-    Lib.procTime()
+    if dump:
+      Lib.procTime(True)
+      step = max(100, lr //10)
     for a in range(lr):
       aa = basis[a]
-      if dump and Lib.__checkMem(a, 10, cnt):
+      if dump and Lib._checkMem(a, step, cnt):
         break
       for b in range(a +1, lr):
         params = (aa, basis[b], param)
-        #cnt += pairFn(out, basis, lr, a, b, params) TBD
         tmp = pairFn(out, basis, lr, a, b, params)
         if isinstance(tmp, int):
           cnt += tmp
@@ -686,25 +725,15 @@ class Lib():
     return cnt if cntOnly else out
 
   @staticmethod
-  def allTriads(basis, dump=False, cntOnly=False):
-    """allTriads(basis,[dump,cntOnly])
-       Return a list all unique triads (or cnt). See triadDump()."""
-    Lib._checkType(basis, (list, tuple), "allTriads")
-    lr = len(basis)
-    return Lib.triadPairs(Lib._NonTriads, basis, dump,
-                             [[]] *(lr *(lr-1)), cntOnly)
-  @staticmethod
-  def _NonTriads(out, basis, lr, b, c, params):
-    """Inverse triadPair() triads list for allTriads and others."""
-    bufOut = []
+  def inverseTriads(out, basis, lr, b, c, params):
+    """inverseTriads(out,basis,lr,b,c,params)
+       Lib.triadPairs pairFn to invert triad result."""
     cnt = 0
-    bb,cc,outIn = params
-    if isinstance(outIn, int):
-      raise Exception("Can't invert a cntOnly triadPair function")
-    Lib._checkType(basis, (list, tuple), "triadDump")
-    bufIn = outIn[b *lr +c]
+    bufOut = []
+    bb,cc,buf = params
+    got = buf[b *lr +c]
     for d in range(c +1, lr):
-      if d not in bufIn:
+      if d not in got:
         bufOut.append(d)
         cnt += 1
     if out:
@@ -712,50 +741,142 @@ class Lib():
     return cnt
 
   @staticmethod
-  def triadDump(pairBuf, basis, expand=0):
-    """triadDump(pairBuf,basis, [expand=0])
-       Yield pairBuf list from Lib.triadPairs() with (a,b) unique pairs of
-       basis elements for non-empty results as a gen lists depending on expand.
-       0: pairs (a,b)(c,...) (use dict(list()),  1: expanded triples (a,b,c),
-       2: zero divisors (+-abc +a)(b+c),     3: sorted list (+-abc, a, b, c)."""
-    Lib._checkType(basis, (list, tuple), "triadDump")
+  def allTriads(basis, dump=False, cntOnly=False):
+    """allTriads(basis,[dump,cntOnly])
+       Return a list of all simple faces (or cnt). See triadDump()."""
+    Lib._checkType(basis, (list, tuple), "allTriads")
+    return Lib.triadPairs(Lib._allTriads, basis, "allTriads", dump,
+                             None, cntOnly)
+  @staticmethod
+  def _allTriads(out, basis, lr, b, c, params):
+    cnt = 0
+    bufOut = []
+    bb,cc,tmp = params
+    for d in range(c +1, lr):
+      if tmp:
+        if d not in tmp[b *lr +c]:
+          bufOut.append(d)
+      else:
+        bufOut.append(d)
+      cnt += 1
+    if out:
+      out[b *lr +c] = bufOut
+    return cnt
+
+  @staticmethod
+  def allCycles(basis, table=None, dump=False):
+    """allCycles(basis,[table,dump])
+       Return two lists of all simplex single & 3-cycle faces. Single contains
+       non cycles including assocCycles() or quaternion-like triads. All other
+       triads are non-associative and 3-cycle faces only list the first cycle of
+       (b,c,d), (b,bc,d), (c,bc,d). bc is multiplied from basis or if table is a
+       multiplication table then bc is looked up. Simple triples with repeated
+       elements or scalars are not triads. See triadDump to display results."""
+    buf = Lib.triadPairs(Lib.__allCycles, basis, "allCycles", dump, table)
+    lr = len(basis)
+    single, cycles = [[]] *(lr *(lr -1)), [[]] *(lr *(lr -1)) 
+    for b in range(lr):
+      for c in range(b +1, lr):
+        offs = b *lr +c
+        tmp = sorted(buf[offs])
+        bufSng, bufCyc = [], []
+        if tmp:
+          oldIdx = tmp[0]
+          cntIdx = 0
+          for idx in tmp +[-2]:
+            if idx == oldIdx:
+              cntIdx += 1
+            elif cntIdx == 1:
+              bufSng.append(oldIdx)
+              cntIdx = 1
+            elif cntIdx == 3:
+              bufCyc.append(oldIdx)
+              cntIdx = 1
+            else:
+              raise Exception("Invalid Lib.allCycle count %d for %s" %(cntIdx,
+                               (basis[b], basis[c], basis[oldIdx])))
+            oldIdx = idx
+        single[offs], cycles[offs] = bufSng, bufCyc
+    return single, cycles
+  @staticmethod
+  def __allCycles(out, basis, lr, b, c, params):
+    bb,cc,table = params
+    if table:
+      bc = abs(table.get(b,c))
+    else:
+      bc = basis.index(abs(bb *cc))
+    b1,c1,bc1 = sorted((b, c, bc))
+    bufOut = out[b1 *lr +c1]
+    if not bufOut: bufOut = []
+    bufOut.extend(range(c +1, lr))
+    out[b1 *lr +c1] = bufOut
+    return 0
+
+  @staticmethod
+  def associativeCycles(basis, table=None, dump=False):
+    """assoc[iative]Cycles(basis,[table,dump])
+       Return a list of independent simplex 3-cycle faces. See allCycles()."""
+    return Lib.triadPairs(Lib.__assocCycles, basis, "assocCycles", dump, table)
+  @staticmethod
+  def __assocCycles(out, basis, lr, b, c, params):
+    cnt = 0
+    bb,cc,table = params
+    if table:
+      bc = abs(table.get(b,c))
+    else:
+      bc = basis.index(abs(bb *cc))
+    b1,c1,bc1 = sorted((b, c, bc))
+    if out[b1 *lr +c1] != [bc1]:
+      out[b1 *lr +c1] = [bc1]
+      cnt = 1
+    return cnt
+  assocCycles = associativeCycles
+
+  @staticmethod
+  def expandPairList(pairList):
+    """expandPairList(pairList)
+       Input a list of (b,c),(ds...) pairs and yield the triads (b,c,d)."""
+    Lib._checkList(pairList, (tuple, list), "expandPairList")
+    for pair in pairList:
+      Lib._checkList(pair, (tuple, list), "expandPairList")
+      if len(pair) != 2 or len(pair[0]) != 2:
+        raise Exception("Invalid PairList for expandPairList")
+      b,c = pair[0]
+      dList = pair[1]
+      for d in dList:
+        yield (b,c,d)
+
+  @staticmethod
+  def triadDump(pairBuf, basis, paired=False, dump=False):
+    """triadDump(pairBuf,basis, [paired,dump])
+       Yield triad list from Lib.triadPairs() with (b,c) unique pairs of basis
+       elements for non-empty d results. If expand yield pairs ((b,c), (ds...)).
+       See Lib.expandPairList() to generate triads."""
     Lib._checkType(pairBuf, (list, tuple), "triadDump")
-    Lib._checkType(expand, int, "triadDump")
+    Lib._checkType(basis, (list, tuple), "triadDump")
+    Lib._checkType(paired, bool, "triadDump")
+    Lib._checkType(dump, bool, "triadDump")
     lr = len(basis)
     if len(pairBuf) != lr *(lr -1):
       raise Exception("triadDump pairBuf should be result of triadPairs")
+    if dump:
+      Lib.procTime(True)
+      step = max(100, lr //10)
     for a in range(lr):
+      if dump and Lib._checkMem(a, step):
+        break
       idx = a *lr
       for b in range(a +1, lr):
         buf = pairBuf[idx +b]
         if buf:
           aa,bb = basis[a], basis[b]
-          if expand == 0:
+          if paired:
             yield (aa,bb), list(basis[c] for c in buf)
-          elif expand == 1:
+          else:
             for c in buf:
               yield aa, bb, basis[c]
-          elif expand == 2:
-            for c in buf:
-              cc = basis[c]
-              rr = aa*bb*cc
-              if (rr +aa)*(bb +cc) == 0:
-                yield rr +aa, bb +cc
-              else:
-                yield -rr +aa, bb +cc
-          elif expand == 3:
-            for c in buf:
-              cc = basis[c]
-              rr = aa*bb*cc
-              sgn = (rr < 0)
-              tmp1 = sorted((abs(rr), aa))
-              tmp2 = sorted((bb, cc))
-              tmp = tmp1 +tmp2 if tmp1[0] < tmp2[0] else tmp2 +tmp1
-              if (abs(rr) +aa)*(bb +cc) != 0:
-                tmp [0] *= -1
-              yield tmp
-          else:
-            raise Exception("Invalid BasisDump parameter: expand")
+    if dump:
+      Lib.checkMem(a, finish=True)
 Common = Lib
 
 ################################################################################
@@ -1248,7 +1369,7 @@ class Tensor(list):
 
   def pow(self, exp):
     """pow(exp)
-       Return matrix with  power applied to each element of self."""
+       Return matrix with power applied to each element of self."""
     Lib._checkType(exp, (int, float), "pow")
     out = []
     if self and isinstance(self[0], (list, tuple)):
@@ -1485,7 +1606,7 @@ class Tensor(list):
       raise Exception("Tensor is not the same type as basis for %s" %name)
 
   def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
-             initPerm=[], permCycle=False):
+             initPerm=[], permCycle=False, antiiso=False):
     """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
@@ -1543,8 +1664,9 @@ class Tensor(list):
       if len(cf) < len(self) or len(cycleIso) < len(self):
         raise Exception("Invalid basis for table.cycles()")
     cnt = 0
+    noAntiIso = dim if antiiso else 0
     for p in perms:                # For all permutations
-      for n in range(dim +1):      # For all negative sign combinations
+      for n in range(noAntiIso +1):      # For all negative sign combinations
         for sgns in Lib.comb(dim, n, True):
           p0 = list(x +len(initPerm) for x in p)
           for sgn in sgns:
@@ -1714,9 +1836,10 @@ class Tensor(list):
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
     if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    tmp = Lib.triadPairs(self.__assocTriads, basis, dump, (alternate,mBasis))
+    tmp = Lib.triadPairs(self.__assocTriads, basis, "assocTriads", dump,
+                         (alternate,mBasis))
     if not nonAssoc:  return tmp
-    return Lib.triadPairs(Lib._NonTriads, basis, dump, tmp)
+    return Lib.triadPairs(Lib._allTriads, basis, "assocTriads", dump, tmp)
   def __assocTriads(self, out, basis, lr, a, b, params):
     cnt = 0
     buf = []
@@ -1755,7 +1878,8 @@ class Tensor(list):
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
     if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    return Lib.triadPairs(self.__moufangTriads, basis, dump, (moufang, mBasis))
+    return Lib.triadPairs(self.__moufangTriads, basis, "moufangTriads", dump,
+                          (moufang, mBasis))
   def __moufangTriads(self, out, basis, lr, a, b, params):
     cnt = 0
     buf = []
@@ -1815,7 +1939,7 @@ class Tensor(list):
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
     if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
-    return Lib.triadPairs(self.__zeroTriads, basis, dump, mBasis)
+    return Lib.triadPairs(self.__zeroTriads, basis, "zeroTriads", dump, mBasis)
   def __zeroTriads(self, out, basis, lr, b, c, params):
     buf = []
     cnt = 0

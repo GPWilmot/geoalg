@@ -24,7 +24,7 @@
 ## used by all basis number calculators. Run help for more info.
 ## Start with either calcR.py, python calcR.py or see ./calcR.py -h.
 ###############################################################################
-__version__ = "0.4"
+__version__ = "0.5"
 import sys, math, os
 import platform, glob
 import traceback
@@ -110,6 +110,7 @@ class ParseState:
     self.store = []        # pairs of (value, basis)
     self.signVal = ""      # only if lastTyp == SIGNS
     self.aftFill = ""
+    self.lastName = ""     # only for calcS variables
     self.lastBasis = 0
     self.isMults1 = False
     self.isMults2 = False
@@ -222,9 +223,12 @@ class LibTest():
 class Calculator:
   """Command line processor parsing basis numbers into python code.Help uses the
      doc strings and class variable documents strings (starting with one _)."""
+  # Firstly, all words processed by parsing
   __USEFUL_WORDS  = ("version", "verbose", "precision", "resolution",
                      "help", "quit", "exit", "save", "load", "show", "test",
-                     "clear", "calc", "vars")       # Words processed by parsing
+                     "clear", "calc", "vars", "free", "date", "time")
+  __USEFUL_LIBS   = ("verbose", "precision", "resolution", 
+                     "free", "date", "time")
   __USEFUL_CMDS   = ("load", "test", "version")     # Words with evaluation
   __USEFUL_FILE   = ("show", "clear", "load", "save")  # Ordered filename words
   __PYTHON_WORDS  = ("print", "raise", "from", "with", # Exec not eval
@@ -268,21 +272,6 @@ class Calculator:
         vers += "(%s: %s)" %(args[idx], args[idx +1])
       idx += 2
     sys.stdout.write(vers +'\n')
-
-  @staticmethod
-  def verbose(verbosity=None):
-    """Toggle or set verbosity for traceback reporting."""
-    return "on" if Lib.verbose(verbosity) else "off"
-
-  @staticmethod
-  def precision(precise=None):
-    """Set equality precision or reset to default e-15."""
-    Lib.precision(precise)
-
-  @staticmethod
-  def resolution(digits=None):
-    """Set print format digits or reset to default 17."""
-    Lib.resolution(digits)
 
   @staticmethod
   def getWordLists():
@@ -394,23 +383,32 @@ class Calculator:
       Calculator.__history = []
 
   @staticmethod
-  def vars(lVars):
-    """List local variables to line length 80."""
-    lv = []
+  def vars(lVars, gVars):
+    """List local and global variables to line length 80."""
+    allV,allF = set(),set()
     for name,var in lVars.items():
       if isinstance(var, (int, float, list, tuple, Lib._basestr)):
         if name[0] != "_":
-          lv.append(name)
+          allV.add(name)
     for name,var in lVars.items():
       if str(type(var)) == "<type 'function'>":
-        lv.append(name +"()")
+        allF.add(name +"()")
+    for name,var in gVars.items():
+      if isinstance(var, (int, float, list, tuple, Lib._basestr)):
+        if name[0] != "_":
+          allV.add(name)
+    for name,var in gVars.items():
+      if str(type(var)) == "<type 'function'>":
+        allF.add(name +"()")
     size = 0
-    for name in lv:
+    for name in allV:
+      size = max(size, len(name))
+    for name in allF:
       size = max(size, len(name))
     width = 80 // (size +2) +1
     fmt = "%%%ds" %(size +2)
-    for pos in range(0, len(lv), width):
-      for name in lv[pos:pos +width]:
+    for pos in range(0, len(allV) +len(allF), width):
+      for name in (sorted(allV) +sorted(allF))[pos:pos +width]:
         sys.stdout.write(fmt %name)
       sys.stdout.write('\n')
 
@@ -471,13 +469,15 @@ class Calculator:
       ext = os.path.splitext(Calculator.__default)[1]
       tmp = "history%s default%s or named file"
       opt = ""
-      if not readline:
-        opt += "\nPIP: readline not installed - no command line history"
+      if not readline and sys.platform != "win32":
+        opt += "PIP: readline not installed - no command line history\n"
       if not ply_lex:
-        opt += "\nPIP: ply not installed - no parsing of basis numbers"
+        opt += "PIP: ply not installed - no parsing of basis numbers\n"
       test = "" if LibTest.testCnt()==0 else "%9s test or test(1..%d,..)%s\n"\
              %("", LibTest.testCnt(), " - run all tests or just some")
       extra = ""
+      libWords = ", ".join(Calculator.__USEFUL_LIBS)
+      libWords += " "*(21 -len(libWords))
       for more in Calculator.__oldCls.values():
         if more and more != Calculator.__inCls:
           if Calculator.__eHelp:
@@ -490,11 +490,11 @@ class Calculator:
           +'          load or load(<files>) - load %s\n' %(tmp %(" from", ext))\
           +'          save or save(<file>)  - append %s\n' %(tmp %(" to", ext))\
           +'            or save(<file>,var) - save var to file\n'\
-          +'          vars                  - list local variables/functions\n'\
+          +'          version, vars         - list all versions, vars/fns\n'\
           +test \
+          +'          ' +libWords +' - See help(Lib.*)\n'\
           +'          quit or exit or control-d[z/CR] - exit[Windows]\n' \
-          +'          precision, resolution, verbose, version - see help' \
-          +'(Lib)' +opt +'\n')
+          +opt)
       if path:
         fNames = list((os.path.basename(fName) for fName in glob.glob(path)))
         if len(fNames) == 0:
@@ -502,11 +502,13 @@ class Calculator:
         else:
           avWidth = sum(map(len, fNames)) //len(fNames) +3
           form = 'Files to load:'
-          try:
-            totWidth = max(len(form) +avWidth,
-                       int(os.popen('stty size', 'r').read().split()[1])) -1
-          except:
-            totWidth = 79
+          totWidth = 80
+          if True: #sys.platform !="win32":
+            try:
+              disWidth = int(os.popen('stty size', 'r').read().split()[1])
+              totWidth = max(len(form) +avWidth, disWidth) -1
+            except:
+              pass
           out = ""
           for nam in fNames:
             tmp = ((avWidth -len(out) %avWidth) if len(out) %avWidth else 0) +1
@@ -518,7 +520,22 @@ class Calculator:
             out += " " *tmp +nam
           sys.stdout.write(form +out +"\n")
     elif not hasattr(cls, "__name__"):
-      raise Exception("Invald help parameter")
+      if isinstance(cls, dict):
+        var = "_%s" %obj
+        if var in cls and isinstance(cls[var], Lib._basestr):
+          sys.stdout.write("   %s\n" %cls[var])
+        elif obj in cls:
+          if hasattr(cls[obj], "__call__"): # For functions
+            if cls[obj].__doc__:
+              sys.stdout.write("   %s\n" %cls[obj].__doc__)
+            else:
+              sys.stdout.write("   Function has no documentation\n")
+          else:
+            sys.stdout.write("   Variable of type: %s\n" %type(cls[obj]))
+        else:
+          sys.stdout.write("   Variable does not exist\n")
+      else:
+        raise Exception("Invald help parameter")
     else:
       Calculator.__help(cls, obj)
 
@@ -586,11 +603,13 @@ class Calculator:
        The ansAssign argument is ignored."""
     doFirstLoad = False
     firstTest = True
+    isAns = False    # Could return some values - TBD
     if firstWord and line.find(firstWord) >= 0:
       word = firstWord
       firstWord = ""
     else:
       word = ""
+      raise Exception("Programming error")
       for uWord in self.__USEFUL_WORDS:
         if line.lstrip().find(uWord) == 0:
           word = uWord
@@ -629,14 +648,21 @@ class Calculator:
       elif word == "calc" and param:
         pline = "('%s')" %param.upper()
       elif word == "vars":
-        pline = "(locals())"
+        if pline:
+          raise Exception("Command vars has no parameters")
+        pline = "(locals(), globals())"
       elif word == "help":
         if param:
           pos1 = param.find(".")
           if pos1 > 0:
-            pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
+            if param[:pos1] in Calculator.__classList:
+              pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
+            else:
+              pline = "(locals(), '%s')" %param[pos1+1:]
           elif param in self.__USEFUL_WORDS:
             pline = "()"
+          elif param not in Calculator.__classList:
+            pline = "(locals(), '%s')" %param
         else:
           path = os.path.dirname(__file__)
           ext = os.path.splitext(Calculator.__default)[1]
@@ -660,6 +686,9 @@ class Calculator:
             raise Exception("Command word processing error: %s" %line)
           bufs = ((isAns, "", []),)
         isAns,code = bufs[0][:2]
+      elif word in self.__USEFUL_LIBS:
+        code = 'sys.stdout.write("%s\\n" %(Lib.' +word \
+                                +(pline if pline else "()") +'))'
       else:
         code = "Calculator." +word +(pline if pline else "()")
     return isAns,code
@@ -714,9 +743,12 @@ class Calculator:
     bracketCnt = 0          # Ignore inside brackets if noBrackExpand
     checkStore = False      # Process the state immediately
     signVal = ""            # Current sign for number or name
+    notEmpty = False        # Check line is not empty
     for token in self.__lexer.process():
       #print(token, state, noBrackExpand, "->", code[-20:])
+      isSpaced = False
       if token.type == "NEWLINE" and not quotesCnt:
+        isSpaced = True
         isComment = False
         checkStore = True
         if state.extendLine:
@@ -793,6 +825,7 @@ class Calculator:
               state.store[-1][1] += token.value
             elif state.lastBasis and validBasis != state.lastBasis:
               code += Calculator.__inCls._processStore(state)
+              state.signVal = "+"
               state.store.append([sgn, token.value])
             elif state.lastTyp == "NUMBER":
               state.store[-1][1] = token.value
@@ -830,6 +863,7 @@ class Calculator:
               doLineExpand = False
               isAns = False
       else:  # All OTHER tokens
+        isSpaced = (token.type in SpaceChars)
         if token.type == '=':
           if noBrackExpand and len(state.store) == 1 \
                            and state.store[0][0] == "+1":
@@ -841,7 +875,7 @@ class Calculator:
             isAns = False
             if isAnsAssign:
               raise Exception("Can't assign to ans")
-        if token.type in SpaceChars:
+        if isSpaced:
           if state.store:
             state.aftFill += " "
             token.value = ""
@@ -859,32 +893,33 @@ class Calculator:
         code += signVal
         signVal = ""
       code += token.value
-      if not (token.type in SpaceChars or isComment or quoteCnt or quotesCnt):
+      if not (isSpaced or isComment or quoteCnt or quotesCnt):
         state.extendLine = (token.type == "\\")
         state.lastTyp = token.type
         if token.type in (':', ';'):
-          if token.type == ';' and isUsefulWord:
-            bufs.append((isAns, code[:-1], ansAssigns, doUsefulWord))
-            code,isAns,ansAssigns,doUsefulWord = "", True, [], ""
-          state.startLine = True
-          isAnsAssign = False
-          doLineExpand = True
+          if token.type == ';':
+            if notEmpty and isUsefulWord:
+              bufs.append((isAns, code[:-1], ansAssigns, doUsefulWord))
+              code,isAns,ansAssigns,doUsefulWord = "", True, [], ""
+            state.startLine = True
+            isAnsAssign = False
+            doLineExpand = True
+            notEmpty = False
+          else:
+            notEmpty = True
         elif token.type not in (',', "NAME"):
           state.startLine = False
+          notEmpty = True
+        elif not state.store:
+          state.lastName = token.value
+          notEmpty = True
+        else:
+          notEmpty = True
     if state.store:
       code += Calculator.__inCls._processStore(state)
-    if code:
+    if code and notEmpty:
       bufs.append((isAns, code, ansAssigns, doUsefulWord))
-    out = []
-    for buf in bufs:
-      if buf[3]: # doUsefulWord - run lex again
-        if Lib._isVerbose():
-          sys.stdout.write("LOG: " +buf[1] +'\n')
-        self.__processExec(self.__parseUsefulWord(*buf))  # Ignore the ans
-        Calculator.__saveVar = None
-      else:
-        out.append(buf[:3])
-    return out
+    return bufs
 
   def __getInput(self, runExec):
     """Tokenise the line with ply.lex and partially parse it to change basis
@@ -963,10 +998,16 @@ class Calculator:
           anyAns,anyAssign = False,False
           assignAns = []
           for buf in bufs:
-            if Lib._isVerbose():
-              sys.stdout.write("LOG: " +buf[1] +'\n')
-            assignAns.append(ans)
-            tmpAns = self.__processExec(buf[:2])
+            if buf[3]: # doUsefulWord - run lex again
+              if Lib._isVerbose():
+                sys.stdout.write("LOG: " +buf[1] +'\n')
+              tmpAns = self.__processExec(self.__parseUsefulWord(*buf))
+              Calculator.__saveVar = None
+            else:
+              if Lib._isVerbose():
+                sys.stdout.write("LOG: " +buf[1] +'\n')
+              assignAns.append(ans)
+              tmpAns = self.__processExec(buf[:2])
             if buf[2]:
               anyAssign = True
             if buf[0]:   # isAns
@@ -1022,7 +1063,7 @@ class Calculator:
         "PIP: ply not installed - no parsing of basis numbers")
       for line in outLines[:3]:
         sys.stderr.write(line +'\n')
-      if not readline:
+      if not readline and sys.platform != "win32":
         sys.stderr.write(outLines[3] +'\n')
       if not ply_lex:
         sys.stderr.write(outLines[4] +'\n')
@@ -1036,12 +1077,12 @@ class Real(float):
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
   def __float__(self):
-    return float(self)
+    return super(self)
   def __int__(self):
     return trunc(self)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
-    return Lib.getResolNum(self)
+    return Lib.getResolNum(float.__float__(self))
   def __repr__(self):
     """Overwrite object output using __str__ for print if !verbose."""
     if Lib._isVerbose():
@@ -1197,10 +1238,10 @@ if __name__ == '__main__':
     """# Test 4 Euler 15-D Matrix is inverse of Euler.matrix.
        test=Matrix(list((x *0.01 for x in range(1,106))))
        store=Euler.Matrix(Euler(*test).matrix())
-       Lib.precision(1.5E-10)
+       Lib.precision(1.5E-9)
        Calculator.log(Matrix(store) == test, store)""",
     """# Test 5 Tensor.diag gives the trace
-       n=6; store = sum(Tensor.Diag(range(1,n+1)).diag()); test = n*(n+1)/2
+       n=6; store = sum(Tensor.Diag(list(range(1,n+1))).diag()); test=n*(n+1)/2
        Calculator.log(store == test, store)""",
     """# Test 6 Tensor.diag(vector) gives the dot product
        v=Tensor(1,2,3,4,5,6); store=sum(v.diag(v)); test=sum((x*x for x in v))

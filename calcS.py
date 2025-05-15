@@ -23,7 +23,7 @@
 ## checking matrix rotations. See default.sym.
 ## Start with either calcS.py, python calcS.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.1"
+__version__ = "0.2"
 import sys, math
 import keyword
 from calcLib import *
@@ -79,8 +79,11 @@ class P(list):
         rhs = "+"
       elif rhs == "-1":
         rhs = "-"
+      elif isinstance(rhs, Lib._basestr):
+        if rhs[0] != "-":
+          rhs = "+" +rhs
       elif rhs >= 0:
-        rhs = "+" +rhs
+        rhs = "+" +str(rhs)
       out = "%s%s*o%d" %(lhs, rhs, self[0])
     return out
   def __repr__(self):
@@ -90,7 +93,7 @@ class P(list):
   def __mul__(self, p):
     """Product n => (a,b)(c,d) = (ac-d*b, da+bc*) for conjugate level n-1."""
     Lib._checkType(p, P, "mul")
-    print(repr(self), "*", repr(p))
+    #print(repr(self), "*", repr(p))
     n = self[0]
     if n != p[0]:
       raise Exception("Invalid P to multiply: %s * %s" %(self, p))
@@ -155,27 +158,82 @@ class P(list):
     return basis
 
   @staticmethod
-  def Multiply(dim, digits=False):
-    """Multiply(dim, [digits,rep])
-       Return product of (A+Bo1+Co2+..)(a+bo1+co2+...) or A1... if digits."""
-    b = P.Basis(dim)
+  def Base(dim, name, el=0):
+    """Base(dim, name, el=0)
+       Return P for basis product all basis as A?0+A?o#.... (or A?o_el) where
+       ?=0/1...(dim times) with o#=basis n-index position if 1."""
+    Lib._checkType(dim, int, "Base")
+    Lib._checkType(el, int, "Base")
+    bas = ["o0"] + P.Basis(dim)
     n = int(pow(2,dim))
-    x = [0] *n
-    y = [0] *n
-    if dim > 4:
-      digits = True
-    if digits:
+    buf = [0] *n
+    if el:
+      find = "o%d" %abs(el)
+      if find not in bas:
+        raise Exception("Invalid index %d for dim" %el)
+    minus = (el < 0)
+    for idx,pos in enumerate(bas):
+      if not el or pos == find:
+        tmp = idx
+        ss = ""
+        cnt = n
+        while cnt > 1:
+          cnt //= 2
+          ss = ("1" if tmp >= cnt else "0") +ss
+          tmp %= cnt
+        buf[idx] = S(name +ss, isMinus=minus)
+      else:
+        buf[idx] = S(0)
+    return P(dim, buf)
+
+  @staticmethod
+  def Multiply(dim, alpha=0):
+    """Multiply(dim, [alpha])
+       Return product of A*B using P.Base else for alpha=1/2 return
+       (A1+A2o1+...)*(a1+a2o1+...) or (A+Bo1+Co2+...)*(a+bo1+co2+...)."""
+    Lib._checkType(dim, int, "Multiply")
+    Lib._checkType(alpha, int, "Multiply")
+    if dim > 5:
+      alpha = 0
+    elif dim > 4:
+      alpha = 1
+    if alpha == 0:
+      a = P.Base(dim, "A")
+      b = P.Base(dim, "B")
+      return "%s * %s = %s" %(a, b, a *b)
+    n = int(pow(2,dim))
+    if alpha == 1:
       for idx in range(n//2):
-        x[idx*2] = S(chr(idx +65)+"1")
-        x[idx*2 +1] = S(chr(idx +65)+"2")
-        y[idx*2] = S(chr(idx +97)+"1")
-        y[idx*2 +1] = S(chr(idx +97)+"2")
+        buf[0][idx*2] = S(chr(idx +65)+"1")
+        buf[0][idx*2 +1] = S(chr(idx +65)+"2")
+        buf[1][idx*2] = S(chr(idx +97)+"1")
+        buf[1][idx*2 +1] = S(chr(idx +97)+"2")
     else:
       for idx in range(n):
-        x[idx] = S(chr(idx +65))
-        y[idx] = S(chr(idx +97))
-    print("%s * %s =" %(P(dim,x), P(dim,y)))
-    return P(dim,x)*P(dim,y)
+        buf[0][idx] = S(chr(idx +65))
+        buf[1][idx] = S(chr(idx +97))
+    return "%s * %s = %s" %(P(dim, buf[0]), P(dim, buf[1]),
+                            P(dim, buf[0]) *P(dim, buf[1]))
+
+  @staticmethod
+  def Mult(dim, a, b):
+    """Mult(dim, a, b)
+       Return basis product o_a * o_b as (a?)(b?)o#. See Multiply."""
+    Lib._checkType(dim, int, "Mult")
+    Lib._checkType(a, int, "Mult")
+    Lib._checkType(b, int, "Mult")
+    a = P.Base(dim, "A", a)
+    b = P.Base(dim, "B", b)
+    return "%s * %s = %s" %(a, b, a *b)
+
+  @staticmethod
+  def Conj(dim, a):
+    """Conj(dim, a)
+       Return conjugate of basis product o_a. See Multiply."""
+    Lib._checkType(dim, int, "Conj")
+    Lib._checkType(a, int, "Conj")
+    a = P.Base(dim, "A", a)
+    return a.__conj(dim)
 
 ################################################################################
 class S():
@@ -200,7 +258,7 @@ class S():
   def __str__(self):
     """Overload string output."""
     tmp = self.__eval()
-    sStr = self.__value if tmp is None else tmp
+    sStr = str(self.__value if tmp is None else tmp)
     if self.__isMinus:
       if sStr.find('+') > 0 or sStr[1:].find('-') > 0:
         sStr = "(%s)" %self.__value
@@ -530,7 +588,7 @@ class S():
         else:
           signTyp = scale[0] 
           scale = scale[1:]
-      if isAttribute:
+      if isAttribute or state.lastName in ("for", "lambda"):
         line += "%s" %val
       elif isText:
         line += signTyp +"%sS('%s',locals()).val()%s" %(scale, val, excess)
@@ -556,7 +614,20 @@ if __name__ == '__main__':
 
   from math import *
   from calcR import Calculator
-  calc = Calculator(S)
+
+  # P & S Unit test cases for Calc with Tests[0] being init for each case
+  # Work in progress TBD
+  Tests = [\
+    """""",
+    """# Test 1 Check both P expansions.
+       test = P.Mult(1,0,0); store = P.Multiply(1)
+       Calculator.log(store == test, store)""",
+    """# Test 2 Check P conjugation
+       test = str(P.Conj(2,12)); store = \"-0*o1+(-0-A11*o1)*o2\"
+       Calculator.log(store == test, store)""",
+    ]
+
+  calc = Calculator(S, Tests)
   S._setWordLists(Calculator)
   calc.processInput(sys.argv)
 ###############################################################################

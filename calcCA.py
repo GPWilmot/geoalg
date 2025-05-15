@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.3"
+__version__ = "0.4"
 import math
 from calcLib import *
 
@@ -214,49 +214,50 @@ class CA():
   @staticmethod
   def _init(key, value, entered0):
     """Return the Grade for basis string key and value +/-1."""
-    typ = None
     lGrade = CA.Grade(value, ("", ""))  # Base for e and i, resp
     rBases = ["", ""]
     typ = None
-    lastChar = '0'
+    digit = False
+    lastChar = ['', '']
     for char in key:
       offset = int(typ == CA.__BASIS_CHARS[1]) # i
       if typ and char.isdigit():
-        if char <= lastChar:
+        if char <= lastChar[offset]:
           lGrade = lGrade.mergeBasis(1, rBases)
           rBases = ["", ""]
           if char == '0':   # Store e0,i0 as i1,e1 and remember for printing
             entered0 |= (offset +1)
             offset = 1 -offset
             char = '1'
-            rBases[offset] = char
-            lGrade = lGrade.mergeBasis(1, rBases)
-            rBases = ["", ""]
-          else:
-            if char == '1': # Reset remembering
-              entered0 &= (offset +1)
-            rBases[offset] += char
+            lGrade = lGrade.mergeBasis(1, lastChar[offset])
+          elif char == '1': # Reset remembering
+            entered0 &= (offset +1)
         else:
-          rBases[offset] += char
-        lastChar = char
-        if char > CA.__maxBasis[offset]:
-          CA.__maxBasis[offset] = char
+          lastChar[offset] = char
+          if char > CA.__maxBasis[offset]:
+            CA.__maxBasis[offset] = char
+        rBases[offset] += char
+        digit = True
       elif typ and char in CA.__HEX_CHARS:
-        if char <= lastChar:
+        if char <= lastChar[offset]:
           lGrade = lGrade.mergeBasis(1, rBases)
           rBases = ["", ""]
+        else:
+          lastChar[offset] = char
+          if char > CA.__maxBasis[offset]:
+            CA.__maxBasis[offset] = char
         rBases[offset] += char
-        lastChar = char
-        if char > CA.__maxBasis[offset]:
-          CA.__maxBasis[offset] = char
+        digit = True
       elif char in CA.__BASIS_CHARS:
         if rBases[0] +rBases[1]:
           lGrade = lGrade.mergeBasis(1, rBases)
           rBases = ["", ""]
         typ = char
-        lastChar = '0'
+        digit = False
       else:
         raise Exception("Invalid basis: %s" %key)
+    if typ and not digit:
+      raise Exception("Invalid last basis: %s" %key)
     return lGrade.mergeBasis(1, rBases), entered0
 
   def __float__(self):
@@ -439,9 +440,11 @@ class CA():
       if not self.__g:
         if not oper(self.w, cf):
           res = False
-      for g in self.__g:
-        if not oper(g.value, cf):
-          res = False
+      if res:
+        for g in self.__g:
+          if not oper(g.value, 0.0):
+            res = False
+            break
       return res
     elif not isinstance(cf, CA):
       raise Exception("Invalid comparison for O: %s" %type(cf))
