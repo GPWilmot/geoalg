@@ -1,0 +1,717 @@
+# File: ultronions.oct
+# Build all zero divisors and Cayley-Dickson algebra structure
+
+_ultronions = """Module contains class Cawagas, variables:
+   ao7, AO7, b07, co7, BO7, so7, SO7, s15, S15, CyclesPattern, ABCXeg, CyclesModes
+ and functions:
+   nonAssocType, nonAssocModeType, cycles, cyclesType, nonAssocMode, nonAssocModeCounts,
+   nonAssocMalcev, nonAssocLine, nonAssocCube, triadCycles3, triadCycles, triadCyclesModes,
+   decimateModes, triadCyclesSA, triadSA, triadsZD, triadFind."""
+
+O.Basis(5)  # Cawagas uses o1-o4 & CABCXeg uses o5
+
+# CA: Tensor.Triads(*(S4/12/14).spin(f7Basis))~Tensor.Table(triadSA(t4/12/14))
+# S4 = e123 -e145 +e167 -e246 -e257 -e347 +e356,   t4 = CP4[0][0]
+# S12 = -e123 +e145 +e167 -e246 -e257 +e347 -e356, t12 = CP5[1][0]
+# S14 = e123 +e145 +e167 +e246 -e257 -e347 +e356,  t14 = CP6[3][0]
+
+# With Cayley Dickson Rule set the same as Wikipedia (default)
+# Octonians = AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3), ao7) where
+ao7 = ("e1", "e2", "e3", "e4", "e5", "e6", "e7")
+
+# found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(AO7),ao7,num=-1)
+AO7 = Tensor(
+      ("-1", "e3", "-e2", "e5", "-e4", "-e7", "e6"),
+      ("-e3", "-1", "e1", "e6", "e7", "-e4", "-e5"),
+      ("e2", "-e1", "-1", "e7", "-e6", "e5", "-e4"),
+      ("-e5", "-e6", "-e7", "-1", "e1", "e2", "e3"),
+      ("e4", "-e7", "e6", "-e1", "-1", "-e3", "e2"),
+      ("e7", "e4", "-e5", "-e2", "e3", "-1", "-e1"),
+      ("-e6", "e5", "e4", "-e3", "-e2", "e1", "-1"))
+
+# The Baez Octonion representation: BO7 = Tensor.Table(bo7).morph(bo7,ao7) where
+# bo7 found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(BO7),ao7,num=-1)
+# With Baez rule set via O.CayleyDicksonRule(True) then search finds
+# co7 permutation so that Tensor.Table(co7).morph(co7,ao7)==BO7 under Baez rule.
+# NB: ao7 maps to O.Basis(3) directly whereas both bo7 and co7 are dis-ordered.
+bo7 = Tensor(O.Basis(3)).permute([1, 2, 4, 3, 7, 5, -6], invert=True)
+co7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
+BO7 = Tensor(
+      ("-1", "e4", "e7", "-e2", "e6", "-e5", "-e3"),
+      ("-e4", "-1", "e5", "e1", "-e3", "e7", "-e6"),
+      ("-e7", "-e5", "-1", "e6", "e2", "-e4", "e1"),
+      ("e2", "-e1", "-e6", "-1", "e7", "e3", "-e5"),
+      ("-e6", "e3", "-e2", "-e7", "-1", "e1", "e4"),
+      ("e5", "-e7", "e4", "-e3", "-e1", "-1", "e2"),
+      ("e3", "e6", "-e1", "e5", "-e4", "-e2", "-1"))
+
+# Split Octonions from Wiki = Tensor(SO7).dump(so7)
+so7 = ("i",  "j",   "k",   "l",   "li", "lj",  "lk")
+SO7 = Tensor(
+     ("-1", "k",  "-j",  "-li", "l",  "-lk", "lj"),
+     ("-k", "-1",  "i",   "-lj", "lk", "l",   "-li"),
+     ("j",  "-i",  "-1",  "-lk", "-lj","li",  "l"),
+     ("li", "lj",  "lk",  "1",   "i",  "j",   "k"),
+     ("-l", "-lk", "lj",  "-i",  "1",  "k",   "-j"),
+     ("lk", "-l",  "-li", "-j",  "-k", "1",   "i"),
+     ("-lj", "li", "-l",  "-k",  "j",  "-i",  "1"))
+# Tensor.Table(O.Basis(2,1)).search(O.Basis(2,1),Tensor(SO7),so7,num=-1)
+# First match=[-1, 2, 3, 4, -5, 6, 7] -> Tensor.Table(so21).morph(so21,so7)==SO7 if
+so21 = Tensor(O.Basis(2,1)).permute([1, 2, 3, -4, 5, 6, 7], invert=True)
+# Tensor.Table(O.Basis(1,2)).search(O.Basis(1,2),Tensor(SO7),so7,cycles=False,num=-1)
+# First match=[1, -4, -5, 6, 7, 2, 3] -> Tensor.Table(so12).morph(so12,so7)==SO7 if
+so12 = Tensor(O.Basis(1,2)).permute([-1, 4, 5, 6, 7, 2, 3], invert=True)
+# Tensor.Table(O.Basis(0,3)).search(O.Basis(0,3),Tensor(SO7),so7,cycles=False,num=-1)
+# First match=[-4, 5, 1, 6, 2, -3, 7] -> Tensor.Table(so03).morph(so03,so7)==SO7 if
+so03 = Tensor(O.Basis(0,3)).permute([-4, 5, 1, 6, 2, -3, 7], invert=True)
+
+# Sedenions from Wikipedia (= Cawagas)
+# Tensor.Table(O.Basis(4)).morph(O.Basis(4), s15)==S15
+s15=("e1","e2","e3","e4","e5","e6","e7","e8","e9","e10","e11","e12","e13","e14","e15")
+_S15 = "Sedenions from Wikipedia (= Cawagas)"
+S15 = Tensor(
+  ("-1",  "e3",  "-e2", "e5",  "-e4", "-e7", "e6",  "e9", "-e8", "-e11","e10", "-e13","e12", "e15","-e14"),
+  ("-e3", "-1",  "e1",  "e6",  "e7",  "-e4", "-e5", "e10","e11", "-e8", "-e9", "-e14","-e15","e12","e13"),
+  ("e2",  "-e1", "-1",  "e7",  "-e6", "e5",  "-e4", "e11","-e10","e9",  "-e8", "-e15","e14","-e13","e12"),
+  ("-e5", "-e6", "-e7", "-1",  "e1",  "e2",  "e3",  "e12","e13", "e14", "e15", "-e8","-e9", "-e10","-e11"),
+  ("e4",  "-e7", "e6",  "-e1", "-1",  "-e3", "e2",  "e13","-e12","e15", "-e14","e9", "-e8", "e11", "-e10"),
+  ("e7",  "e4",  "-e5", "-e2", "e3",  "-1",  "-e1", "e14","-e15","-e12","e13", "e10","-e11","-e8", "e9"),
+  ("-e6", "e5",  "e4",  "-e3", "-e2", "e1",  "-1",  "e15","e14", "-e13","-e12","e11","e10", "-e9", "-e8"),
+  ("-e9", "-e10","-e11","-e12","-e13","-e14","-e15","-1", "e1",  "e2",  "e3",  "e4", "e5",  "e6",  "e7"),
+  ("e8",  "-e11","e10", "-e13","e12", "e15", "-e14","-e1","-1",  "-e3", "e2",  "-e5","e4",  "e7",  "-e6"),
+  ("e11", "e8",  "-e9", "-e14","-e15","e12", "e13", "-e2","e3",  "-1",  "-e1", "-e6","-e7", "e4",  "e5"),
+  ("-e10","e9",  "e8",  "-e15","e14", "-e13","e12", "-e3","-e2", "e1",  "-1",  "-e7","e6",  "-e5", "e4"),
+  ("e13", "e14", "e15", "e8",  "-e9", "-e10","-e11","-e4","e5",  "e6",  "e7",  "-1", "-e1", "-e2", "-e3"),
+  ("-e12","e15", "-e14","e9",  "e8",  "e11", "-e10","-e5","-e4", "e7",  "-e6", "e1", "-1",  "e3",  "-e2"),
+  ("-e15","-e12","e13", "e10", "-e11","e8",  "e9",  "-e6","-e7", "-e4", "e5",  "e2", "-e3", "-1",  "e1"),
+  ("e14", "-e13","-e12","e11", "e10", "-e9", "e8",  "-e7","e6",  "-e5", "-e4", "e3", "e2",  "-e1", "-1"))
+
+class Cawagas():
+  """for x in Cawagas().deriveZDs(): print((x[0]+x[1])*(x[2]+x[3]))"""
+  # Cawagas Sedenion zero divisors
+  #       0     1     2      3     4      5      6
+  #       1     2     3     12    13     14     15
+  ZD1 = (o1,   o2,  -o12,  o234, o1234, o34,   o134)
+  ZD2 = (o1,   o23,  o123, o134, o34,  -o124,  o24)
+  ZD3 = (o1,   o13,  o3,   o24, -o124,  o1234, o234)
+  ZD4 = (o2,   o23,  o3,   o1234,o134,  o14,  -o124)
+  ZD5 = (o2,   o123, o13, -o124, o14,   o34,   o234)
+  ZD6 = (-o12, o23,  o13,  o34, o1234,  o24,   o14)
+  ZD7 = (-o12, o3,   o123, o14, o24,    o134,  o234)
+
+  def _deriveZDs(self, *x):
+    """Used by deriveZDs."""
+    out = x[5]
+    for y in x[1:3]:
+      a,b,c,d = x[4] *(-1 if x[0][1]=="-" else 1),\
+                x[3], x[1], x[2] *(-1 if x[0][0]=="-" else 1)
+      out.append((a,b,c,d))
+      return
+    for y in x[3:5]:
+      a,b,c,d = x[2] *(-1 if x[0][0]=="-" else 1),\
+                x[1], x[3], x[4] *(-1 if x[0][0]=="-" else 1)
+      out.append((a,b,c,d))
+
+  def deriveZDs(self):
+    """deriveZDs()
+       Return sedenion zero divisors list (a,b,c,d) equivalent to Cawagas."""
+    out = []
+    for x in (self.ZD1, self.ZD2, self.ZD3,self.ZD4,self.ZD5,self.ZD6,self.ZD7):
+      self._deriveZDs("+-", x[0], x[4], x[1], x[5], out,0)
+      self._deriveZDs("++", x[0], x[5], x[1], x[4], out,1)
+      self._deriveZDs("--", x[0], x[3], x[1], x[6], out,2)
+      self._deriveZDs("-+", x[0], x[6], x[1], x[3], out,3)
+      self._deriveZDs("-+", x[1], x[5], x[2], x[6], out,4)
+      self._deriveZDs("+-", x[1], x[4], x[2], x[3], out,5)
+      self._deriveZDs("--", x[1], x[6], x[2], x[5], out,6)
+      self._deriveZDs("++", x[1], x[3], x[2], x[4], out,7)
+      self._deriveZDs("+-", x[2], x[6], x[0], x[4], out,8)
+      self._deriveZDs("--", x[2], x[3], x[0], x[5], out,9)
+      self._deriveZDs("-+", x[2], x[5], x[0], x[3], out,10)
+      self._deriveZDs("++", x[2], x[4], x[0], x[6], out,11)
+    return out
+
+def nonAssocType(bc, d=O(0)):
+  """nonAssocType(bc, [d])
+     Return character from "ABCXs." for triad with ABC: abc non-associativity,
+     X: completely non-associative,  s:scalar, .: repeated elements. bc is one
+     of the lists (a,b,c,d), (b,c,d) or (b,c). d is ignored in the first two
+     cases and a=b*c*d in the last two."""
+  Lib._checkList(bc, O, "nonAssocType", (2,4))
+  Lib._checkType(d, O, "nonAssocType")
+  if len(bc) == 4:
+    a,b,c,d = bc
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  return b.nonAssocType(c, d)
+
+def nonAssocModeType(bc, d=O(0)):
+  """nonAssocModeType(bc, d=O(0))
+     Return nonAssocType for (a+b)(c+d),(-d+b)(c+a),(a'+b)(c+db),(-db+b)(c+a')
+     where a=b*c*d, db=d*b and a'=a*b*db as "p?d?e?b?". This is Primary, Dual,
+     Extended and Both which is extended dual. bc is one of the lists (a,b,c,d),
+     (b,c,d) or (b,c). d ignored in the first cases and a=b*c*d if missing."""
+  Lib._checkList(bc, O, "nonAssocModeType", (2,4))
+  Lib._checkType(d, O, "nonAssocModeType")
+  if len(bc) == 4:
+    a,b,c,d = bc
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  return b.nonAssocModeType(c, d)
+
+def cycles(bc, d=O(0)):
+  Lib._checkList(bc, O, "cycles", (2,4))
+  Lib._checkType(d, O, "cycles")
+  if len(bc) == 4:
+    a,b,c,d = bc
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  out = b.cycles(c)
+  if d:
+    return list(list(x) +[d] for x in out)
+  return out
+
+def cyclesType(bc, d=O(0)):
+  Lib._checkList(bc, O, "cyclesType", (2,4))
+  Lib._checkType(d, O, "cyclesType")
+  if len(bc) == 4:
+    a,b,c,d = bc
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  return b.cyclesType(c,d)
+
+def nonAssocMode(bc, d=O(0), mode=0):
+  """nonAssocMode(bc, [d=O(0), mode=0])
+     Return b',c',d' for (b,c,d),(b,c,a),(b,c,db),(b,c,a') where a=b*c*d, db=d*b
+     and a'=b*c*db which are Prim, Dual, Extended or Both for mode=0,1,2,3. bc
+     is one of the lists (a,b,c,d), (b,c,d) or (b,c). d is ignored in the first
+     cases and a=b*c*d. Return (a',b',c',d') ZD ordered if mode+=4."""
+  Lib._checkList(bc, O, "nonAssocMode", (2,4))
+  Lib._checkType(d, O, "nonAssocMode")
+  if len(bc) == 4:
+    a,b,c,d = bc  # ignore a
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  return b.nonAssocMode(c, d, mode)
+
+def nonAssocModeCounts(bc, dLine=[], noCnt=False):
+  """nonAssocModeCounts(bc, dLine, [noCnt])
+     Return the types[cnt] for each mode as Figures a=(X,A), b, c, d=dual."""
+  Lib._checkList(bc, O, "nonAssocModeCounts", (2,4))
+  Lib._checkList(dLine, O, "nonAssocModeCounts")
+  if len(bc) == 4:
+    a,b,c,d = bc
+    dLine = [d]
+  elif len(bc) == 3:
+    b,c,d = bc
+    dLine = [d]
+  else:
+    b,c = bc[0],bc[1]
+  pair = (b, c)
+  match = {"AAA" :0, "XXX" :1, "AXX": 2, "XAA" :3,
+           "CBC" :4, "CCB" :5, "BCB" :6, "BBC" :7}
+  means = ["Ad", "Xd", "Aa", "Xa", "Bb", "Bc", "Cb", "Cc"]
+  accum = [0]*10
+  for typ in (nonAssocType(nonAssocMode(pair,d,1)) \
+             +nonAssocType(nonAssocMode(pair,d,2)) \
+             +nonAssocType(nonAssocMode(pair,d,3)) for d in dLine):
+    accum[match[typ]] += 1
+  if noCnt:
+    return "".join(means[x] for x,y in enumerate(accum) if y)
+  return "".join(means[x] +str(y) for x,y in enumerate(accum) if y)
+
+def nonAssocMalcev(bc, d=O(0)):
+  """nonAssocMalcev(bc, [d])
+     Lower case type if not Malcev. Used in nonAssocLine and nonAssocCube."""
+  Lib._checkList(bc, O, "nonAssocMalcev", (2,4))
+  Lib._checkType(d, O, "nonAssocMalcev")
+  if len(bc) == 4:
+    a,b,c,d = bc  # ignore a
+  else:
+    b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
+  tmp = nonAssocType(bc,d)
+  if b.malcev(c, d) == 0:
+    if tmp == ".":
+      tmp = "@"
+    elif tmp == "s":
+      tmp = "S"
+    return tmp
+  return tmp.lower()
+
+def nonAssocLine(bc, dLine, triadFn=nonAssocType):
+  """nonAssocLine(bc,dLine,[triadFn=nonAssocType])
+     Return triadFn(bc,d) for d in dLine. Can use triadFn=nonAssoc[Mode]Type."""
+  Lib._checkList(bc, O, "nonAssocLine", 2)
+  Lib._checkType(dLine, (list, tuple), "nonAssocLine")
+  return list(triadFn(bc, d) for d in dLine)
+
+def nonAssocCube(pDim, nDim=0, triadFn=nonAssocType, all=True):
+  """nonAssocCube(pDim,[nDim=0,triadFn=nonAssocType,all=False])
+     Return triadFn(...) for unique triples, unordered if all."""
+  Lib._checkType(pDim, int, "nonAssocCube", (1,0))
+  Lib._checkType(nDim, int, "nonAssocCube", (1,0))
+  Lib._checkType(all, bool, "nonAssocCube")
+  size1 = int(pow(2,(pDim +nDim))-1); lr = size1 #?
+  size2 = size1 *size1 #(size1 -1)
+  out = [None] *size2
+  for b in range(size2):
+    out[b] = ['0'] *size1
+    rng = O.Basis(pDim, nDim)
+    c0 = 0 if all else b +1
+    for c in range(c0, lr):
+      bb,cc = rng[b], rng[c]
+      d0 = 0 if all else c +1
+      for d in range(d0, lr):
+        dd = rng[d]
+        out[b *size1 +c][d] = triadFn((bb, cc), dd)
+  return out
+
+# CyclesPattern covers all cyclesType() patterns as well as non-cycle triads.
+# Non AB triads need other modes using nonAssocModesTypes() for zero divisors.
+CyclesPattern = {0: "AAA", 1: "BBA", 2: "ACC", 3: "XBB",
+                 4: "BXC", 5: "CAB", 6: "CCX", 7: "XXX",
+                 8: "A"}
+
+ABCXeg = ((o1, o24, o45), (o1, o24, o345), (o1, o24, o34), (o1, o24, o5))
+
+# Map CyclesPattern to nonAssocModeType for cycles() then take indicies.
+CyclesModes = {0: ('pAdAeAbA','pAdAeAbA','pAdAeAbA'), 1: ('pBeB','pBeB','pAdA'),
+               2: ('pAdA', 'dBeB', 'dBeB'),         3: ('eAbA', 'pBbB', 'pBbB'),
+               4: ('pBbB','eAbA','dBbB'),           5: ('dBeB','pAdA','pBeB'),
+               6: ('dBbB','dBbB','eAbA'),           7: ('', '', ''),
+               8: ('pAdAeAbA',)}
+_CyclesIn  = ((2,1,3), (2,), (1,), (1,), (3,), (3,), (2,), (2,1,3), (0,))
+_CyclesOut = (((0,2,1,3),(0,2,1,3),(0,2,1,3)), ((0,2),(0,2),(0,1)),
+             ((0,1),(1,2),(1,2)),             ((2,3),(0,3),(0,3)),
+             ((0,3),(2,3),(1,3)),             ((1,2),(0,1),(0,2)),
+             ((1,3),(1,3),(2,3)),             ((),(),()),
+             ((0,),))
+
+def triadCycles3(dim, dump=False):
+  """triadCycles3(dim, [dump])
+     Return Lib.allTriads() as the first cycles (b,c) and 3 lists of ds for
+     each pair. These have the same length but the first includes non-cycles."""
+  Lib._checkType(dim, int, "triadCycles", (1,3))
+  Lib._checkType(dump, bool, "triadCycles")
+  return _triadCycles3(O.Basis(dim), dump)
+
+def _triadCycles3(bas, dump=False):
+  pairs = {}
+  for pair,dList in Lib.triadDump(Lib.allTriads(bas, dump), bas, True, dump):
+    b,c = pair
+    tri = b.cycles(c)
+    if tri[0] not in pairs:
+      pairs[tri[0]] = [[], [], []]
+    pairs[tri[0]][tri.index((b,c))].extend(dList)
+  return pairs
+
+def triadCycles(dim, unpaired=False, dump=False):
+  """triadCycles(dim, [unpaired,dump])
+     Return non-associative cycles organised by 3 Triad Cycles, ie a list of
+            AAA, BBA, ACC, XBB, BXC, CAB, CCX, XXX, A.
+     These are patterns listed via the first cycles pair from triadCycles() with
+     non-cycle singles added to the last column which have d<bc. Associative
+     triads with d=bc are discarded. Use triadsZD() to generate zero-divisors.
+     If paired is set, return PairList lists of (b,c)(ds...) pairs. Use
+     Lib.expandPairList() to return pairs to cycles or use dict() to turn each
+     index into a dictionary. triadCyclesModes() returns the decimateModes
+     PairList and the aggreage of patterns for each cycle."""
+  Lib._checkType(dim, int, "cyclesPattern", (1,0))
+  Lib._checkType(unpaired, bool, "cyclesPattern")
+  Lib._checkType(dump, bool, "cyclesPattern")
+  cycPatTypes = dict(list((CyclesPattern[x],x) for x in CyclesPattern))
+  pairs = _triadCycles3(O.Basis(dim), dump)
+  cnt = 0
+  fstep = Lib.comb(int(pow(2, dim)), 2) /100
+  step = max(100, int(fstep) if fstep < sys.maxsize else sys.maxsize)
+  out = [[], [], [], [], [], [], [], [], []]
+  checkList = {}
+  singles = []
+  for pair,dss in pairs.items():
+    b0,c0 = pair
+    bc = abs(b0 *c0)
+    dods = dss[1]
+    vals = [[], [], [], [], [], [], [], [], []]
+    for d0 in dss[0]:
+      if d0 > bc:       # Skip non-cycles & associatives
+        cycTyp = b0.cyclesType(c0, d0)
+        vals[cycPatTypes[cycTyp]].append(d0)
+      elif d0 < bc:     # Skip associatives
+        vals[8].append(d0)
+    for idx,val in enumerate(vals):
+      if val:
+        out[idx].append(((b0, c0), val))
+    if dump:
+      cnt += 1
+      if Lib._checkMem(cnt, step):
+        break
+  if unpaired:
+    for idx in range(9):
+      out[idx] = list(Lib.expandPairList(out[idx]))
+  if dump:
+    Lib.checkMem(cnt, finish=True)
+  return out
+
+def triadCyclesModes(dim, dump=False, limit=0):
+  """triadCyclesModes(dim, [dump,limit])
+     Returns (patterns, order) where patterns are the same as triadCycles()
+     but decimated, ie a decimateModes PairList for all patterns
+            AAA, BBA, ACC, XBB, BXC, CAB, CCX, XXX, A.
+     These are patterns listed via the first cycles pair from triadCycles() with
+     non-cycle singles added to the last column which have d<bc. Associative 
+     triads with d=bc are discarded. Use triadsZD() to generate zero-divisors
+     with decimated parameter set True. Order is a dictionary of groups of
+     patterns for the cycles with the list of cycle pairs that include this
+     pattern along with the modes that were decimated. Each patterns index
+     and singles can be turned into triads using Lib.expandPairList() or use
+     dict() to turn into a dictionary. Limit stops patterns(2) or order(1)."""
+  Lib._checkType(dim, int, "cyclesPattern", (1,0))
+  Lib._checkType(dump, bool, "cyclesPattern")
+  cycPatTypes = dict(list((CyclesPattern[x],x) for x in CyclesPattern))
+  pairs = _triadCycles3(O.Basis(dim), dump)
+  cnt = 0
+  fstep = Lib.comb(int(pow(2, dim)), 2) /100
+  step = max(100, int(fstep) if fstep < sys.maxsize else sys.maxsize)
+  out = [[], [], [], [], [], [], [], [], []] if limit != 2 else []
+  orderList = {}
+  for pair,dss in pairs.items():
+    b0,c0 = pair
+    bc = abs(b0 *c0)
+    vals = [[], [], [], [], [], [], [], [], []]
+    if dss[1] != dss[2]:
+      raise Exception("Invalid cycles[2] lengths at %s" %(pair,))
+    else:
+      idx = 0
+      for d0 in dss[0]:
+        idx += 1
+        if d0 > bc:
+          cycTyp = b0.cyclesType(c0, d0)
+          vals[cycPatTypes[cycTyp]].append(d0)
+        elif d0 < bc:     # Non-cycles
+          vals[8].append(d0)
+        else:   # d0 == bc  End of non-assoc. when associative
+          if dss[0][idx:] != dss[1]:
+            raise Exception("Invalid cycles[0] lengths at %s" %(pair,))
+    order0 = set()
+    if limit != 2:
+      for idx,val in enumerate(vals):
+        if val:
+          modes = decimateModes((pair, val), idx)
+          if modes:
+            out[idx].append(((b0, c0), val))
+            cycTyp = CyclesPattern[idx]
+            for mode in modes:
+              order0.add(cycTyp +mode)
+    if limit != 1:
+      key = tuple(sorted(order0))
+      if key not in orderList:
+        orderList[key] = []
+      orderList[key].append(pair)
+    if dump:
+      cnt += 1
+      if Lib._checkMem(cnt, step):
+        break
+  if dump:
+    Lib.checkMem(cnt, finish=True)
+  return out,orderList
+
+def decimateModes(cycPair, patternIdx=0):
+  """decimateModes(pairList, [patternIdx=0])
+     Input a list of (b,c),(ds...) pairs and decimate the ds removing any Dual,
+     Extended or Both entries for any d assumed Prim. Returns the largest mode
+     indices for each ds that are zero divisors. The indices are 0123 for Prim,
+     Dual, Extended or Both, resp. which are subsets of CyclesModes (ie PDEB,
+     PE, PD, EB, PE, DE, DE, X, PDEB)."""
+  Lib._checkList(cycPair, (list, tuple), "decimateModes", 2)
+  if len(cycPair[0]) != 2:
+    raise Exception("Invalid cycPair for decimateModes")
+  b,c = cycPair[0]
+  dList = cycPair[1]
+  idx = 0
+  out = set()
+  while idx < len(dList):
+    d = dList[idx]
+    a = abs(b *c *d)
+    db = abs(d *b)
+    aa = abs(b *c *db)
+    bufd = [d, a, db, aa]
+    found = True
+    out0 = ""
+    for mode in _CyclesIn[patternIdx]:
+      if not mode:
+        if b.nonAssocType(c,d) != "B":
+          found = False
+        else:
+          out0 += '0'
+      elif bufd[mode] in dList[idx:]:
+        dList.remove(bufd[mode])
+        out0 += str(mode)
+      else:
+        if patternIdx in (0,1,7):
+          out0 += '0'
+        else:
+          found = False
+        break
+    if found:
+      idx += 1
+      if len(out0) > 0:
+        out.add(out0)
+    else:
+      dList.remove(d)
+  return out
+
+def triadCyclesSA(triCyc, full=False, silo=None):
+  """triadCyclesSA(triCyc, [full,silo])
+     Return dict of normed triads with generated algebra's non-assoc. count
+     as key "" and numbered keys are the silo number with the number of
+     occurances of any triad in the normed triad's ring if full. Otherwise
+     return the each sub-alg. pattern/item along with the first triad.
+     Item counts for silos times 3 + count for non-cycles[8] == 28 if
+     silo not set otherwise just use only one silo used. Use
+     "".join(sorted(nonAssocType(x) for x in Lib.comb(7,3,triadSA(triad))))
+     to see the identification for the triad for any sub-algebra(SA)."""
+  Lib._checkList(triCyc, (list, tuple), "traidCyclesSA", 9)
+  Lib._checkType(full, bool, "triadCyclesSA")
+  if silo is None:
+    silos = triCyc
+    silo = 0
+  else:
+    Lib._checkType(silo, int, "triadCyclesSA", (0,8))
+    silos = [triCyc[silo]]
+  pos = list(idx for idx in range(len(triCyc)) if triCyc[idx])[0]
+  if not triCyc[pos] or len(triCyc[pos][0]) != 2:
+    raise Exception("Need triCyc as pairList in traidCyclesSA")
+  out = {}
+  for idx,arr in enumerate(silos):
+    for pairs in arr:
+      pair,ds = pairs
+      all7 = []
+      for dx in ds:
+        if dx in all7:
+          tmp[idx +silo] += 1
+        else:
+          all7 = _triadSA(list(pair) +[dx])
+          triad = (all7[0], all7[1], all7[3])
+          if triad in out:
+            tmp = out[triad]
+            if idx in tmp:
+              tmp[idx +silo] += 1
+            else:
+              tmp[idx +silo] = 1
+          else:
+            sub = len(list(Lib.triadDump(O.AssocTriads(all7,True),all7)))
+            tmp = {"": sub, idx +silo: 1}
+            out[triad] = tmp
+  if full:
+    return out
+  out0 = {}
+  for x,y in out.items():
+    z = tuple(y.items())
+    if z in out0:
+      out0[z][1] += 1
+    else:
+      out0[z] = [x,1]
+  return out0
+
+def triadSA(triad, normed=False):
+  """triadSA(triad, [normed])
+     Return sorted algebra generated by triad (SA or Oct) or normed triad."""
+  Lib._checkList(triad, O, "triadSA", 3)
+  Lib._checkType(normed, bool, "triadSA")
+  out = _triadSA(triad)
+  if normed:
+    return (out[0], out[1], out[3])
+  return out
+
+SS = [[1, 7, 63, 413, 2583, 16905, 118251, 873901],
+     [1,  1,  42, 504,  4158, 30996, 229194, 1729728],
+     [1,  1,   1, 168,  3024, 34776, 332640, 2912616]]
+OO = [1, 8 , 50 , 310 , 2046, 14478 , 107950 , 831470]
+TT = [0, 15, 155, 1395, 11811, 97155, 788035, 6347715]
+
+def _triadSA(triad):
+  """Internal version of triadSA."""
+  b,c,d = triad
+  return sorted([b, c, d, abs(b *c), abs(b *d), abs(c *d), abs(b *c *d)])
+
+def triadsZD(cycPat, dump=False):
+  """triadsZD(cycPat, [dump])
+     Return the zero divisor triads derived from triadCycles[Modes]() output.
+     Handles triadCycles() paired or unpaired and the order component of
+     triadCyclesModes() is ignored and patterns are assumed decimated.
+     Lib.cycles() is recovered and if decimated nonAssocMode() is used
+     to recover all modes. For any triad find the sub-algebra ZDs with
+     m=triadSA(triad); list(Lib.triadDump(O.ZeroDivisors(m),m))."""
+  Lib._checkList(cycPat, (list, tuple, dict), "triadsZD", (2,0))
+  decimated = (len(cycPat) == 2)
+  triCyc = cycPat[0] if decimated else cycPat
+  Lib._checkList(triCyc, (list, tuple), "triadsZD", 9)
+  Lib._checkType(dump, bool, "triadsZD")
+  pos = list(idx for idx in range(len(triCyc)) if triCyc[idx])[0]
+  expand = len(triCyc[pos]) > 0 and len(triCyc[pos][0]) == 2
+  getTriadsFn = Lib.expandPairList if expand else lambda x: x
+  cycPatTypes = dict(list((CyclesPattern[x],x) for x in CyclesPattern))
+  if dump:
+    cnt = 0
+    step = max(5000, len(triCyc[pos]) * 5)
+  cycPatTypes = dict(list((CyclesPattern[x],x) for x in CyclesPattern))
+  out = set()
+  for idx,pats in enumerate(_CyclesOut):
+    for triad in getTriadsFn(triCyc[idx]):
+      b0,c0,d0 = triad
+      cycles = b0.cycles(c0)
+      if dump:
+        cnt += 1
+        if Lib._checkMem(cnt, step):
+          return out
+      if decimated:
+        for cyc,modes in enumerate(pats):
+          b1,c1 = cycles[cyc]
+          for pos,mode in enumerate(modes):
+            if mode == 0:
+              d1 = d0
+            else:
+              d1 = b1.nonAssocMode(c1, d0, mode)[2]
+            if nonAssocType((b1,c1,d1)) not in ('A','B'):
+              raise Exception("Invalid ZD at triCyc[%d][%s]"%(idx,(b1,c1,d1)))
+            uniTri = b1.nonAssocMode(c1, d1, mode=4)
+            out.add(uniTri[1:])
+      else:
+        for cyc,modes in enumerate(pats):
+          b1,c1 = cycles[cyc]
+          if modes:
+            mode = modes[0]
+            if mode == 0:
+              d1 = d0
+              if idx == 8 and b1.nonAssocType(c1, d0) != 'A':
+                break
+            else:
+              d1 = b1.nonAssocMode(c1, d0, mode)[2]
+              if nonAssocType((b1,c1,d1)) not in ('A','B'):                        # TDB
+                raise Exception("Invalid ZD at triCyc[%d][%s]"%(idx,(b1,c1,d1)))
+            uniTri = b1.nonAssocMode(c1, d1, mode=4)
+            out.add(uniTri[1:])
+  sys.stdout.write("%d: %d%s" %(idx, len(out), ", " if idx < 8 else ""))
+  if dump:
+    Lib.checkMem(cnt, finish=True)
+  else:
+    sys.stdout.write("\n")
+  return out
+
+def triadFind(triCyc, bc, ds=[]):
+  """triadFind(triCyc, bc, [ds])
+     Return all (silo,cyc,index) in triadCycles() output for the triad[s]."""
+  Lib._checkList(triCyc, (list, tuple), "triadFind", 9)
+  Lib._checkList(bc, O, "triadFind", (2,4))
+  Lib._checkList(ds, O, "triadFind")
+  if len(bc) == 4:
+    a,b0,c0,d0 = bc
+    ds = [d0]
+  elif len(bc) == 3:
+    b0,c0,d0 = bc
+    ds = [d0]
+  else:
+    b0,c0 = bc
+  pos = list(idx for idx in range(len(triCyc)) if triCyc[idx])[0]
+  expand = len(triCyc[pos]) > 0 and len(triCyc[pos][0]) == 2
+  getTriadsFn = Lib.expandPairList if expand else lambda x: x
+  unique = [[], [], []]
+  for cyc in range(3):
+    for col in triCyc:
+      unique[cyc].append(list(b.nonAssocMode(c, d, 4) for b,c,d in \
+                    (Lib.cycles(y)[cyc] for y in getTriadsFn(col))))
+  out = []
+  for d1 in ds:
+    out0 = []
+    triUni = b0.nonAssocMode(c0, d1, 4)
+    for cyc in range(3):
+      for idx,col in enumerate(triCyc):
+        if triUni in unique[cyc][idx]:
+          out0.append((idx, cyc, unique[cyc][idx].index(triUni)))
+    out.append(out0)
+  return out
+
+# Build zero divs from A types (+ Bs in cp5[5]). Don't need pairs anymore.
+# p3/cycles = ((o1,o2),(o1,o3),(o1,o23),(o2,o13),(o12,o123),(o2,o3),(o12,o13))
+# p4=list((O.Basis(4)[x[0]-1],O.Basis(4)[x[1]-1]) for x in Lib.comb(15,2,True))
+b3 = O.Basis(3); b4= O.Basis(4); b5= O.Basis(5)
+cp3 = triadCycles(3)
+ac3 = list(Lib.triadDump(Lib.assocCycles(b3), b3))
+if "do5" not in globals() or do5:
+
+  # First of table 7 primary == last of table 6 extended
+  list(Lib.triadDump(O.ZeroDivisors(b5),b5))[906]  # (o123, o25, o345) #a = o14
+  t5=[[]]*(31*30);t5[8*31+17]=(27,);list(Lib.triadDump(t5,b5)) # b=o14,a = o123
+  
+  # See triadCyclesModes(5)[0] to match tables in structure paper
+  cp4 = triadCycles(4); CP4 = list(list(Lib.expandPairList(x)) for x in cp4)
+  cp5 = triadCycles(5); epl = Lib.expandPairList; dcp50 = dict(cp5[0])
+  zd4 = list(Lib.triadDump(O.ZeroDivisors(b4), b4))
+  zp4 = list(Lib.chain(*list(Lib.cycles(x) for x in epl(cp4[0]))))#~triadsZD(4)
+  zd5 = list(Lib.triadDump(O.ZeroDivisors(b5), b5))
+  t3 = list(epl(list(x for x in cp5[0] if x[0] in dict(cp4[0])))) # AAA
+  t4 = list(epl(list(x for x in cp5[0] if len(x[1])==12 and \
+                                      x[0] not in dict(cp4[0]))))
+  t50 = list(epl(list(x for x in cp5[0] if len(x[1])==4)))        # AAA+BBA
+  t512 = list(epl(list(x for x in cp5[1] if x[0] in dcp50)))
+  t6 = list(epl(list(x for x in cp5[1] if x[0] not in dcp50)))
+  zp5 = list(Lib.chain(*list(Lib.cycles(x) for x in t3+t4+t50+t512+t6)))
+  print("zd4 check:", "Pass" if zd4==sorted(zp4) else "Fail", \
+        "and zd5 check:", "Pass" if zd5==sorted(zp5) else "Fail") 
+  do5 = False
+
+# O(3)  (A2*o1+B1*o2 +B2*o12+C1*o3 +C2*o13+D1*o23 +D2*o123)
+#     * (c2*o1+d1*o2 +d2*o12+e1*o3 +e2*o13+f1*o23 +f2*o123)
+A2=B1=B2=C1=C2=D1=D2=c2=d1=d2=e1=e2=f1=f2=1; A1=c1=0
+real1=(A1*c1-c2*A2-(d1*B1+B2*d2)-(e1*C1+C2*e2-(-D1*f1-f2*D2))) 
+pure1= (c2*A1+A2*c1-(B2*d1-d2*B1)-(C2*e1-e2*C1-(-f2*D1+D2*f1)))*o1 \
+      +(d1*A1-A2*d2+B1*c1+c2*B2-(D1*e1+e2*D2+-f1*C1-C2*f2))*o2 \
+      +(A2*d1+d2*A1+-c2*B1+B2*c1-(-e2*D1+D2*e1+C2*f1-f2*C1))*o12 \
+      +(e1*A1-A2*e2-(B1*f1+f2*B2)+C1*c1+c2*C2-(-d1*D1-D2*d2))*o3 \
+      +(A2*e1+e2*A1-(f2*B1-B2*f1)+-c2*C1+C2*c1-(-D2*d1+d2*D1))*o13 \
+      +(B1*e1-e2*B2+f1*A1+A2*f2+-d1*C1+C2*d2+D1*c1-c2*D2)*o23 \
+      +(e2*B1+B2*e1+-A2*f1+f2*A1+-C2*d1-d2*C1+c2*D1+D2*c1)*o123 # = 0
+
+A2T7 = \
+  {(o14, o25):    (o345,  o1345,  o2345,  o12345),
+   (o14, o35):    (o245,  o1245,  o2345,  o12345),
+   (o14, o235):   (o245,  o1245,  o345,  o1345),
+   (o24, o15):    (o345,  o1345,  o2345,  o12345),
+   (o24, o35):    (o145,  o1245,  o1345,  o12345),
+   (o24, o235):   (o145,  o1245,  o1345,  o12345),
+   (o124, o15):   (o345,  o1345,  o2345,  o12345),
+   (o124, o35):   (o145,  o245,  o1345,  o2345),
+   (o124, o235):  (o145,  o245,  o345,  o12345),
+   (o34, o15):    (o245,  o1245,  o2345,  o12345),
+   (o34, o125):   (o145,  o245,  o1345,  o2345),
+   (o34, o235):   (o145,  o1245,  o1345,  o12345),
+   (o134, o15):   (o245,  o1245,  o2345,  o12345),
+   (o134, o125):  (o145,  o245,  o345,  o12345),
+   (o134, o235):  (o145,  o245,  o345,  o12345),
+   (o234, o15):   (o245,  o1245,  o345,  o1345),
+   (o234, o125):  (o145,  o245,  o345,  o12345),
+   (o234, o135):  (o145,  o245,  o345,  o12345),
+   (o1234, o15):  (o245,  o1245,  o345,  o1345),
+   (o1234, o125): (o145,  o245,  o1345,  o2345),
+   (o1234, o135): (o145,  o1245,  o345,  o2345),
+   (o14, o125):   (o345,  o1345,  o2345,  o12345),
+   (o14, o135):   (o245,  o1245,  o2345,  o12345),
+   (o14, o1235):  (o245,  o1245,  o345,  o1345),
+   (o24, o125):   (o345,  o1345,  o2345,  o12345),
+   (o24, o135):   (o145,  o1245,  o345,  o2345),
+   (o24, o1235):  (o145,  o1245,  o345,  o2345),
+   (o124, o25):   (o345,  o1345,  o2345,  o12345),
+   (o124, o135):  (o145,  o245,  o345,  o12345),
+   (o124, o1235): (o145,  o245,  o1345,  o2345),
+   (o34, o25):    (o145,  o1245,  o1345,  o12345),
+   (o34, o135):   (o245,  o1245,  o2345,  o12345),
+   (o34, o1235):  (o145,  o245,  o1345,  o2345),
+   (o134, o25):   (o145,  o1245,  o345,  o2345),
+   (o134, o35):   (o245,  o1245,  o2345,  o12345),
+   (o134, o1235): (o145,  o1245,  o345,  o2345),
+   (o234, o25):   (o145,  o1245,  o1345,  o12345),
+   (o234, o35):   (o145,  o1245,  o1345,  o12345),
+   (o234, o1235): (o245,  o1245,  o345,  o1345),
+   (o1234, o25):  (o145,  o1245,  o345,  o2345),
+   (o1234, o35):  (o145,  o245,  o1345,  o2345),
+   (o1234, o235): (o245,  o1245,  o345,  o1345)}
