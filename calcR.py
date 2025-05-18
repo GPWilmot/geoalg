@@ -697,10 +697,9 @@ class Calculator:
     """Call processExec within calc? adding catch block for exec."""
     code = buf[1]
     cnt = 0
-    if buf[0]:  # isAns so do eval with return ans
-      if not code:
-        return None
-    else:
+    if not code:
+      return None
+    elif not buf[0]:  # isAns so do eval with return ans
       tmp = "try:\n"
       if Lib._isVerbose():
         tmp += "  import traceback\n"
