@@ -4,12 +4,12 @@
 ########################################
 
 _spin7_g2 = """This module for calcCA defines the Triads7[30] 3-forms for Spin7, triads7
-   functions to process allSign() elements and makeG2(i,j) to generate globals
-   A, B,...,N for octonian representations. The variables are:
+ functions to process allSign() elements and makeG2(i,j) to generate globals
+ A, B,...,N for octonian representations. The variables are:
    Triads7gen, Triads7, PP1, PPP1, PP1p, P1o, PP1o, S1, SS1, TriadsG2, S1o, SS1o,
    f7Basis, Spin7O, Spin7R, Nac7Mirrors, Nac7Map, AutoTriads7, AutoTriadsO,
    ?0/1/2/3(?=A-N), G2?, G2?2, G2?, G2?2/3(?=0,1,2,3), TableG2, g??, G0?, Gn? matrices
-   and functions:
+ and functions:
    nac7subalg, nac7mirrors, nac7map, triadsOhalf, triads7all, triads7terms,
    triads7remain, triads7class, triads7test, triads7parity, triads7autos,
    tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
