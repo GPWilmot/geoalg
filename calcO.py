@@ -303,7 +303,7 @@ class O():
        Higher and unitary grades can also be entered eg: o12u1=1.0. Repeated
        bases are not allowed and hex digits must be increasing. See Basis and
        BasisArgs for a list of basis numbers and names."""
-    self.w = 0.0 if len(args) == 0 else args[0] # Scalar
+    self.w = args[0] if args else 0  # Scalar
     Lib._checkType(self.w, (int, float), "O")
     self.__g = []                               # Array of ordered Grades
     self.__currentAdd = -1                      # Previous add index
@@ -318,7 +318,9 @@ class O():
           self.__g.append(O.Grade(val, [idx +1, xyz[idx +1], ""]))
     for key,value in kwargs.items():
       Lib._checkType(value, (int, float), "O")
-      if value:
+      if not key:
+        self.w += value
+      elif value:
         lGrade = O._init(key, value, O.__BASIS_CHARS)
         self.__add(lGrade)
 
@@ -343,7 +345,6 @@ class O():
         if char <= lastChar[offset]:
           rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
           lGrade = lGrade.mergeBasis(1, rBases)
-          #lastChar[offset] = lGrade.bases()[offset +1][-1]
           rBases = [0, "", ""]
         else:
           lastChar[offset] = char
@@ -357,7 +358,6 @@ class O():
         if char <= lastChar[offset]:
           rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
           lGrade = lGrade.mergeBasis(1, rBases)
-          #lastChar[offset] = lGrade.bases()[offset +1][-1]
           rBases = [0, "", ""]
         else:
           lastChar[offset] = char
@@ -415,11 +415,29 @@ class O():
       return not self.__g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, O):
       return False
-    if abs(self.w -cf.w) > precision or len(self.__g) != len(cf.__g):
+    if abs(self.w -cf.w) > precision:
       return False
-    for idx,grade in enumerate(self.__g):
-      if not grade.isEq(cf.__g[idx], precision):
-        return False
+    idx = 0
+    for grade in self.__g:
+      while len(cf.__g) > idx:
+        order = grade.order(cf.__g[idx])
+        if order > 0:
+          if abs(cf.__g[idx].value) > precision:
+            return False
+          idx += 1
+        elif order < 0:
+          if abs(grade.value) > precision:
+            return False
+          break
+        else:
+          if not grade.isEq(cf.__g[idx], precision):
+            return False
+          idx += 1
+          break
+    while len(cf.__g) > idx:
+      if abs(cf.__g[idx].value) > precision:
+        return False 
+      idx += 1
     return True
   def __ne__(self, cf):
     """Not equal is not automatic. Need this."""
@@ -507,8 +525,9 @@ class O():
     else:
       Lib._checkType(q, (int, float), "mul")
       out = O(self.w *q)
-      for grade in self.__g:
-        out.__g.append(self.Grade(grade.value *q, grade.bases()))
+      if q:
+        for grade in self.__g:
+          out.__g.append(self.Grade(grade.value *q, grade.bases()))
     return out
   __rmul__ = __mul__
 
@@ -1742,7 +1761,9 @@ class O():
       elif len(item) == 0:
         scalar = 1
       elif isinstance(item[0], Lib._basestr):
-        base = item[0] if item[0][:1] in O.__allChars else ("o" +item[0])
+        base = item[0]
+        if item[0] and item[0][0] not in O.__allChars:
+          base = "o" +item[0]
         terms[base] = item[1]
       else:
         base = "o"

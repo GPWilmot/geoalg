@@ -349,6 +349,7 @@ class Calculator:
     if not filenames:
       filenames = Calculator.__default
     for filename in filenames.split(','):
+      Lib._storeName(filename)
       code = Lib.readText(Calculator.fixFilename(filename))
       if not code:
         if not noError:

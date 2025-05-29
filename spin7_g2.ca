@@ -14,9 +14,9 @@ _spin7_g2 = """This module for calcCA defines the Triads7[30] 3-forms for Spin7,
    triads7remain, triads7class, triads7test, triads7parity, triads7autos,
    tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
 
-# From CA(7)+ find 30 tetrahedron faces selected to define sub-algebras of CA(7).
+_Triads7 = "30 tetrahedron faces selected to define sub-algebras of CA(7)"
+_Triads7gen = "Triads7 = list(Triads7gen) [takes 2.3 minutes]"
 Triads7gen = (CA.Eval(x) for x in Lib.triads(7))
-# Triads7 = list(Triads7gen) [takes 2.3 minutes]
 Triads7 = (e123 +e145 +e167 +e246 +e257 +e347 +e356, e123 +e145 +e167 +e247 +e256 +e346 +e357,
            e123 +e146 +e157 +e245 +e267 +e347 +e356, e123 +e146 +e157 +e247 +e256 +e345 +e367,
            e123 +e147 +e156 +e245 +e267 +e346 +e357, e123 +e147 +e156 +e246 +e257 +e345 +e367,
@@ -139,7 +139,7 @@ def nac7subalg(tri, pos=None):
 #       e237, e245*, e246#, e247#, e256, e257, e346*, e347*, e356*, e357*]
 # S16: [e146#, e147#, e246#, e247#]
 
-# Sign combination indices for mirrors from the first 8 combinations (add all 128-idx)
+_Nac7Mirrors = "Sign combination indices for mirrors from the first 8 combinations (add all 128-idx)"
 Nac7Mirrors = [[0, 29, 38, 43, 49, 52, 56, 57], [1, 14, 23, 28, 50, 51, 55, 58],
                [2, 9, 24, 27, 40, 41, 54, 59], [3, 8, 25, 26, 39, 42, 48, 53],
                [4, 11, 17, 22, 33, 36, 45, 63], [5, 10, 18, 21, 32, 37, 44, 62],
@@ -238,7 +238,7 @@ Nac7Map = ( \
 #29:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
 # Cardinality: R=96, S=96, T=256, U=464, V=704, W=64, O=240
 
-# Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()
+AutoTriads7 = "Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()"
 AutoTriads7 = (((), CA(1)),                     (((2,3), (4,5), (6,7)), e246),
   (((1,2), (4,5), (6,7)), e256),                  (((1,2), (5,7)), e345),
   (((2,3), (5,7)), e157),                 (((4,5), (4, 6), (4,7)), e123),

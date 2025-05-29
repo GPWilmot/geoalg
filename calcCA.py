@@ -190,7 +190,7 @@ class CA():
        with higher and imaginary grades entered with more hex digits eg:
        e12i1=1.0. Repeated bases are not allowed and e0 is i1 and i0 is e1.
        See Basis and BasisArgs for a list of basis numbers and names."""
-    self.w = 0.0 if len(args) == 0 else args[0] # Scalar  #__w TBD
+    self.w = args[0] if args else 0  # Scalar  #__w TBD
     Lib._checkType(self.w, (int, float), "CA")
     self.__g = []                               # Array of ordered Grades
     self.__currentAdd = -1                      # Previous add index
@@ -203,10 +203,12 @@ class CA():
         base = hex(idx +1)[-1]
         self.__g.append(CA.Grade(val, [base,""]))
         if base > CA.__maxBasis[0]:
-          U.__maxBasis[0] = base
+          CA.__maxBasis[0] = base
     for key,value in kwargs.items():
       Lib._checkType(value, (int, float), "CA")
-      if value:
+      if not key:
+        self.w += value
+      elif value:
         lGrade,entered0 = CA._init(key, value, self.__entered0)
         self.__entered0 = entered0
         self.__add(lGrade)
@@ -229,7 +231,7 @@ class CA():
             entered0 |= (offset +1)
             offset = 1 -offset
             char = '1'
-            lGrade = lGrade.mergeBasis(1, lastChar[offset])
+            lastChar[offset] = max(1, lastChar[offset])
           elif char == '1': # Reset remembering
             entered0 &= (offset +1)
         else:
@@ -300,11 +302,29 @@ class CA():
       return not self.__g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, CA):
       return False
-    if abs(self.w -cf.w) > precision or len(self.__g) != len(cf.__g):
+    if abs(self.w -cf.w) > precision:
       return False
-    for idx,grade in enumerate(self.__g):
-      if not grade.isEq(cf.__g[idx], precision):
-        return False
+    idx = 0
+    for grade in self.__g:
+      while len(cf.__g) > idx:
+        order = grade.order(cf.__g[idx])
+        if order > 0:
+          if abs(cf.__g[idx].value) > precision:
+            return False
+          idx += 1
+        elif order < 0:
+          if abs(grade.value) > precision:
+            return False
+          break
+        else:
+          if not grade.isEq(cf.__g[idx], precision):
+            return False
+          idx += 1
+          break
+    while len(cf.__g) > idx:
+      if abs(cf.__g[idx].value) > precision:
+        return False 
+      idx += 1
     return True
   def __ne__(self, cf):
     """Not equal is not automatic. Need this."""
@@ -394,8 +414,9 @@ class CA():
       Lib._checkType(ca, (int, float), "mul")
       out = CA(self.w *ca)
       out.__entered0 = self.__entered0
-      for grade in self.__g:
-        out.__g.append(self.Grade(grade.value *ca, grade.bases()))
+      if ca:
+        for grade in self.__g:
+          out.__g.append(self.Grade(grade.value *ca, grade.bases()))
     return out
   __rmul__ = __mul__
 
@@ -514,8 +535,6 @@ class CA():
       elif order > 0:
         pos = idx
         break
-      #order = base.order(grade)
-      #pos += 1
     if grade.value:
       self.__currentAdd = pos
       self.__g.insert(pos, grade)
@@ -1830,7 +1849,9 @@ class CA():
       elif len(item) == 0:
         scalar = 1
       elif isinstance(item[0], Lib._basestr):
-        base = item[0] if item[0][:1] in CA.__allChars else ("e" +item[0])
+        base = item[0]
+        if item[0] and item[0][0] not in CA.__allChars:
+          base = "e" +item[0]
         terms[base] = item[1]
       else:
         base = "e"

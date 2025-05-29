@@ -59,6 +59,7 @@ class Lib():
   __lastTime    = 0             # Store epoch for time
   __lastProcTime= 0             # Store program time float seconds
   __checkMemSrt = True          # checkMem to run procTime at start
+  __storeName   = []            # Store and check loaded filenames
   _memLimitMB   = 500           # Abort if less mem than this
   if sys.version_info.major == 2:
     _basestr = basestring       # Handle unicode
@@ -141,29 +142,39 @@ class Lib():
     return ("on" if verbosity else "off")
 
   @staticmethod
-  def resolution(digits=0):
-    """resolution([digits])
-       Set print format digits or reset to 18. Minimum is 4 & default is 9."""
-    if not isinstance(digits, int) or digits < 0:
-      raise Exception("Invalid printing resolution")
-    if digits == 0:
-      digits = 18
-    elif digits < 4:
-      digits = 4
-    Lib.__resolution = digits
-    Lib.__resol_form = "%%0.%dG" %digits
-    Lib.__resol_float = "%%0.%df" %digits
-    return digits
+  def resolution(digits=0, get=False):
+    """resolution([digits,get])
+       Set or reset to 18 &/or return format digits. Min. is 4 & default 9."""
+    if get:
+      if precise is not None:
+        raise Exception("Can't set precision when get set")
+    else:
+      if not isinstance(digits, int) or digits < 0:
+        raise Exception("Invalid printing resolution")
+      if digits == 0:
+        digits = 18
+      elif digits < 4:
+        digits = 4
+      Lib.__resolution = digits
+      Lib.__resol_form = "%%0.%dG" %digits
+      Lib.__resol_float = "%%0.%df" %digits
+    return Lib.__resolution
 
   @staticmethod
-  def precision(precise=None):
-    """precision([precise])
-       Set equality precision or reset to default e-15."""
-    if precise is None:
-      precise = 1E-15
-    Lib._checkType(precise, float, "precision")
-    Lib.__precision = precise
-    return precise
+  def precision(precise=None, get=False):
+    """precision([precise,get])
+       Set or reset to default e-15 &/or return equality precision."""
+    if get:
+      if precise is not None:
+        raise Exception("Can't set precision when get set")
+    else:
+      if precise is None:
+        precise = 1E-15
+      Lib._checkType(precise, float, "precision")
+      if precise <= 0.0 or precise > 0.9:
+        raise Exception("Precision must be positive and smaller that 0.9")
+      Lib.__precision = precise
+    return Lib.__precision
 
   @staticmethod
   def isInfo():
@@ -180,7 +191,6 @@ class Lib():
   def getResolNum(val):
     """getResolNum(val)
        Return int or the float rounded to resolution or in exponent format."""
-    #print("XXX",type(val))
     num = str(val)
     pos = num.find('.')
     if pos < 0 or len(num) -pos -1 < Lib.__resolution:
@@ -216,16 +226,17 @@ class Lib():
       Lib._checkType(elem, typ, method)
   @staticmethod
   def _checkSize(size, val, method, src):
-      if isinstance(size, int):
-        if size != val:
-          raise Exception("Invalid %s !=%d for %s" %(src, size, method))
-      elif isinstance(size, (list,tuple)):
-        if len(size) == 2 and (val < size[0] or \
-              (size[1] > 0 and val > size[1])):
-          raise Exception("Invalid %s !in [%d,%s] for %s" %(src, size[0],
-                           size[1] if size[1] else "..", method))
-      elif size:
-        raise Exception("Invalid check %s parameters in %s" %(src, method))
+    """Raise exception if val != int size or in (x,y), y=0=infinity."""
+    if isinstance(size, int):
+      if size != val:
+        raise Exception("Invalid %s !=%d for %s" %(src, size, method))
+    elif isinstance(size, (list,tuple)):
+      if len(size) == 2 and (val < size[0] or \
+            (size[1] > 0 and val > size[1])):
+        raise Exception("Invalid %s !in [%d,%s] for %s" %(src, size[0],
+                         size[1] if size[1] else "..", method))
+    elif size:
+      raise Exception("Invalid check %s parameters in %s" %(src, method))
 
   @staticmethod
   def _getResolutions():
@@ -255,6 +266,18 @@ class Lib():
       resolForm = r"%%s%s%%s" %Lib.__resol_form
       out = sign +flt +basis
     return out
+  @staticmethod
+  def _storeName(name):
+    if name not in Lib.__storeName:
+      Lib.__storeName.append(name)
+  @staticmethod
+  def _checkName(names):
+    out = []
+    for name in names.split(','):
+      if name not in Lib.__storeName:
+        out.append(name)
+    if out:
+      raise Exception("Need to load %s" %",".join(out))
   @staticmethod
   def _piRange(a):
     """Return an euler angle to range -pi..+pi."""
