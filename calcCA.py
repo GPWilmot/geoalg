@@ -224,16 +224,16 @@ class CA():
     for char in key:
       offset = int(typ == CA.__BASIS_CHARS[1]) # i
       if typ and char.isdigit():
+        if char == '0':   # Store e0,i0 as i1,e1 and remember for printing
+          entered0 |= (offset +1)
+          offset = 1 -offset
+          char = '1'
+          lastChar[offset] = max(char, lastChar[offset])
+        elif char == '1': # Reset remembering
+          entered0 &= (offset +1)
         if char <= lastChar[offset]:
           lGrade = lGrade.mergeBasis(1, rBases)
           rBases = ["", ""]
-          if char == '0':   # Store e0,i0 as i1,e1 and remember for printing
-            entered0 |= (offset +1)
-            offset = 1 -offset
-            char = '1'
-            lastChar[offset] = max(1, lastChar[offset])
-          elif char == '1': # Reset remembering
-            entered0 &= (offset +1)
         else:
           lastChar[offset] = char
           if char > CA.__maxBasis[offset]:
