@@ -142,18 +142,19 @@ class Lib():
     return ("on" if verbosity else "off")
 
   @staticmethod
-  def resolution(digits=0, get=False):
+  def resolution(digits=None, get=False):
     """resolution([digits,get])
        Set or reset to 18 &/or return format digits. Min. is 4 & default 9."""
     if get:
-      if precise is not None:
-        raise Exception("Can't set precision when get set")
+      if digits is not None:
+        raise Exception("Can't set digits when get set")
     else:
       if not isinstance(digits, int) or digits < 0:
         raise Exception("Invalid printing resolution")
-      if digits == 0:
+      if digits is None:
         digits = 18
-      elif digits < 4:
+      Lib._checkType(digits, int, "resolution")
+      if digits < 4:
         digits = 4
       Lib.__resolution = digits
       Lib.__resol_form = "%%0.%dG" %digits
