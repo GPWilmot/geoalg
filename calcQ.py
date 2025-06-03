@@ -879,15 +879,16 @@ class Q():
   @staticmethod
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for Q."""
-    calcHelp = """Quaternion Calculator - Process numbers with i, j, k appended.
+    calcHelp = """Quaternion Calculator - Process numbers and i, j, k.
           Euler angles, FrameMatrix and ECEF WGS-84 frames are supported."""
-    return (("Q", "R"), ("Q", "math"),
+    ijk = "i,j,k=Q(0,1),Q(0,0,1),Q(0,0,0,1)"
+    return (("Q", "R"), ("Q", "math"), ijk,
          "default.quat", calcHelp, "Can also use quaternions with basis i,j,k.")
 
   @classmethod
   def _setCalcBasis(cls, calcs, dummy):
-    """Load other calculator. Does nothing for quaternions."""
-    return ""
+    """Load this other calculator. Does nothing for quaternions."""
+    return "quaternions"
 
   @classmethod
   def _validBasis(cls, value):
@@ -960,7 +961,7 @@ if __name__ == '__main__':
   # Quaternion Unit test cases for Calc with Tests[0] being init for each case
   Tests = [\
     """d30=radians(30); d60=radians(60); d45=radians(45); d90=radians(90)
-       e=Euler(pi/6,pi/4,pi/2); q=i+2j+3k""",
+       e=Euler(pi/6,pi/4,pi/2); q=i+2*j+3*k""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
        Rx=d60+i; rx=(d60 +i).versor()
        test = Rx.frameMatrix() *q.vector(); store = (rx*q*rx.inverse()).vector()
@@ -1046,7 +1047,7 @@ if __name__ == '__main__':
          G,P,N = Tensor.Rotations(a.unit().vector(), b.unit().vector())
          p = (a * b).projects(x); x0 = P *x.vector()
          return [p[0].vector(), p[1].vector().trim()] == [x0, x.vector()-x0]
-       d2 = Ptest(i, j, i+2j);  d3 = Ptest(i, j+2k, i+j+k)
+       d2 = Ptest(i, j, i+2j);  d3 = Ptest(i, j+2*k, i+j+k)
        Calculator.log(d2 and d3, (d2, d3))""",
     """# Test 20 Compare Tensor.Rotations with Q.versor.rotate.
        a,b = Q(0,1), Q(0,0,1,2)/sqrt(5)

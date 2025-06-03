@@ -24,7 +24,7 @@
 ## used by all basis number calculators. Run help for more info.
 ## Start with either calcR.py, python calcR.py or see ./calcR.py -h.
 ###############################################################################
-__version__ = "0.5"
+__version__ = "0.6"
 import sys, math, os
 import platform, glob
 import traceback
@@ -224,18 +224,20 @@ class Calculator:
   """Command line processor parsing basis numbers into python code.Help uses the
      doc strings and class variable documents strings (starting with one _)."""
   # Firstly, all words processed by parsing
-  __USEFUL_WORDS  = ("version", "verbose", "precision", "resolution",
-                     "help", "quit", "exit", "save", "load", "show", "test",
-                     "clear", "calc", "vars", "free", "date", "time")
-  __USEFUL_LIBS   = ("verbose", "precision", "resolution", 
-                     "free", "date", "time")
-  __USEFUL_CMDS   = ("load", "test", "version")     # Words with evaluation
-  __USEFUL_FILE   = ("show", "clear", "load", "save")  # Ordered filename words
+  __USEFUL_WORDS  = ("quit", "exit", "help", "show", "clear", "save",
+                     "load", "test", "version", "calc", "vars",
+                     "verbose", "precision", "resolution", "free",
+                     "date", "time")
+  __USEFUL_LIBS   = ("verbose", "precision", "resolution",  "free",
+                     "date", "time")
+  __USEFUL_CMDS   = ("load", "test", "version")        # Words with evaluation
+  __USEFUL_FILE   = ("show", "clear", "save", "load")  # Ordered filename words
   __PYTHON_WORDS  = ("print", "raise", "from", "with", # Exec not eval
                      "with", "global", "raise", "import",
                      "for", "while", "exec", "eval", "del")
-  __PYTHON_FUNCS  = ("def",)                          # Exec & no expand fn
-  #__PYTHON_STARTS = ("in", "lambda",)                 # No expand 'til!., TBD
+  __PYTHON_FUNCS  = ("def",)                   # Exec & no expand fn
+  __inCls = None                               # Current processor
+  __firstCls = None                            # Initial __inCls
   __oldCls = {}                                # Previous __inCls's
   __classList = ["Lib", "Euler", "Matrix", "Tensor"]  # From calcLib
   __moduleList = []                            # Calc classes loaded
@@ -247,7 +249,7 @@ class Calculator:
 
   def __init__(self, clsType, tests=[], indent=None):
     """Singleton calculator for basis numbers."""
-    modList, clsList, default, cHelp, eHelp  = clsType._getCalcDetails()
+    modList, clsList, ijk, fDef, cHelp, eHelp  = clsType._getCalcDetails()
     LibTest._initRunTests(tests, indent)
     Calculator.__inCls = clsType              # Current calculator
     Calculator.__firstCls = clsType           # Initial __inCls
@@ -258,9 +260,14 @@ class Calculator:
     Calculator.__prompt = modList[0]          # Current calculator name
     Calculator.__cHelp = cHelp                # Calculator help text
     Calculator.__eHelp = eHelp                # Load extra help text
-    Calculator.__default = default            # Load file default value
+    Calculator.__default = fDef               # Load file default value
+    Calculator.__firstCls._processExec(False, ijk)
     self.__line = ""                          # Store to history if OK
     self.__lexer = Lexer() if ply_lex else None
+
+  @staticmethod
+  def replaceTests(tests):
+    LibTest._initRunTests(tests)
 
   @staticmethod
   def version(*args):
@@ -305,8 +312,6 @@ class Calculator:
     """Run test numbers or all tests."""
     name = Calculator.__firstCls.__name__
     name = "R" if name == "Real" else name
-    if Calculator.__prompt not in Calculator.__promptList +[name]:
-      raise Exception("Invalid calculator for %s tests" %name)
     code = ""
     for number in numbers.split(','):
       tst = number.strip() if number else ""
@@ -326,6 +331,7 @@ class Calculator:
 
   @staticmethod
   def fixFilename(filename):
+    """Add home path & extention if not already there."""
     return Lib.fixFilename(filename, os.path.dirname(__file__),
                      os.path.splitext(Calculator.__default)[1])
 
@@ -341,23 +347,24 @@ class Calculator:
     if filename:
       sys.stdout.write(Lib.readText(filename).replace('\\', "\\\\") +'\n')
     else:
-      sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") +'\n')
-
+      sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") \
+                        +'\n')
   @staticmethod
-  def load(filenames=None, noError=False):
-    """Load filenames or default file and add to history."""
-    if not filenames:
-      filenames = Calculator.__default
-    for filename in filenames.split(','):
-      Lib._storeName(filename)
-      code = Lib.readText(Calculator.fixFilename(filename))
-      if not code:
-        if not noError:
-          raise Exception("File %s is empty" %filename)
-      elif Lib._isVerbose() and readline:
-        readline.read_history_file(Calculator.fixFilename(filename))
+  def load(filename=None, noError=False):
+    """Load filename or default file and add to history."""
+    if not filename:
+      filename = Calculator.__default
+    if not os.path.splitext(filename)[1]:
+      filename += os.path.splitext(Calculator.__default)[1]
+    Lib._storeName(filename)
+    code = Lib.readText(Calculator.fixFilename(filename))
+    if not code:
+      if not noError:
+        raise Exception("File %s is empty" %filename)
+    elif Lib._isVerbose() and readline:
+      readline.read_history_file(Calculator.fixFilename(filename))
     if Lib._isVerbose():
-      Calculator.__lastCmd = "load(%s)" %filenames
+      Calculator.__lastCmd = "load(%s)" %filename
     return code
 
   @staticmethod
@@ -423,26 +430,32 @@ class Calculator:
       if name and len(name) < 3:
         names.append(name)
     calcs = [None] if calc is None else calc.split(',')
-    topCls = None
+    newCls = None
+    ijkMsg = ""
     for calc in calcs:
       if calc is None:
         sys.stdout.write("Calculator%s: %s\n" %("s" if len(names) > 1 else "",
                                         ", ".join(names)))
       elif calc in names:
         mod = "calc%s" %calc
+        clsName = "Real" if calc == "R" else calc
+        code = 'if importlib:\n'
+        code += '  pkg = importlib.import_module("calc%s")\n' %calc
+        code += '  globals()["%s"] = getattr(pkg, "%s")\n' %(clsName, clsName)
+        Calculator.__firstCls._processExec(False, code)
+        code = 'globals()["%s"] if importlib else None' %clsName
+        newCls = Calculator.__firstCls._processExec(True, code)
+        if newCls is None:
+          raise Exception("No importlib: run %s.py from the command line"%mod)
+        modList, clsList, ijk, fDef, cHelp, eHelp = newCls._getCalcDetails()
+        Calculator.__firstCls._processExec(False, ijk)
+        msg = newCls._setCalcBasis(Calculator.__moduleList, Calculator)
+        if msg:
+          ijkMsg = msg
         if calc not in Calculator.__moduleList: # Not already loaded
-          clsName = "Real" if calc == "R" else calc
-          code = 'if importlib:\n'
-          code += '  pkg = importlib.import_module("calc%s")\n' %calc
-          code += '  globals()["%s"] = getattr(pkg, "%s")\n' %(clsName, clsName)
-          Calculator.__firstCls._processExec(False, code)
-          code = 'globals()["%s"] if importlib else None' %clsName
-          newCls = Calculator.__firstCls._processExec(True, code)
-          if newCls is None:
-            raise Exception("No importlib: run %s.py from the command line"%mod)
           Calculator.__oldCls[clsName] = newCls
-          modList, clsList, default, Calculator.__cHelp, Calculator.__eHelp \
-                               = newCls._getCalcDetails()
+          Calculator.__cHelp = cHelp
+          Calculator.__eHelp = eHelp
           for mod in clsList:
             if mod not in Calculator.__classList:
               Calculator.__classList.append(mod)
@@ -454,14 +467,18 @@ class Calculator:
           if calc not in Calculator.__promptList:      # Stick to biggest calc
             Calculator.__inCls = newCls 
             Calculator.__prompt = modList[0]
-            Calculator.__default = default
-        topCls = Calculator.__inCls
+            Calculator.__default = fDef
       else:
         raise Exception("No such calculator: calc%s" %calc)
-    if topCls:
-        msg = topCls._setCalcBasis(Calculator.__moduleList, Calculator)
-        if msg:
-          sys.stdout.write(msg +'\n')
+    if newCls:
+      for cls in Calculator.__oldCls.values():
+        cls._setCalcBasis(Calculator.__moduleList, Calculator)
+      msg = "Variables i,j,k reset to " if ijkMsg else ""
+      if len(Calculator.__moduleList) > 1:
+        msg = "Enabled " +", ".join(Calculator.__moduleList)
+        msg += " and i,j,k reset to " if ijkMsg else ""
+      if msg + ijkMsg:
+        sys.stdout.write(msg +ijkMsg +'\n')
 
   @staticmethod
   def help(cls=None, obj=None, path=None):
@@ -504,7 +521,7 @@ class Calculator:
           avWidth = sum(map(len, fNames)) //len(fNames) +3
           form = 'Files to load:'
           totWidth = 80
-          if True: #sys.platform !="win32":
+          if sys.platform !="win32":
             try:
               disWidth = int(os.popen('stty size', 'r').read().split()[1])
               totWidth = max(len(form) +avWidth, disWidth) -1
@@ -536,7 +553,7 @@ class Calculator:
         else:
           sys.stdout.write("   Variable does not exist\n")
       else:
-        raise Exception("Invald help parameter")
+        raise Exception("Invalid help parameter")
     else:
       Calculator.__help(cls, obj)
 
@@ -631,6 +648,7 @@ class Calculator:
         if param[0] == '"' and param[-1] == '"' or \
            param[0] == "'" and param[-1] == "'":
           param = param[1:-1]
+      param = param.strip()
       if word in self.__USEFUL_FILE:  # File cmds can use default filename
         extra = ""
         if word == "load" and param == "noError=True":
@@ -641,8 +659,8 @@ class Calculator:
           if len(buf) > 1:
             if len(buf) > 2:
               raise Exception("Too many variables to save")
-            param = buf[0]
-            extra = ",'%s'" %buf[1]
+            param = buf[0].strip()
+            extra = ",'%s'" %buf[1].strip()
             Calculator.__saveVar = self.__processExec((True, buf[1]))
         if param:
           pline = "('%s'%s)" %(param, extra)
@@ -656,10 +674,11 @@ class Calculator:
         if param:
           pos1 = param.find(".")
           if pos1 > 0:
-            if param[:pos1] in Calculator.__classList:
-              pline = "(%s, '%s')" %(param[:pos1], param[pos1+1:])
+            if param[:pos1].strip() in Calculator.__classList:
+              pline = "(%s, '%s')" %(param[:pos1].strip(),
+                                     param[pos1+1:].strip())
             else:
-              pline = "(locals(), '%s')" %param[pos1+1:]
+              pline = "(locals(), '%s')" %param[pos1+1:].strip()
           elif param in self.__USEFUL_WORDS:
             pline = "()"
           elif param not in Calculator.__classList:
@@ -735,6 +754,7 @@ class Calculator:
     doUsefulWord = ""       # Process this special word
     doLineExpand = True     # Do expand if not special word or function
     noBrackExpand = 0       # Don't expand basis inside calc class
+    loadCmdExpand = 0       # Process load cmd (nested in file or not)
     state = ParseState()    # Store basis & numbers for conversion
     isComment = False       # Ignore commented text
     isAnsAssign = False     # History needs expanded ans
@@ -779,10 +799,16 @@ class Calculator:
       elif token.type == "BRACKS":
         if token.value == '(':
           bracketCnt += 1
+          if loadCmdExpand == 2 and bracketCnt == 1:
+            token.value = '("'
         else:
           bracketCnt -= 1
           if bracketCnt <= noBrackExpand:
             noBrackExpand = 0
+          if loadCmdExpand and bracketCnt == 0:
+            if loadCmdExpand == 2:
+              token.value = '")'
+            loadCmdExpand = 0
         checkStore = True
       elif token.type == "EQUALS":
         checkStore = True
@@ -850,13 +876,17 @@ class Calculator:
             ansAssigns.append(token.lexpos)
             token.value = 'eval("ans")'
             isAnsAssign = True
-          #elif token.value in self.__PYTHON_STARTS:
-          #  state.startLine = True
           elif state.startLine:
             if token.value in self.__USEFUL_WORDS:
               if isUsefulWord:
                 doUsefulWord = token.value
-                doLineExpand = False
+                if bracketCnt == 0 and token.value == "load":
+                  loadCmdExpand = 1
+              elif token.value == "load":
+                if bracketCnt == 0:
+                  loadCmdExpand = 2
+                  token.value = "Lib._checkName"
+              doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
               isAns = False
             elif token.value in self.__PYTHON_FUNCS:
@@ -875,7 +905,8 @@ class Calculator:
             isAns = False
             if isAnsAssign:
               raise Exception("Can't assign to ans")
-        if isSpaced:
+          checkStore = True
+        elif isSpaced:
           if state.store:
             state.aftFill += " "
             token.value = ""
@@ -884,6 +915,10 @@ class Calculator:
             token.value = ""
           code += signVal
           signVal = ""
+        elif token.type == "," and loadCmdExpand == 1:
+          bufs.append((isAns, code +")", ansAssigns, doUsefulWord))
+          code,ansAssigns = "", []
+          token.value = "load("    # Fix load dependencies
         else:
           checkStore = True
       if checkStore:
@@ -904,6 +939,7 @@ class Calculator:
             state.startLine = True
             isAnsAssign = False
             doLineExpand = True
+            loadCmdExpand = 0
             notEmpty = False
           else:
             notEmpty = True
@@ -964,6 +1000,7 @@ class Calculator:
        Processor loops over input lines parsing then executing the converted
        line until exit. Commands are run immediately."""
     runExec = ""
+    checkCalc = False
     doLoad = os.path.isfile(os.path.join(os.path.dirname(__file__),
                                          Calculator.__default))
     try:
@@ -1002,8 +1039,12 @@ class Calculator:
               if Lib._isVerbose():
                 sys.stdout.write("LOG: " +buf[1] +'\n')
               tmpAns = self.__processExec(self.__parseUsefulWord(*buf))
+              if runExec and Calculator.__inCls != Calculator.__firstCls:
+                checkCalc = True
               Calculator.__saveVar = None
             else:
+              if checkCalc:
+                raise Exception("Can't change calculator on the command line")
               if Lib._isVerbose():
                 sys.stdout.write("LOG: " +buf[1] +'\n')
               assignAns.append(ans)
@@ -1076,6 +1117,7 @@ class Real(float):
      modified. It has no methods, use math methods instead eg sin(pi) but change
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
+  __loadedCalcs = []                     # Notify any other calc loaded
   def __float__(self):
     return super(self)
   def __int__(self):
@@ -1150,8 +1192,8 @@ class Real(float):
 
   @staticmethod
   def IsCalc(calc):
-    """Test loading of other calculators. Not used in this calculator."""
-    return (calc == "R")
+    """Check if named calculator has been loaded."""
+    return (calc in Real.__loadedCalcs)
 
   #########################################################
   ## Calculator class help and basis processing methods  ##
@@ -1161,12 +1203,13 @@ class Real(float):
     """Return the calculator help, module heirachy and classes for Real."""
     calcHelp = """Calculator - Simple calculator to build more complex processors.
           Use calc(Q) for complex and quaternion calculations."""
-    return (("R"), ("Real", "math"), "default.calc", calcHelp, 
+    return (("R"), ("Real", "math"), "", "default.calc", calcHelp, 
             "Use scalar method instead of Real numbers.")
 
   @classmethod
   def _setCalcBasis(cls, calcs, dummy):
-    """Load other calculator. Does nothing for reals/floats."""
+    """Load this other calculator. Does nothing for reals/floats."""
+    Real.__loadedCalcs = calcs
     return ""
 
   @classmethod

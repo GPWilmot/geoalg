@@ -66,9 +66,9 @@ class O():
   __QUAT_CHARS  = ('i', 'j', 'k')        # Quaternion basis chars
   __CA_CHARS    = ('e', 'i')             # CA basis chars only
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
-  __allChars    = ['o', 'u']             # Include CA & Quaternions
+  __allChars    = ['o', 'u']             # Include CA
   __maxBasis    = ['', '']               # Store the dimension characters
-  __useQuat     = False                  # Q class is loaded
+  __loadedCalcs = []                     # Notify any other calc loaded
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
@@ -1781,7 +1781,7 @@ class O():
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, o1, o2, o12) with up to 4
        arguments. If calc(Q) included then w may instead be a Q object."""
-    if O.__useQuat:   # If module calcQ included can use Euler class
+    if "Q" in O.__loadedCalcs:     # If module calcQ included can use Q class
       if len(args) == 1 and isinstance(args[0], Q):
         q = args[0]
         args = []
@@ -1797,11 +1797,8 @@ class O():
 
   @staticmethod
   def IsCalc(calc):
-    """Check if calcQ or calcCA has been loaded."""
-    if calc == "O": return True
-    if calc == "CA" and O.__useCA:
-      return True
-    return (calc == "Q" and O.__useQuat)
+    """Check if named calculator has been loaded."""
+    return (calc in O.__loadedCalcs)
 
   ###################################################
   ## Calc class help and basis processing methods  ##
@@ -1809,40 +1806,29 @@ class O():
   @staticmethod
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for O."""
-    calcHelp = """Octonian/Sedenian Calculator - Process 30-dimensional basis
+    cHelp = """Octonian/Sedenian Calculator - Process 30-dimensional basis
           numbers (o1..F or u1..F) and multiples."""
-    return (("O", "CA", "Q", "R"), ("O", "math"), "default.oct", calcHelp, "")
+    ijk = "i,j,k=O(o1=1),O(o2=1),O(o12=1)"
+    return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 
   @classmethod
   def _setCalcBasis(cls, calcs, dummy):
-    """Load other calculator. If quaternions are loaded then convert
-       i,j,k into Q() instead of o1,o2,o12. Default True."""
-    loaded = ""
+    """Load this other calculator. Quaternions are redefined."""
+    O.__loadedCalcs = calcs
     if "CA" in calcs:
       for i in cls.__CA_CHARS:
         if i not in cls.__allChars:
           cls.__allChars.append(i)
       cls.__useCA = True
-    if cls.__useCA:
-      loaded = "CA"
-    if "Q" in calcs:
-      for i in cls.__QUAT_CHARS:
-        if i not in cls.__allChars:
-          cls.__allChars.append(i)
-      cls.__useQuat = True
-    if cls.__useQuat:
-      loaded += " and " if cls.__useCA else ""
-      loaded += "Quaternions"
-    if loaded:
-      return "Octonion calculator has %s enabled" %loaded
-    return ""
+    return "o1,o2,o12"
 
   @classmethod
   def _validBasis(cls, value, full=False):
-    """Used by Calc to recognise full basis forms o... and u... or i, j, k
+    """Used by Calc to recognise full basis forms o... and u...
        or e... and i... if CA is loaded."""
     if len(value) == 1:
-      return 1 if value in cls.__QUAT_CHARS else 0
+      return 0
+      #return 1 if value in cls.__QUAT_CHARS else 0
     if value[0] not in cls.__allChars:
       return 0
     isBasis = True
@@ -1861,29 +1847,20 @@ class O():
   @classmethod
   def _processStore(cls, state):
     """Convert the store array into O(...) or Q(...) python code. Convert to
-       Q(...) if basis is i, j, k and __useQuat or CA(...) for e/i basis and
-       __useCA else expand to bivectors. If isMults1/2 set then double up
+       CA(...) for e/i basis if __useCA. If isMults1/2 set then double up
        since O to Q or MULTS are higher priority then SIGNS. The state is a
        ParseState from Calculator.processTokens()."""
     kw = {}
     line = ""
-    isQuat = isCA = False
-    quatKeys = (None, 'i', 'j', 'k')  # based on __QUAT_KEYS
+    isCA = False
     signTyp = state.signVal
     firstCnt = 1 if state.isMults1 else -1
     lastCnt = len(state.store) -1 if state.isMults2 else -1
     for cnt,value in enumerate(state.store):
       val,key = value
-      if key:
-        if key in cls.__QUAT_CHARS:
-          isQuat = O.__useQuat     # The same validBasis type
-          if not isQuat:
-            xyz = cls.BasisArgs(2)
-            if key == 'k':
-              val = val[1:] if val[:1] == "-" else "-" +val
-            key = xyz[cls.__QUAT_CHARS.index(key)]
-        elif key[0] in cls.__CA_CHARS:
-          isCA = O.__useCA
+      isCA = False
+      if key and key[0] in cls.__CA_CHARS:
+        isCA = O.__useCA
 
       # If basis already entered or single so double up
       isMult = (cnt in (firstCnt, lastCnt) and lastCnt != 0)
@@ -1894,11 +1871,6 @@ class O():
           line += kw[None]
           signTyp = "+"
           kw[None] = "0"
-        elif isQuat:
-          line += signTyp +"Q(%s)" %",".join( \
-                  ("%s" %kw[x] if x in kw else '0') for x in quatKeys)
-          signTyp = "+"
-          kw = {}
         else:
           scalar = ""
           if None in kw:
@@ -1912,17 +1884,12 @@ class O():
                     ("%s=%s" %(x,kw[x])) if x else str(kw[x]), kw.keys())))
           signTyp = "+"
           kw = {}
-        isQuat = False
-        isCA = False
       kw[key] = val
 
     # Dump the remainder
     if len(kw) == 1 and None in kw:
       signTyp = kw[None][0] if signTyp or kw[None][0] == "-" else ""
       line += signTyp +kw[None][1:]
-    elif isQuat:
-      line += signTyp +"Q(%s)" %",".join( \
-              ("%s" %kw[x] if x in kw else '0') for x in quatKeys)
     else:
       scalar = ""
       if None in kw:

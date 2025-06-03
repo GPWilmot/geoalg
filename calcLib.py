@@ -275,6 +275,7 @@ class Lib():
   def _checkName(names):
     out = []
     for name in names.split(','):
+      name = name.strip()
       if name not in Lib.__storeName:
         out.append(name)
     if out:

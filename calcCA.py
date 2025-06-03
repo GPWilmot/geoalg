@@ -50,11 +50,9 @@ class CA():
      """
   __HEX_BASIS   = 15                     # e and i basis size excluding 0
   __HEX_CHARS   = ('A', 'B', 'C', 'D', 'E', 'F')
-  __QUAT_CHARS  = ('i', 'j', 'k')        # Quaternion basis chars
   __BASIS_CHARS = ('e', 'i')             # CA basis chars only
-  __allChars    = ['e', 'i']             # Maybe include quaternions
   __maxBasis    = ['0', '0']             # Store the max dimensions
-  __useQuat     = False                  # Notify Q is included
+  __loadedCalcs = []                     # Notify any other calc loaded
   dumpRepr      = False                  # Repr defaults to str
 
   class Grade:
@@ -1842,7 +1840,7 @@ class CA():
     for item in sets:
       Lib._checkType(item, (list, tuple), "Eval")
       if isinstance(item, Lib._basestr):
-        base = item[0] if item[0][0] in CA.__allChars else ("e" +item[0])
+        base = item[0] if item[0][0] in CA.__BASIS_CHARS else ("e" +item[0])
         terms[base] = 1
       elif not isinstance(item, (list, tuple)):
         raise Exception("Invalid basis for Eval: %s" %item)
@@ -1850,7 +1848,7 @@ class CA():
         scalar = 1
       elif isinstance(item[0], Lib._basestr):
         base = item[0]
-        if item[0] and item[0][0] not in CA.__allChars:
+        if item[0] and item[0][0] not in CA.__BASIS_CHARS:
           base = "e" +item[0]
         terms[base] = item[1]
       else:
@@ -1883,7 +1881,7 @@ class CA():
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, e32, e13, e21) with up to 4
        arguments. If calc(Q) included then scalar may instead be a Q object."""
-    if CA.__useQuat:   # If module calcQ included can use Q class
+    if "Q" in CA.__loadedCalcs:      # If module calcQ included can use Q class
       if len(args) == 1 and isinstance(args[0], Q):
         q = args[0]
         args = [q.w, q.x, q.y, q.z]
@@ -1897,9 +1895,8 @@ class CA():
 
   @staticmethod
   def IsCalc(calc):
-    """Check if calcQ has been loaded."""
-    if calc == "CA": return True
-    return (calc == "Q" and CA.__useQuat)
+    """Check if named calculator has been loaded."""
+    return (calc in CA.__loadedCalcs)
 
   ###################################################
   ## Calc class help and basis processing methods  ##
@@ -1909,29 +1906,21 @@ class CA():
     """Return the calculator help, module heirachy and classes for CA."""
     calcHelp = """Clifford Algebra Calculator - Process 30-dimensional basis
           numbers (e0..F or i0..F) of signature (+,-) and multiples."""
-    return (("CA", "Q", "R"), ("CA", "math"), "default.ca", calcHelp, "")
+    ijk = "i,j,k=CA(e32=1),CA(e13=1),CA(e21=1)"
+    return (("CA", "Q", "R"), ("CA", "math"), ijk, "default.ca", calcHelp, "")
 
   @classmethod
   def _setCalcBasis(cls, calcs, dummy):
-    """Load other calculator. If quaternions are loaded then convert
-       i,j,k into Q() instead of e32,e13,e21. Default True."""
-    if "Q" in calcs:
-      cls.__useQuat = True
-      for i in cls.__QUAT_CHARS:
-        if i not in cls.__allChars:
-          cls.__allChars.append(i)
-    if cls.__useQuat:
-      return "CA calculator has Quaternions enabled"
-    return ""
+    """Load this other calculator. Quaternions are redefined."""
+    CA.__loadedCalcs = calcs
+    return "e32,e13,e21"
 
   @classmethod
   def _validBasis(cls, value):
-    """Used by Calc to recognise repeated basis forms e... and i...
-       and quaternions basis i, j, k because this module is optional 
-       and we don't want files & tests to break."""
+    """Used by Calc to recognise repeated basis forms e... and i...."""
     if len(value) == 1:
-      return 1 if value in cls.__QUAT_CHARS else 0
-    if value[0] not in cls.__allChars:
+      return 0
+    if value[0] not in cls.__BASIS_CHARS:
       return 0 
     isBasis = True
     for ch in value:
@@ -1945,24 +1934,16 @@ class CA():
 
   @classmethod
   def _processStore(cls, state):
-    """Convert the store array into CA(...) or Q(...) python code. Convert to
-       Q(...) if basis is i, j, k and __useQuat else expand to bivectors. If
+    """Convert the store array into CA(...) or Q(...) python code. If
        isMults1/2 set then double up since CA to Q or MULTS are higher priority
        then SIGNS. The state is a ParseState from Calculator.processTokens()."""
     kw = {}
     line = ""
-    isQuat = False
-    quatKeys = (None, 'i', 'j', 'k')  # based on __QUAT_KEYS
     signTyp = state.signVal
     firstCnt = 1 if state.isMults1 else -1
     lastCnt = len(state.store) -1 if state.isMults2 else -1
     for cnt,value in enumerate(state.store):
       val,key = value
-      if key in cls.__QUAT_CHARS:
-        isQuat = cls.__useQuat   # The same validBasis type
-        if not isQuat:
-          xyz = cls._VersorArgs(3, rotate=True)
-          key = xyz[cls.__QUAT_CHARS.index(key)]
 
       # If basis already entered or single so double up or accum scalar
       isMult = (cnt in (firstCnt, lastCnt) and lastCnt != 0)
@@ -1973,11 +1954,6 @@ class CA():
           line += kw[None]
           signTyp = "+"
           kw[None] = "0"
-        elif isQuat:
-          line += signTyp +"Q(%s)" %",".join( \
-                  ("%s" %kw[x] if x in kw else '0') for x in quatKeys)
-          signTyp = "+"
-          kw = {}
         else:
           scalar = ""
           if None in kw:
@@ -1987,16 +1963,12 @@ class CA():
                   ("%s=%s" %(x,kw[x])) if x else str(kw[x]), kw.keys())))
           signTyp = "+"
           kw = {}
-        isQuat = False
       kw[key] = val
 
     # Dump the remainder
     if len(kw) == 1 and None in kw:
       signTyp = kw[None][0] if signTyp or kw[None][0] == "-" else ""
       line += signTyp +kw[None][1:]
-    elif isQuat:
-      line += signTyp +"Q(%s)" %",".join( \
-              ("%s" %kw[x] if x in kw else '0') for x in quatKeys)
     else:
       scalar = ""
       if None in kw:
@@ -2083,7 +2055,7 @@ if __name__ == '__main__':
        Calculator.log(store == Euler(*test), store)""",
     """# Test 10 Geodetic distance = acos(p.w *d.w -p.dot(d)).
        if CA.IsCalc("Q"):
-         p = Q.Euler(e); d=(d45+i+2j+3k).versor()
+         p = Q.Euler(e); d=(d45+i+2*j+3*k).versor()
          test = math.acos(p.w *d.w -p.dot(d))
          p = CA.Q(p); d = CA.Q(d)
        else:

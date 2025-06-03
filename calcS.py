@@ -241,6 +241,10 @@ class S():
      symbols are checked in locals and globals otherwise the text is embedded
      as operations. This allows symbols to be included in Matricies and expanded
      later."""
+  __calculator = None                    # Last calculator loaded
+  __globWordList = []                    # Remember variables
+  __keyWordList = []                     # Avoid processing modules
+  __loadedCalcs = []                     # Notify any other calc loaded
 
   def __init__(self, symbol, getLocals=None, isMinus=False):
     """S(symbol, [isTxt])
@@ -504,8 +508,8 @@ class S():
 
   @staticmethod
   def IsCalc(calc):
-    """Check if calcQ has been loaded."""
-    return (calc == "S")
+    """Check if named calculator has been loaded."""
+    return (calc in S.__loadedCalcs)
 
   ###################################################
   ## Calc class help and basis processing methods  ##
@@ -519,7 +523,7 @@ class S():
     """Return the calculator help, module heirachy and classes for S."""
     help = \
       """Symbolic Algebra Calculator - Process symbols as strings currently."""
-    return (("S"), ("S", "P", "math"), "default.sym", help, "")
+    return (("S"), ("S", "P", "math"), "", "default.sym", help, "")
 
   @staticmethod
   def _setWordLists(Calc):
@@ -532,7 +536,8 @@ class S():
 
   @classmethod
   def _setCalcBasis(cls, calcs, Calc):
-    """Load other calculator. None currently."""
+    """Load this other calculator. None currently."""
+    S.__loadedCalcs = calcs
     S._setWordLists(Calc)
     return ""
 
