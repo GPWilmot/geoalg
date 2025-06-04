@@ -611,6 +611,7 @@ class O():
             if not oper(base.value, 0.0):
               res = False
             cfIdx += 1
+    return res
 
   def __add(self, grade):
     """Add a single O term to self placing it in the correct order."""

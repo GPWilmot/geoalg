@@ -188,11 +188,11 @@ class CA():
        with higher and imaginary grades entered with more hex digits eg:
        e12i1=1.0. Repeated bases are not allowed and e0 is i1 and i0 is e1.
        See Basis and BasisArgs for a list of basis numbers and names."""
-    self.w = args[0] if args else 0  # Scalar  #__w TBD
-    Lib._checkType(self.w, (int, float), "CA")
+    self.w = args[0] if args else 0             # Scalar
     self.__g = []                               # Array of ordered Grades
     self.__currentAdd = -1                      # Previous add index
     self.__entered0 = 0                         # Remember for printing e0/i0
+    Lib._checkType(self.w, (int, float), "CA")
     if len(args) > self.__HEX_BASIS *2:
       raise Exception("Too many basis elements")
     for idx,val in enumerate(args[1:]):
@@ -506,6 +506,7 @@ class CA():
             if not oper(base.value, 0.0):
               res = False
             cfIdx += 1
+    return res
 
   def __add(self, grade):
     """Add a single CA term to self placing it in the correct order. Optimise
@@ -514,16 +515,12 @@ class CA():
       self.w += grade.value
       return
     if self.__currentAdd >= 0: 
-      order = self.__g[self.__currentAdd].order(grade)
       pos = self.__currentAdd
     else:
-      order = self.__g[0].order(grade) if self.__g else 0
       pos = 0
-    order = self.__g[0].order(grade) if self.__g else 0
     pos = 0
     for idx,base in enumerate(self.__g[pos:]):
       order = base.order(grade)
-      pos = idx +1
       if order == 0:
         self.__g[idx].value += grade.value
         if not self.__g[idx].value:
@@ -531,8 +528,8 @@ class CA():
           self.__currentAdd -= 1
         return
       elif order > 0:
-        pos = idx
         break
+      pos = idx +1
     if grade.value:
       self.__currentAdd = pos
       self.__g.insert(pos, grade)
@@ -1934,9 +1931,9 @@ class CA():
 
   @classmethod
   def _processStore(cls, state):
-    """Convert the store array into CA(...) or Q(...) python code. If
-       isMults1/2 set then double up since CA to Q or MULTS are higher priority
-       then SIGNS. The state is a ParseState from Calculator.processTokens()."""
+    """Convert the store array into CA(...) python code. If isMults1/2
+       set then double up since MULTS are higher priority then SIGNS.
+       The state is a ParseState from Calculator.processTokens()."""
     kw = {}
     line = ""
     signTyp = state.signVal
