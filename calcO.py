@@ -1807,7 +1807,7 @@ class O():
   @staticmethod
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for O."""
-    cHelp = """Octonian/Sedenian Calculator - Process 30-dimensional basis
+    cHelp = """Octonion/Sedenion/Ultra Calculator - Process 30-dimensional basis
           numbers (o1..F or u1..F) and multiples."""
     ijk = "i,j,k=O(o1=1),O(o2=1),O(o12=1)"
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")

@@ -16,34 +16,34 @@ O.Basis(5)  # Cawagas uses o1-o4 & CABCXeg uses o5
 # S14 = e123 +e145 +e167 +e246 -e257 -e347 +e356,  t14 = CP6[3][0]
 
 # With Cayley Dickson Rule set the same as Wikipedia (default)
-# Octonians = AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3), ao7) where
-ao7 = ("e1", "e2", "e3", "e4", "e5", "e6", "e7")
+f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))
+AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
+print("Wiki representation:", AO7 == Tensor(
+      ("-1", "f3", "-f2", "f5", "-f4", "-f7", "f6"),
+      ("-f3", "-1", "f1", "f6", "f7", "-f4", "-f5"),
+      ("f2", "-f1", "-1", "f7", "-f6", "f5", "-f4"),
+      ("-f5", "-f6", "-f7", "-1", "f1", "f2", "f3"),
+      ("f4", "-f7", "f6", "-f1", "-1", "-f3", "f2"),
+      ("f7", "f4", "-f5", "-f2", "f3", "-1", "-f1"),
+      ("-f6", "f5", "f4", "-f3", "-f2", "f1", "-1")))
 
-# found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(AO7),ao7,num=-1)
-AO7 = Tensor(
-      ("-1", "e3", "-e2", "e5", "-e4", "-e7", "e6"),
-      ("-e3", "-1", "e1", "e6", "e7", "-e4", "-e5"),
-      ("e2", "-e1", "-1", "e7", "-e6", "e5", "-e4"),
-      ("-e5", "-e6", "-e7", "-1", "e1", "e2", "e3"),
-      ("e4", "-e7", "e6", "-e1", "-1", "-e3", "e2"),
-      ("e7", "e4", "-e5", "-e2", "e3", "-1", "-e1"),
-      ("-e6", "e5", "e4", "-e3", "-e2", "e1", "-1"))
-
-# The Baez Octonion representation: BO7 = Tensor.Table(bo7).morph(bo7,ao7) where
-# bo7 found via Tensor.Table(O.Basis(3)).search(O.Basis(3),Tensor(BO7),ao7,num=-1)
-# With Baez rule set via O.CayleyDicksonRule(True) then search finds
-# co7 permutation so that Tensor.Table(co7).morph(co7,ao7)==BO7 under Baez rule.
-# NB: ao7 maps to O.Basis(3) directly whereas both bo7 and co7 are dis-ordered.
+# The Baez Octonion representation is found with an anti-isomorphic
+# permutation or by changing to Baez duubling rule and applying an
+# isomorphic permutation.
 bo7 = Tensor(O.Basis(3)).permute([1, 2, 4, 3, 7, 5, -6], invert=True)
+BO7 = Tensor.Table(bo7).morph(bo7,f7Basis)
+O.CayleyDicksonRule(True)
 co7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
-BO7 = Tensor(
-      ("-1", "e4", "e7", "-e2", "e6", "-e5", "-e3"),
-      ("-e4", "-1", "e5", "e1", "-e3", "e7", "-e6"),
-      ("-e7", "-e5", "-1", "e6", "e2", "-e4", "e1"),
-      ("e2", "-e1", "-e6", "-1", "e7", "e3", "-e5"),
-      ("-e6", "e3", "-e2", "-e7", "-1", "e1", "e4"),
-      ("e5", "-e7", "e4", "-e3", "-e1", "-1", "e2"),
-      ("e3", "e6", "-e1", "e5", "-e4", "-e2", "-1"))
+CO7 = Tensor.Table(co7).morph(co7,f7Basis)
+O.CayleyDicksonRule(False)
+print("Baez representation:", BO7 == CO7, BO7 == Tensor(
+      ("-1", "f4", "f7", "-f2", "f6", "-f5", "-f3"),
+      ("-f4", "-1", "f5", "f1", "-f3", "f7", "-f6"),
+      ("-f7", "-f5", "-1", "f6", "f2", "-f4", "f1"),
+      ("f2", "-f1", "-f6", "-1", "f7", "f3", "-f5"),
+      ("-f6", "f3", "-f2", "-f7", "-1", "f1", "f4"),
+      ("f5", "-f7", "f4", "-f3", "-f1", "-1", "f2"),
+      ("f3", "f6", "-f1", "f5", "-f4", "-f2", "-1")))
 
 # Split Octonions from Wiki = Tensor(SO7).dump(so7)
 so7 = ("i",  "j",   "k",   "l",   "li", "lj",  "lk")
@@ -662,15 +662,15 @@ if "do5" not in globals() or do5:
 
 # O(3)  (A2*o1+B1*o2 +B2*o12+C1*o3 +C2*o13+D1*o23 +D2*o123)
 #     * (c2*o1+d1*o2 +d2*o12+e1*o3 +e2*o13+f1*o23 +f2*o123)
-A2=B1=B2=C1=C2=D1=D2=c2=d1=d2=e1=e2=f1=f2=1; A1=c1=0
-real1=(A1*c1-c2*A2-(d1*B1+B2*d2)-(e1*C1+C2*e2-(-D1*f1-f2*D2))) 
-pure1= (c2*A1+A2*c1-(B2*d1-d2*B1)-(C2*e1-e2*C1-(-f2*D1+D2*f1)))*o1 \
-      +(d1*A1-A2*d2+B1*c1+c2*B2-(D1*e1+e2*D2+-f1*C1-C2*f2))*o2 \
-      +(A2*d1+d2*A1+-c2*B1+B2*c1-(-e2*D1+D2*e1+C2*f1-f2*C1))*o12 \
-      +(e1*A1-A2*e2-(B1*f1+f2*B2)+C1*c1+c2*C2-(-d1*D1-D2*d2))*o3 \
-      +(A2*e1+e2*A1-(f2*B1-B2*f1)+-c2*C1+C2*c1-(-D2*d1+d2*D1))*o13 \
-      +(B1*e1-e2*B2+f1*A1+A2*f2+-d1*C1+C2*d2+D1*c1-c2*D2)*o23 \
-      +(e2*B1+B2*e1+-A2*f1+f2*A1+-C2*d1-d2*C1+c2*D1+D2*c1)*o123 # = 0
+A2=B1=B2=C1=C2=D1=D2=c2=d1=d2=ee1=ee2=f1=f2=1; A1=c1=0
+real1=(A1*c1-c2*A2-(d1*B1+B2*d2)-(ee1*C1+C2*ee2-(-D1*f1-f2*D2))) 
+pure1= (c2*A1+A2*c1-(B2*d1-d2*B1)-(C2*ee1-ee2*C1-(-f2*D1+D2*f1)))*o1 \
+      +(d1*A1-A2*d2+B1*c1+c2*B2-(D1*ee1+ee2*D2+-f1*C1-C2*f2))*o2 \
+      +(A2*d1+d2*A1+-c2*B1+B2*c1-(-ee2*D1+D2*ee1+C2*f1-f2*C1))*o12 \
+      +(ee1*A1-A2*ee2-(B1*f1+f2*B2)+C1*c1+c2*C2-(-d1*D1-D2*d2))*o3 \
+      +(A2*ee1+ee2*A1-(f2*B1-B2*f1)+-c2*C1+C2*c1-(-D2*d1+d2*D1))*o13 \
+      +(B1*ee1-ee2*B2+f1*A1+A2*f2+-d1*C1+C2*d2+D1*c1-c2*D2)*o23 \
+      +(ee2*B1+B2*ee1+-A2*f1+f2*A1+-C2*d1-d2*C1+c2*D1+D2*c1)*o123 # = 0
 
 A2T7 = \
   {(o14, o25):    (o345,  o1345,  o2345,  o12345),

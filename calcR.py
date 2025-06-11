@@ -137,10 +137,13 @@ class LibTest():
       if not test:
         LibTest.__testPass = False
       tst = LibTest.__testRng[LibTest.__testCnt]
-      sys.stdout.write("Test%d: %s\n" %(tst, "PASS" if test else "FAIL"))
       LibTest.__testCnt += 1
-      if Lib._isVerbose() and store is not None:
-        sys.stdout.write(str(store) +'\n')
+      if store is None:
+        sys.stdout.write("Test %d\n" %tst)
+      else:
+        sys.stdout.write("Test%d: %s\n" %(tst, "PASS" if test else "FAIL"))
+        if Lib._isVerbose():
+          sys.stdout.write(str(store) +'\n')
 
   @staticmethod
   def testCnt():
@@ -439,14 +442,17 @@ class Calculator:
       elif calc in names:
         mod = "calc%s" %calc
         clsName = "Real" if calc == "R" else calc
-        code = 'if importlib:\n'
-        code += '  pkg = importlib.import_module("calc%s")\n' %calc
-        code += '  globals()["%s"] = getattr(pkg, "%s")\n' %(clsName, clsName)
-        Calculator.__firstCls._processExec(False, code)
-        code = 'globals()["%s"] if importlib else None' %clsName
-        newCls = Calculator.__firstCls._processExec(True, code)
-        if newCls is None:
-          raise Exception("No importlib: run %s.py from the command line"%mod)
+        if clsName in Calculator.__oldCls:
+          newCls = Calculator.__oldCls[clsName]
+        else:
+          code = 'if importlib:\n'
+          code += '  pkg = importlib.import_module("calc%s")\n' %calc
+          code += '  globals()["%s"] = getattr(pkg, "%s")\n' %(clsName, clsName)
+          Calculator.__firstCls._processExec(False, code)
+          code = 'globals()["%s"] if importlib else None' %clsName
+          newCls = Calculator.__firstCls._processExec(True, code)
+          if newCls is None:
+            raise Exception("No importlib: run %s.py from the command line"%mod)
         modList, clsList, ijk, fDef, cHelp, eHelp = newCls._getCalcDetails()
         Calculator.__firstCls._processExec(False, ijk)
         msg = newCls._setCalcBasis(Calculator.__moduleList, Calculator)

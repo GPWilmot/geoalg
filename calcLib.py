@@ -1378,7 +1378,7 @@ class Tensor(list):
     return self.copy(out)
 
   def transpose(self):
-    """transpose()
+    """trans[pose]()
        Return transpose matrix."""
     if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
       out = []
@@ -1391,6 +1391,7 @@ class Tensor(list):
     out = Tensor(self)
     out.__size = (self.__size[1], self.__size[0])
     return out
+  trans=transpose
 
   def pow(self, exp):
     """pow(exp)
@@ -1548,7 +1549,7 @@ class Tensor(list):
     return self.copy(out)
 
   def differences(self, mat, ignore=None):
-    """differences(mat,[ignore])
+    """diff[erences](mat,[ignore])
        Return list of indicies for differences of 2 matricies & ignore value."""
     Lib._checkType(mat, (list, tuple), "diff")
     out = []
@@ -1576,11 +1577,13 @@ class Tensor(list):
         if diff:
           out.append([idx1])
     return out
+  diff=differences
 
-  def dump(self, xLabels=[], yLabels=[], name=""):  # Use resolution TBD XXX
+  def dump(self, xLabels=[], yLabels=[], name=None):  # Use resolution TBD XXX
     """dump([xLabels,yLabels,name])
        Pretty print of Matrix with optional labels."""
     s = t = 0
+    xName = "" if name is None else name
     if xLabels:
       Lib._checkType(xLabels, (list, tuple), "dump")
       if not self or len(xLabels) != self.__size[1]:
@@ -1598,10 +1601,10 @@ class Tensor(list):
     else:
       size = max(map(lambda x :len(str(x)), self))
     formX = " %%%ds" %(max(s,size))
-    nameX = "%%-%ds" %(max(t,len(str(name))) +3)
-    formY = " %%%ds" %max(t,len(str(name)))
-    if xLabels or name:
-      sys.stdout.write(nameX %str(name) +"%s\n" %"".join(formX %x for x in xLabels))
+    nameX = "%%-%ds" %(max(t,len(str(xName))) +3)
+    formY = " %%%ds" %max(t,len(str(xName)))
+    if xLabels or name is not None:
+      sys.stdout.write(nameX %str(xName) +"%s\n" %"".join(formX %x for x in xLabels))
       if xLabels:
         sys.stdout.write(formY %"" +'-' *(len(xLabels) *(max(s,size)+1)+2)+'\n')
     for ii,vals in enumerate(self):

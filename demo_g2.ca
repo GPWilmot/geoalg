@@ -1,0 +1,158 @@
+###############################################
+## Calculators demoG2.ca - G.P.Wilmot 30/5/2025
+###############################################
+
+_demo_g2 = """Run calcCA.py demo with "load(spin7_g2,demo_g2); verbose; test" or
+ test(1), ..., test(25). Can't run calc and help in a test so have used
+ Calculator.calc() and Calculator.help() or print() for variables.
+ """
+
+import pydoc; pydoc.pager = pydoc.plainpager # Replace Linux less with cat
+load(spin7_g2.ca)
+
+demo_tests = [\
+  "",
+  """#
+     # Test 1: CA help and calc command (ignore Calculators normally)
+     #
+     Calculator.log(True)
+     Calculator.help(); Calculator.calc()""",
+  """#
+     # Test 2: Example help command for a library 
+     #
+     Calculator.log(True)
+     Calculator.help(Euler)""",
+  """#
+     # Test 3: Load Q calculator and example help command for a method
+     #
+     Calculator.log(True)
+     Calculator.calc("Q")
+     Calculator.help(Q.frameMatrix)""",
+  """#
+     # Test 4: Example of quaternion test(7)
+     # Rotate via frameMatrix == versor.versorMatrix(half angle).
+     #
+     Calculator.log(True)
+     d45=radians(45)
+     test = (d45+i+j+k).frameMatrix()
+     store = (d45+i+j+k).versor().versorMatrix()
+     print("Calculator.Log(store == test, store) => %s" %(store==test), "\\n", store)""",
+  """#
+     # Test 5: CA equivalent vector
+     #
+     Calculator.log(True)
+     print((d45+i+j+k).versor().inverse() *i *(d45+i+j+k).versor())
+     print((d45+i+j+k).versor() *i *(d45+i+j+k).versor().inverse())""",
+  """#
+     # Test 6: Quaternion multiplication table
+     #
+     Calculator.log(True)
+     ijk = [i,j,k]; Tensor.Table(ijk).dump(ijk)""",
+  """#
+     # Test 7: Redefine i,j,k as CA quaternions
+     #
+     Calculator.log(True)
+     Calculator.calc("CA"); Calculator.help()""",
+  """#
+     # Test 8: Clifford algebra quaternion multiplication table
+     #
+     Calculator.log(True)
+     CAijk = [i,j,k]; Tensor.Table(CAijk).dump(CAijk)""",
+  """#
+     # Test 9: Load octonion calculator which redefines i,j,k
+     #
+     Calculator.log(True)
+     Calculator.calc("O"); Calculator.help()""",
+  """#
+     # Test 10: Octonions quaternion multiplication table
+     #
+     Calculator.log(True)
+     Oijk = [i,j,k]; Tensor.Table(Oijk).dump(Oijk)""",
+  """#
+     # Test 11: Compare CA and O
+     #
+     Calculator.log(True)
+     if CA.IsCalc("O"):
+       cb = CA.Basis(0,3)
+       ob = list(O.Basis(3)); ob = ob[:2] +ob[3:4] +[O(o12=-1)] +ob[4:]
+       Tensor.Table(cb).dump(cb,name="CA")
+       print()
+       Tensor.Table(ob).dump(ob,name="O")
+     else:
+       print("Need to run the commands: calc(O)")""",
+  """#
+     # Test 12: The 7D pseudoscalar has negative signature
+     #
+     Calculator.log(True)
+     print(e1234567**2, "or", e1234567*e1234567==-1)""",
+  """#
+     # Test 13: Define a function that returns a generator
+     #
+     Calculator.log(True)
+     def gen(x): return (x(y,CA(e1234567=1)) for y in CA.Basis(7))
+     gas=gen(CA.asym); print(gen, "\\n", gas, next(gas), next(gas))
+     print(list(gas), "\\n")""",
+  """#
+     # Test 14: Pseudoscalar is commutative
+     #
+     Calculator.log(True)
+     print(list(gen(CA.asym)), "\\n")""",
+  """#
+     # Test 15: All generators need a loop
+     #
+     Calculator.log(True)
+     g=gen(CA.sym); print("\\n", g); print(list(g), "\\n")""",
+  """#
+     # Test 16: My version of generalised dot and wedge product
+     #
+     Calculator.log(True)
+     print(list(gen(CA.dot)),"\\n"); print(list(gen(CA.wed))); help(CA.dot);help(CA.wed)""",
+  """#
+     # Test 17: Functions to classify signed 3-forms (already loaded)
+     #
+     Calculator.log(True)
+     print("help=\\n", _spin7_g2, "\\n")""",
+  """#
+     # Test 18: First 2 of 30 7-fold 3-forms
+     #
+     Calculator.log(True)
+     print("help=",_Triads7); print(len(Triads7)); print(Triads7[0:2], "\\n")""",
+  """#
+     # Test 19: First signed 7-fold 3-form = primary cross product (class V)
+     #
+     Calculator.log(True)
+     print(triads7class(Triads7[0]), triads7all(0,0)==Triads7[0])
+     print("Classes =", dict((x[0],x[1][0]) for x in Nac7Name.items()), "\\n")""",
+  """#
+     # Test 20: 4th signed 3-form is a calibration (class O)
+     #
+     Calculator.log(True)
+     print(triads7class(triads7all(0,4)), "is", triads7all(0,4), "\\n")""",
+  """#
+     # Test 21: Associative calibration -> G2
+     #
+     Calculator.log(True)
+     p=-e1234567; print(p*triads7all(0,4)); print(makeG2(), "\\n")""",
+  """#
+     # Test 22: Make a list of complimentary triad as a basis
+     #
+     Calculator.log(True)
+     def ctb(x): return (CA.Eval((x[0],x[1])) for x in (p*triads7all(0,x)).copyTerms())""",
+  """#
+     # Test 23: Commuting primary (enabling) algebra but not symmetric
+     #
+     Calculator.log(True)
+     ctb0 = list(ctb(0)); print(ctb0, "\\n"); Tensor.Table(ctb0).dump(ctb0); print("\\n")""",
+  """#
+     # Test 24: Symmetry -> calibration
+     #
+     Calculator.log(True)
+     ctb4 = list(ctb(4)); Tensor.Table(ctb4).dump(ctb4); print("\\n")""",
+  """#
+     # Test 25: Projection Operators (PO) with /8 normalisation
+     #
+     Calculator.log(True)
+     r = (triads7all(0,4)-3*p)/4; s = (1-p*r)/2; print(r**2==-1, s*s==s)
+     print("s*8 =", s*8, "\\n")"""]
+
+Calculator.replaceTests(demo_tests)

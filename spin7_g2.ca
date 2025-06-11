@@ -73,16 +73,7 @@ SS1o = e1234567 *S1o
 # Octonians = TriadsOhalf +(-1*Tensor(TriadsOhalf))                      # len=480
 
 # Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Tensor.Table/Cycles(basis)
-f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))    # morph(PP1, f7Basis)
-#       f1  f2  f3  f4  f5  f6  f7
-#   ------------------------------
-# f1|    1 -f7 -f6  f5  f4 -f3 -f2
-# f2|  -f7   1 -f5  f6 -f3  f4 -f1
-# f3|  -f6 -f5   1  f7 -f2 -f1  f4
-# f4|   f5  f6  f7   1  f1  f2  f3
-# f5|   f4 -f3 -f2  f1   1 -f7 -f6
-# f6|  -f3  f4 -f1  f2 -f7   1 -f5
-# f7|  -f2 -f1  f4  f3 -f6 -f5   1
+
 # So PP1 *PP1 = 7 -2*PP1 +8*f4
 #          e1247  e1256  e1346  e1357  e2345  e2367  e4567
 #      ------1------2------3------4------5------6------7--
@@ -94,20 +85,27 @@ f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))    # morph(PP1, f7B
 # e2367|  -e1346  e1357 -e1247  e1256 -e4567    1.0 -e2345
 # e4567|  -e1256 -e1247  e1357  e1346 -e2367 -e2345    1.0
 
-# triads7all(0,4) = O- = -O+
-Spin7O = Tensor( \
- ("-1",  "f3",  "-f2", "f5", "-f4",  "f7",  "-f6"),
- ("-f3", "-1",  "f1",  "-f6", "f7",  "f4",  "-f5"),
- ("f2",  "-f1", "-1",  "f7",  "f6",  "-f5", "-f4"),
- ("-f5", "f6",  "-f7", "-1",  "f1",  "-f2", "f3"),
- ("f4",  "-f7", "-f6", "-f1", "-1",  "f3",  "f2"),
- ("-f7", "-f4", "f5",  "f2",  "-f3", "-1",  "f1"),
- ("f6",  "f5",  "f4",  "-f3", "-f2", "-f1", "-1"))
-if CA.IsCalc("O"):  # Need default.oct
-  Tensor(A7).search(m8,Spin7O,f7Basis)
-  Tensor.Triads(*(-triads7all(0,22)).spin(f7Basis)) == Tensor(A7).morph(m8,f7Basis)
-  Tensor.Triads(*triads7all(0,22).spin(f7Basis)) == Tensor(C7).morph(m8,f7Basis)
-  Tensor.Triads(*triads7all(10,0).spin(f7Basis)) == Tensor(E7).morph(m8,f7Basis)
+f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7")) 
+
+# Octonion representation in calcO is triads7all(0,22) => O+
+# ie Tensor.Triads(*(triads7all(0,22)).spin(f7Basis)) == AO7 (checked below)
+# Baez rep. in calcO is triads7all(0,105) = -triads7all(0,22) = -O+ = O-
+Spin7O = Tensor( 
+ ("-1",  "f3",  "-f2", "f5", "-f4",  "-f7",  "f6"),
+ ("-f3", "-1",  "f1",  "f6", "f7",  "-f4",  "-f5"),
+ ("f2",  "-f1", "-1",  "f7",  "-f6",  "f5", "-f4"),
+ ("-f5", "-f6",  "-f7", "-1",  "f1",  "f2", "f3"),
+ ("f4",  "-f7", "f6", "-f1", "-1",  "-f3",  "f2"),
+ ("f7", "f4", "-f5",  "-f2",  "f3", "-1",  "-f1"),
+ ("-f6",  "f5",  "f4",  "-f3", "-f2", "f1", "-1"))
+Spin7Obaez = Spin7O.transpose()
+
+if CA.IsCalc("O"):  # Same code as ultronions.oct
+  AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
+  O.CayleyDicksonRule(True)
+  BO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
+  O.CayleyDicksonRule(False)
+  print("Octonion representations:", Spin7O == AO7, Spin7Obaez == BO7)
 
 # triads7all(0,0) = R+-
 Spin7R = Tensor( \
@@ -1080,4 +1078,7 @@ g23s = (sr2*(e12+e15)-e37+e46, sr2*(e13+e16)-e45+e27, sr2*(14+e17)-e26+e35,
 g01s = (G01[4]-G01[5], G01[12]-G01[13], G01[10]-G01[11], G01[9]-G01[8], G01[2]-G01[3], G01[6]-G01[7])
 gn1s = ("X1-Y1", "X2-Y2", "Y3-X3", "X4-Y4", "X5-Y5", "X6-Y6")
 # = (E-L, D+K, H; ~G+N, ~M, ~J) # ~ = skewed
+
+
+
 
