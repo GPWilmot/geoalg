@@ -1,9 +1,9 @@
-# Geometric Algebra Calculators - Quaternions, Octonions, Sedenions and Clifford Algrebra (geoalg)
+# Geometric Algebra Calculators - Quaternions, Octonions, Sedenions, etc and Clifford Algebra (geoalg)
 
 This project provides 5 calculators interpreted by Python to allow basis elements such as *i, j, k, e<sub>1</sub>, e<sub>2</sub>, e<sub>3</sub>* to be entered at the prompt:
 * calcCA - Clifford Algebra calculator to understand and extend quaternions
 * calcQ - Quaternion calculator that covers complex numbers
-* calcO - Octonion extended calculator includes split octonions and sedenions to multiple levels
+* calcO - Octonion/ultronion calculator includes sedenions and split ultronions
 * calcR - Real numbers only but the basis for other calculators along with calcLib
 * calcS - Symbolic expansion only used to test n-D CA rotations and sedenion products
 
