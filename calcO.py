@@ -1071,13 +1071,13 @@ class O():
     """sym(q)
        Return symmetric product of two Os. The pure part is always zero."""
     Lib._checkType(q, O, "sym")
-    out = (self *q +q *self)
-    return out
+    return (self *q +q *self)
 
   def asym(self, q):
     """asym(q)
        Return antisymmetric product of two Os. Cross product is pure part."""
     Lib._checkType(q, O, "asym")
+    return (self *q -q *self)
  
   def associator(self, p, q, alternate=False):
     """assoc[iator](p,q, [alternate])
