@@ -33,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.6"
+__version__ = "0.7"
 import math
 from calcLib import *
 
@@ -173,15 +173,15 @@ class O():
        index is taken from _BasisArray()."""
     def __init__(self, value, bases):
       """Element with scalar and p, o & u bases as Product index & BasisArgs."""
-      self._init(value, bases)
-    def _init(self, value, bases):
+      self.__init(value, bases)
+    def __init(self, value, bases):
       self.value = value
       self.__pBase = bases[0]
       self.__oBase = bases[1]
       self.__uBase = bases[2]
     def __str__(self):
       return "%s[%s,%s,%s]" %(self.value, self.__pBase,
-                            self.__oBase, self.__uBase)
+                             self.__oBase, self.__uBase)
     __repr__ = __str__
     def __mergeStr(self, dupStr):
       sStr = sorted(dupStr)
@@ -213,24 +213,12 @@ class O():
       return ((oCh +self.__oBase) if self.__oBase else "",
               (uCh +self.__uBase) if self.__uBase else "")
     def str(self, oCh='o', uCh='u'):    # O.__BASIS_CHARS[0/1]
-      out = ""
-      idx = 0
-      oChar = self.__oBase[idx:idx+1]
-      oTyp = 0
-      for ch in sorted(self.__oBase + self.__uBase):
-        if ch == oChar:
-          out += ("" if oTyp == 1 else oCh) +ch
-          oTyp = 1
-          idx += 1
-          oChar = self.__oBase[idx:idx+1]
-        else:
-          out += ("" if oTyp == 2 else uCh) +ch
-          oTyp = 2
-      return out
+      return (oCh +self.__oBase) if self.__oBase else "" \
+             + (uCh +self.__uBase) if self.__uBase else ""
 
     def copy(self, value=None):
       inherit = super().__new__(self.__class__)
-      inherit._init(self.value if value is None else value,
+      inherit.__init(self.value if value is None else value,
                     (self.__pBase, self.__oBase[:], self.__uBase[:]))
       return inherit
 
@@ -300,7 +288,7 @@ class O():
       else:
         bases = lhs
       inherit = super().__new__(self.__class__)
-      inherit._init(value, bases)
+      inherit.__init(value, bases)
       return inherit
 
   ##############################################################################
@@ -331,33 +319,34 @@ class O():
       if not key:
         self.w += value
       elif value:
-        self.__add(O._init(key, value, O.__BASIS_CHARS,
-                           O.Grade(1, (0, "", ""))))
+        lGrade = O._init(key, value, O.__BASIS_CHARS, 
+                        O.Grade(value, (0, "", "")))
+        self.__add(lGrade)
 
   @staticmethod
-  def _init(key, value, baseChars, lGrade):
+  def _init(key, value, baseChars, lGrade=None):
     """Return the Grade for basis string key. Separate o & u parts."""
-    grades = [lGrade, lGrade.copy()]
+    if lGrade is None:
+      lGrade = O.Grade(value, (0, "", ""))  # Base for o and u, resp
     rBases = [0, "", ""]
     typ = None
-    baseCh = False
+    baseCh = True
     lastChar = ''
     for char in key:
       if (char.isdigit() or char in O.__HEX_CHARS) and char > lastChar:
         lastChar = char
     xyz = O._BasisArray(lastChar)[0]
     lastChar,oneByOne  = '', False
-    cntBases = 0
     for char in key:
-      offset = int(typ == baseChars[1]) # o==0, u==1
+      offset = int(typ == baseChars[1]) # o==1, u==2
       oneByOne = (oneByOne or char <= lastChar)
       if typ and char.isdigit():
         if char in O.__maxBasis[1 -offset]:
           raise Exception("Dimension already used by %s%s" \
                            %(baseChars[1 -offset], char))
         if oneByOne:
-          rBases[0] = xyz.index("".join(sorted(rBases[offset +1])))
-          grades[offset] = grades[offset].mergeBasis(1, rBases)
+          rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
         if char not in O.__maxBasis[offset]:
@@ -368,22 +357,19 @@ class O():
         if char in O.__maxBasis[1 -offset]:
           raise Exception("Invalid basis: %s%s" %(typ, char))
         if oneByOne:
-          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
-          grades[offset] = grades[offset].mergeBasis(1, rBases)
+          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
         if char not in O.__maxBasis[offset]:
           O.__maxBasis[offset] += char
         rBases[offset +1] += char
         baseCh = False
-      elif char in baseChars and not baseCh:
-        if cntBases == 3 or char == typ:
-          raise Exception("Invalid basis duplication: %s" %char)
-        if rBases[offset +1]:
-          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
-          grades[offset] = grades[offset].mergeBasis(1, rBases)
+      elif char in baseChars:
+        if rBases[1] +rBases[2]:
+          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
+          lGrade = lGrade.mergeBasis(1, rBases)
           rBases = [0, "", ""]
-        cntBases += 1
         typ = char
         baseCh = True
         lastChar,oneByOne  = '', False
@@ -392,17 +378,10 @@ class O():
     if typ and baseCh:
       raise Exception("Invalid last basis: %s" %key)
     rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
-    grades[offset] = grades[offset].mergeBasis(value, rBases)
-    if cntBases == 1:
-      return grades[offset]
-    rBases[1] = grades[0].bases()[1]
-    rBases[2] = grades[1].bases()[2]
-    if typ == baseChars[0]:
-      grades[0].value *= -1
-    rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
-    grades[0]._init(grades[0].value *grades[1].value, rBases)
-    return grades[0]
+    return lGrade.mergeBasis(1, rBases)
 
+  @staticmethod
+  def _TBDMax(): return O.__maxBasis
   def __float__(self):
     return float(self.w)
   def __int__(self):
@@ -414,11 +393,11 @@ class O():
     for base in [None] +self.__g:
       if base:
         val = base.value
-        bOut = base.str()
+        oOut,uOut = base.strs()
       else:
         val = self.w
-        bOut = ""
-      out += Lib._resolutionDump(sign, val, bOut)
+        oOut = uOut = ""
+      out += Lib._resolutionDump(sign, val, oOut +uOut)
       if out:
         sign = " +"
     return out if out else "0"
@@ -1840,7 +1819,7 @@ class O():
     """Return the calculator help, module heirachy and classes for O."""
     cHelp = """Octonion/Sedenion/Ultra Calculator - Process 30-dimensional basis
           numbers (o1..F or u1..F) and multiples."""
-    ijk = O.SetQuaternions()[0] #O(o1=1),O(o2=1),O(o12=1)"
+    ijk = O.SetQuaternions()[0]
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 
   @classmethod
@@ -1852,7 +1831,7 @@ class O():
         if i not in cls.__allChars:
           cls.__allChars.append(i)
       cls.__useCA = True
-    return O.SetQuaternions()[1] #o1,o2,o12
+    return O.SetQuaternions()[1]
 
   @classmethod
   def _validBasis(cls, value, full=False):
@@ -1997,11 +1976,11 @@ if __name__ == '__main__':
        if O.IsCalc("Q"):
          test = (d45+i+j+k).frameMatrix()
        else:
-         test = (d45+o1+o2+o12).frameMatrix()
-       store = (d45+o1+o2+o12).versor().versorMatrix()
+         test = (d45+i+j+k).frameMatrix()
+       store = (d45+i+j+k).versor().versorMatrix()
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
-       r = d45 +o1+o2 +o12; store = r.normalise().euler().matrix()
+       r = d45 +i +j +k; store = r.normalise().euler().matrix()
        if O.IsCalc("Q"):
          test = r.normalise().versorMatrix()
        else:
