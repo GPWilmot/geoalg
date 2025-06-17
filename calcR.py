@@ -278,8 +278,7 @@ class Calculator:
     vers = Lib.version()
     idx = 0
     while idx +1 < len(args):
-      if __version__ != args[idx +1]:
-        vers += "(%s: %s)" %(args[idx], args[idx +1])
+      vers += "(%s: %s)" %(args[idx], args[idx +1])
       idx += 2
     sys.stdout.write(vers +'\n')
 
