@@ -217,7 +217,7 @@ class CA():
     lGrade = CA.Grade(value, ("", ""))  # Base for e and i, resp
     rBases = ["", ""]
     typ = None
-    digit = False
+    baseCh = False
     lastChar = ['', '']
     for char in key:
       offset = int(typ == CA.__BASIS_CHARS[1]) # i
@@ -237,7 +237,7 @@ class CA():
           if char > CA.__maxBasis[offset]:
             CA.__maxBasis[offset] = char
         rBases[offset] += char
-        digit = True
+        baseCh = False
       elif typ and char in CA.__HEX_CHARS:
         if char <= lastChar[offset]:
           lGrade = lGrade.mergeBasis(1, rBases)
@@ -247,16 +247,17 @@ class CA():
           if char > CA.__maxBasis[offset]:
             CA.__maxBasis[offset] = char
         rBases[offset] += char
-        digit = True
-      elif char in CA.__BASIS_CHARS:
+        baseCh = False
+      elif char in CA.__BASIS_CHARS and not baseCh:
         if rBases[0] +rBases[1]:
           lGrade = lGrade.mergeBasis(1, rBases)
           rBases = ["", ""]
         typ = char
-        digit = False
+        baseCh = True
+        lastChar[offset] = ''
       else:
         raise Exception("Invalid basis: %s" %key)
-    if typ and not digit:
+    if typ and baseCh:
       raise Exception("Invalid last basis: %s" %key)
     return lGrade.mergeBasis(1, rBases), entered0
 
