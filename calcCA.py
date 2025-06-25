@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.4"
+__version__ = "0.5"
 import math
 from calcLib import *
 
@@ -304,27 +304,39 @@ class CA():
     if abs(self.w -cf.w) > precision:
       return False
     idx = 0
-    for grade in self.__g:
-      while len(cf.__g) > idx:
-        order = grade.order(cf.__g[idx])
-        if order > 0:
-          if abs(cf.__g[idx].value) > precision:
+    cfIdx = 0
+    while True:
+      base = self.__g[idx] if idx < len(self.__g) else None
+      cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
+      if not (base and cfBase):
+        if not base:
+          if not cfBase:
+            return True
+          if abs(cfBase.value) > precision:
             return False
-          idx += 1
-        elif order < 0:
-          if abs(grade.value) > precision:
-            return False
-          break
+          cfIdx += 1
         else:
-          if not grade.isEq(cf.__g[idx], precision):
+          if abs(base.value) > precision:
             return False
           idx += 1
-          break
-    while len(cf.__g) > idx:
-      if abs(cf.__g[idx].value) > precision:
-        return False 
-      idx += 1
-    return True
+      else:
+        order = base.order(cfBase)
+        if order == 0:
+          if abs(base.value -cfBase.value) > precision:
+            return False
+          idx += 1
+          cfIdx += 1
+        else:
+          if order < 0:
+            if abs(cfBase.value) > precision:
+              return False
+            idx += 1
+          else:
+            if abs(base.value) > precision:
+              return False
+            cfIdx += 1
+    raise Exception("Programming error for equality")
+
   def __ne__(self, cf):
     """Not equal is not automatic. Need this."""
     return not self.__eq__(cf)
@@ -470,7 +482,6 @@ class CA():
       raise Exception("Invalid comparison for O: %s" %type(cf))
     cfIdx = 0
     idx = 0
-    order = 0
     res = True
     while True:
       base = self.__g[idx] if idx < len(self.__g) else None
@@ -773,6 +784,8 @@ class CA():
     """basisTerms()
        Return self as 3 lists = a list of e-basis indicies, values & i-basis."""
     out1,out2,out3 = [],[],[]
+    if self.w:
+      out1,out2,out3 = [[]],[self.w],[[]]
     for grade in self.__g:
       eBase,iBase = grade.bases()
       basis = []
@@ -934,38 +947,39 @@ class CA():
       return -math.sqrt(-n2)
     return math.sqrt(n2)
 
-  def conjugate(self, split=False):
-    """conj[ugate]([split])
-       Return copy of self with pure parts negated (imaginary only if split)."""
-    out = self.dup()
-    out.__entered0 = self.__entered0
-    if split:
-      for grade in out.__g:
-        sgnVal = grade.copy(1)
-        sgnVal = sgnVal.mergeBasis(1, grade.bases())
-        grade.value *= sgnVal.value
-    else:
-      for grade in out.__g:
-          grade.value = -grade.value
-    return out
-  conj = conjugate
-
   def canonical(self):
     """canon[ical]()
-       Return canonical involution copy of self with basis parts negated. This
-       is an automorphism of the algebra denoted with a tilde (~ accent) by
-       R.Harvey so the tilde() method can be used (or conjugate(True).
-       Grades p%4=(0123) have negation (+-+-)."""
-    return self.conjugate(True)
+       Return canonical involution copy of self with basis parts negated.
+       This is an automorphism of the algebra denoted with a tilde (~ accent)
+       by R.Harvey so the tilde() method can be used. Grades p%4=(0123) have
+       negation (+-+-). Also see composite() and conjugate()."""
+    out = self.dup()
+    out.__entered0 = self.__entered0
+    for grade in out.__g:
+      if sum(grade.lens()) %2 == 1:
+        grade.value = -grade.value
+    return out
   canon = canonical
   tilde = canonical
+
+  def conjugate(self):
+    """conj[ugate]()
+       Return copy of self with imaginary parts negated. See canonical()."""
+    out = self.dup()
+    out.__entered0 = self.__entered0
+    for grade in out.__g:
+      sgnVal = grade.copy(1)
+      sgnVal = sgnVal.mergeBasis(1, grade.bases())
+      grade.value *= sgnVal.value
+    return out
+  conj = conjugate
 
   def reverse(self):
     """rev[erse]()
        Return reversal involution copy of self with basis parts reversed. This
        is an anti-automorphism of the algebra denoted with a check (v accent)
        by R.Harvey so the check() method can be used. Grades p%4=(0123) have
-       negation (++--)."""
+       negation (++--). Also see composite()."""
     out = self.dup()
     out.__entered0 = self.__entered0
     for grade in out.__g:
@@ -1828,37 +1842,47 @@ class CA():
 
   @staticmethod
   def Eval(sets):
-    """Eval(sets)
-       Return the CA evaluated from sets of e-basis, str lists or dict pairs."""
-    Lib._checkType(sets, (list, tuple), "Eval")
-    if not (len(sets) and isinstance(sets[0], (list, tuple))):
-      sets = [sets]
+    """Eval(terms)
+       Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
+    Lib._checkList(terms, None, "Eval", [1,0])
+    if not isinstance(terms[0], (list, tuple)):
+      terms = [terms]
+    Lib._checkList(terms, (list, tuple), "Eval", [1,0])
+    Lib._checkList(terms[0], None, "Eval", [1,0])
     scalar = 0
-    terms = {}
-    for item in sets:
-      Lib._checkType(item, (list, tuple), "Eval")
-      if isinstance(item, Lib._basestr):
-        base = item[0] if item[0][0] in CA.__BASIS_CHARS else ("e" +item[0])
-        terms[base] = 1
-      elif not isinstance(item, (list, tuple)):
-        raise Exception("Invalid basis for Eval: %s" %item)
-      elif len(item) == 0:
-        scalar = 1
-      elif isinstance(item[0], Lib._basestr):
-        base = item[0]
-        if item[0] and item[0][0] not in CA.__BASIS_CHARS:
-          base = "e" +item[0]
-        terms[base] = item[1]
-      else:
-        base = "e"
-        sgn = 1
-        for num in item:
-          Lib._checkType(num, int, "Eval")
-          base += "%X" %abs(num)
-          if num < 0:
-            sgn *= -1
-        terms[base] = sgn
-    return CA(scalar, **terms)
+    if isinstance(terms[0][0], Lib._basestr):
+      out = {}
+      for item in terms:
+        if len(item) == 0:
+          scalar = 1
+        elif isinstance(item[0], Lib._basestr):
+          base = item[0]
+          if item[0] and item[0][0] not in CA.__BASIS_CHARS:
+            base = "e" +item[0]
+          out[base] = item[1]
+    else:
+      if not isinstance(terms[0][0], (list, tuple)):
+        terms = [terms]
+      terms = list(terms)
+      terms.extend([[]] *(3-len(terms)))
+      out = [[None]] *max(map(len,terms))
+      for term,base in enumerate(("e","","i")):
+        for idx,item in enumerate(terms[term]):
+          if out[idx][0] is None:
+            out[idx] = ["", 1]
+          if not base:
+            Lib._checkType(item, (int, float), "Eval")
+            out[idx][1] *= item
+          elif item:
+            basis = base
+            for num in item:
+              Lib._checkType(num, int, "Eval")
+              basis += "%X" %abs(num)
+              if num < 0:
+                out[idx][1] *= -1
+            out[idx][0] += basis
+      out = dict(out)
+    return CA(scalar, **out)
 
   @staticmethod
   def tri2str(tri):

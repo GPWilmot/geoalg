@@ -224,7 +224,8 @@ class Lib():
     if size:
       Lib._checkSize(size, len(arg), method, "list length")
     for elem in arg:
-      Lib._checkType(elem, typ, method)
+      if typ is not None:
+        Lib._checkType(elem, typ, method)
   @staticmethod
   def _checkSize(size, val, method, src):
     """Raise exception if val != int size or in (x,y), y=0=infinity."""
@@ -1080,9 +1081,9 @@ class Tensor(list):
           else:
             a[row][col] = mat * val2
       elif isinstance(mat, Lib._basestr):
-        a.append(self.__mulStr(mat, val1))
+        a.append(self.__mulStr(mat, str(val1)))
       elif isinstance(val1, Lib._basestr):
-        a.append(self.__mulStr(mat, val1))
+        a.append(self.__mulStr(str(mat), val1))
       else:
         a.append(mat * val1)
     return self.copy(a)

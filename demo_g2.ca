@@ -68,7 +68,7 @@ demo_tests = [\
      #
      Calculator.log(True)
      if CA.IsCalc("O"):
-       k=o12; Calculator.calc("O")
+       k=O(o12=1); Calculator.calc("O")
        Oijk = [i,j,k]; Tensor.Table(Oijk).dump(Oijk)
      else:
        print("Need to run the commands: calc(O)")""",

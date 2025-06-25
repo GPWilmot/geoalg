@@ -217,10 +217,8 @@ class O():
              + (uCh +self.__uBase) if self.__uBase else ""
 
     def copy(self, value=None):
-      inherit = super().__new__(self.__class__)
-      inherit.__init(self.value if value is None else value,
+      return O.Grade(self.value if value is None else value,
                     (self.__pBase, self.__oBase[:], self.__uBase[:]))
-      return inherit
 
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
@@ -287,9 +285,7 @@ class O():
           bases = rhs
       else:
         bases = lhs
-      inherit = super().__new__(self.__class__)
-      inherit.__init(value, bases)
-      return inherit
+      return O.Grade(value, bases)
 
   ##############################################################################
   ## Class overwritten functionality methods
@@ -319,34 +315,33 @@ class O():
       if not key:
         self.w += value
       elif value:
-        lGrade = O._init(key, value, O.__BASIS_CHARS, 
-                        O.Grade(value, (0, "", "")))
-        self.__add(lGrade)
+        self.__add(O._init(key, value, O.__BASIS_CHARS,
+                           O.Grade(1, (0, "", ""))))
 
   @staticmethod
-  def _init(key, value, baseChars, lGrade=None):
+  def _init(key, value, baseChars, lGrade):
     """Return the Grade for basis string key. Separate o & u parts."""
-    if lGrade is None:
-      lGrade = O.Grade(value, (0, "", ""))  # Base for o and u, resp
+    grades = [lGrade, lGrade.copy()]
     rBases = [0, "", ""]
     typ = None
-    baseCh = True
+    baseCh = False
     lastChar = ''
     for char in key:
       if (char.isdigit() or char in O.__HEX_CHARS) and char > lastChar:
         lastChar = char
     xyz = O._BasisArray(lastChar)[0]
     lastChar,oneByOne  = '', False
+    cntBases = 0
     for char in key:
-      offset = int(typ == baseChars[1]) # o==1, u==2
+      offset = int(typ == baseChars[1]) # o==0, u==1
       oneByOne = (oneByOne or char <= lastChar)
       if typ and char.isdigit():
         if char in O.__maxBasis[1 -offset]:
           raise Exception("Dimension already used by %s%s" \
                            %(baseChars[1 -offset], char))
         if oneByOne:
-          rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
-          lGrade = lGrade.mergeBasis(1, rBases)
+          rBases[0] = xyz.index("".join(sorted(rBases[offset +1])))
+          grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
         if char not in O.__maxBasis[offset]:
@@ -357,19 +352,22 @@ class O():
         if char in O.__maxBasis[1 -offset]:
           raise Exception("Invalid basis: %s%s" %(typ, char))
         if oneByOne:
-          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
-          lGrade = lGrade.mergeBasis(1, rBases)
+          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
+          grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
         if char not in O.__maxBasis[offset]:
           O.__maxBasis[offset] += char
         rBases[offset +1] += char
         baseCh = False
-      elif char in baseChars:
-        if rBases[1] +rBases[2]:
-          rBases[0] = xyz.index(''.join(sorted(rBases[1] +rBases[2])))
-          lGrade = lGrade.mergeBasis(1, rBases)
+      elif char in baseChars and not baseCh:
+        if cntBases == 3 or char == typ:
+          raise Exception("Invalid basis duplication: %s" %char)
+        if rBases[offset +1]:
+          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
+          grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", ""]
+        cntBases += 1
         typ = char
         baseCh = True
         lastChar,oneByOne  = '', False
@@ -378,10 +376,17 @@ class O():
     if typ and baseCh:
       raise Exception("Invalid last basis: %s" %key)
     rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
-    return lGrade.mergeBasis(1, rBases)
+    grades[offset] = grades[offset].mergeBasis(value, rBases)
+    if cntBases == 1:
+      return grades[offset]
+    rBases[1] = grades[0].bases()[1]
+    rBases[2] = grades[1].bases()[2]
+    if typ == baseChars[0]:
+      grades[0].value *= -1
+    rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+    grades[0]._init(grades[0].value *grades[1].value, rBases)
+    return grades[0]
 
-  @staticmethod
-  def _TBDMax(): return O.__maxBasis
   def __float__(self):
     return float(self.w)
   def __int__(self):
@@ -421,27 +426,39 @@ class O():
     if abs(self.w -cf.w) > precision:
       return False
     idx = 0
-    for grade in self.__g:
-      while len(cf.__g) > idx:
-        order = grade.order(cf.__g[idx])
-        if order > 0:
-          if abs(cf.__g[idx].value) > precision:
+    cfIdx = 0
+    while True:
+      base = self.__g[idx] if idx < len(self.__g) else None
+      cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
+      if not (base and cfBase):
+        if not base:
+          if not cfBase:
+            return True
+          if abs(cfBase.value) > precision:
             return False
-          idx += 1
-        elif order < 0:
-          if abs(grade.value) > precision:
-            return False
-          break
+          cfIdx += 1
         else:
-          if not grade.isEq(cf.__g[idx], precision):
+          if abs(base.value) > precision:
             return False
           idx += 1
-          break
-    while len(cf.__g) > idx:
-      if abs(cf.__g[idx].value) > precision:
-        return False 
-      idx += 1
-    return True
+      else:
+        order = base.order(cfBase)
+        if order == 0:
+          if abs(base.value -cfBase.value) > precision:
+            return False
+          idx += 1
+          cfIdx += 1
+        else:
+          if order < 0:
+            if abs(cfBase.value) > precision:
+              return False
+            idx += 1
+          else:
+            if abs(base.value) > precision:
+              return False
+            cfIdx += 1
+    raise Exception("Programming error for equality")
+
   def __ne__(self, cf):
     """Not equal is not automatic. Need this."""
     return not self.__eq__(cf)
@@ -1976,11 +1993,11 @@ if __name__ == '__main__':
        if O.IsCalc("Q"):
          test = (d45+i+j+k).frameMatrix()
        else:
-         test = (d45+i+j+k).frameMatrix()
-       store = (d45+i+j+k).versor().versorMatrix()
+         test = (d45+o1+o2+o12).frameMatrix()
+       store = (d45+o1+o2+o12).versor().versorMatrix()
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
-       r = d45 +i +j +k; store = r.normalise().euler().matrix()
+       r = d45 +o1+o2 +o12; store = r.normalise().euler().matrix()
        if O.IsCalc("Q"):
          test = r.normalise().versorMatrix()
        else:

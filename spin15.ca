@@ -9,7 +9,7 @@ try:
 except:
   shared_memory = None
 
-_spin15 = """Module contains variables:
+_spin15 = """Extend G2 construction to Spin(15). Module contains variables:
    f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nacs15map_0,
    Nacs15names, Nacs15, Nacs15mirrors, PS15, F15, FF15, P!%, PP15, S15, SS15,
    na15, F(*3,4,5)1520, SE15, SO15, phi15
