@@ -8,11 +8,11 @@ _spin7_g2 = """This module for calcCA defines the Triads7[30] 3-forms for Spin7,
  A, B,...,N for octonian representations. The variables are:
    Triads7gen, Triads7, PP1, PPP1, PP1p, P1o, PP1o, S1, SS1, TriadsG2, S1o, SS1o,
    f7Basis, Spin7O, Spin7R, Nac7Mirrors, Nac7Map, AutoTriads7, AutoTriadsO,
-   ?0/1/2/3(?=A-N), G2?, G2?2, G2?, G2?2/3(?=0,1,2,3), TableG2, g??, G0?, Gn? matrices
+   NameG2/2, MatrixG2/2, WikiG2/2, G2/2 (ie G2 & G22), Table2, <XyG2 stuff>
  and functions:
    nac7subalg, nac7mirrors, nac7map, triadsOhalf, triads7all, triads7terms,
    triads7remain, triads7class, triads7test, triads7parity, triads7autos,
-   tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
+   setupG2, tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
 
 _Triads7 = "30 tetrahedron faces selected to define sub-algebras of CA(7)"
 _Triads7gen = "Triads7 = list(Triads7gen) [takes 2.3 minutes]"
@@ -253,7 +253,7 @@ AutoTriads7 = (((), CA(1)),                     (((2,3), (4,5), (6,7)), e246),
   (((1,2),(3,7),(3,5)), e356),           (((3,7), (5,6), (1,2),(3,4)), e3),
   (((3,7), (4,5), (2,3),(6,7)), e1),                 (((3,7)), e123))
 
-# G21 & G22 are are automorphisms of triads7all(0,63). Map to all other O-.
+# G2 & G22 are are automorphisms of triads7all(0,63). Map to all other O-.
 # Map triads7all(x,63) to all triadsOhalf(x). AutoTriads7 maps 0.63 to O-: 63, 60, 53, 59, 61, 62,
 #  59, 58, 62, 63, 78, 53, 62, 61, 59, 59, 60, 62, 59, 78, 62, 62, 58, 59, 63, 60, 53, 59, 61, 62
 
@@ -325,11 +325,11 @@ def triads7remain(phi):
     return 0
   return remain *e1234567 /2 -phi
 
-def triads7class(phi, id=False):
-  """triad7class(phi, [id])
+def triads7class(phi, listOut=False):
+  """triad7class(phi, [listOut])
      Classify phi as <class=R/S/T/U/V/W/O> with parity & index in 30:128."""
   Lib._checkType(phi, CA, "triads7class")
-  Lib._checkType(id, bool, "triads7class")
+  Lib._checkType(listOut, bool, "triads7class")
   aPhi = abs(phi)
   if aPhi not in Triads7:
     raise Exception("Abs. input phi to triads7class not found in Triads7")
@@ -342,7 +342,7 @@ def triads7class(phi, id=False):
   else:
     terms = list(CA(**{x[0]: 1}) for x in (aPhi).copyTerms())
     clsName = Nac7Name[Nac7Map[idx30][terms.index(abs(remain))]][0]
-  if id:
+  if listOut:
     return (clsName, -sgn, idx30, int(idx128))
   return "%s%s:%0.3f" %(clsName, "-" if parity %2 else "+", idx30 +idx128/1000)
 
@@ -367,6 +367,7 @@ def _triads7combs(g2, comb=0, parity=False):
     elif (comb != 1 and len(term) > 2) or len(term) %2:
       raise Exception("Can't swap > 4-form with comb != 1 or odd form")
     else:
+      print(term)
       g2Terms.append((sgn *CA.Eval(term),))
   return g2Terms
 
@@ -490,9 +491,10 @@ def triads7autos(idx):
     x0 = x1
 
 #--------------------------------------------------------------------------
-# Wiki/G2_(mathematics), set lambdas = 1 to get Cayley Table, TableG2, below.
-# "A"*A0 +"B"*B0 +"C"*C0 +"D"*D0 +"E"*E0 +"F"*F0 +"G"*G0 +"H"*H0 +"I"*I0 \
-#     +"J"*J0 +"K"*K0 +"L"*L0 +"M"*M0 +"N"*N0:
+#  G2 matrix and spin representations.
+#--------------------------------------------------------------------------
+NameG2 = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N")
+NameG22 = ("A+H", "B+I", "C+J", "D+K", "F+M", "G+N", "L-E")
 #  0    C   -B    E   -D   -G     F-M
 # -C    0    A    F   -G+N  D-K  -E-L
 #  B   -A    0   -N    M    L    -K
@@ -500,35 +502,42 @@ def triads7autos(idx):
 #  D   G-N  -M   A-H   0    J     I
 #  G   K-D  -L   B-I  -J    0    -H
 # -F+M E+L   K  -C+J  -I    H     0
-A0 = Matrix.Diag([0]*7); A0[2][1]=-1; A0[1][2]=+1; A0[4][3]=+1; A0[3][4]=-1
-B0 = Matrix.Diag([0]*7); B0[0][2]=-1; B0[2][0]=+1; B0[5][3]=+1; B0[3][5]=-1
-C0 = Matrix.Diag([0]*7); C0[1][0]=-1; C0[0][1]=+1; C0[3][6]=+1; C0[6][3]=-1
-D0 = Matrix.Diag([0]*7); D0[0][4]=-1; D0[4][0]=+1; D0[1][5]=+1; D0[5][1]=-1
-E0 = Matrix.Diag([0]*7); E0[3][0]=-1; E0[0][3]=+1; E0[6][1]=+1; E0[1][6]=-1
-F0 = Matrix.Diag([0]*7); F0[6][0]=-1; F0[0][6]=+1; F0[1][3]=+1; F0[3][1]=-1
-G0 = Matrix.Diag([0]*7); G0[0][5]=-1; G0[5][0]=+1; G0[4][1]=+1; G0[1][4]=-1
-H0 = Matrix.Diag([0]*7); H0[4][3]=-1; H0[3][4]=+1; H0[6][5]=+1; H0[5][6]=-1
-I0 = Matrix.Diag([0]*7); I0[5][3]=-1; I0[3][5]=+1; I0[4][6]=+1; I0[6][4]=-1
-J0 = Matrix.Diag([0]*7); J0[5][4]=-1; J0[4][5]=+1; J0[6][3]=+1; J0[3][6]=-1
-K0 = Matrix.Diag([0]*7); K0[1][5]=-1; K0[5][1]=+1; K0[6][2]=+1; K0[2][6]=-1
-L0 = Matrix.Diag([0]*7); L0[5][2]=-1; L0[2][5]=+1; L0[6][1]=+1; L0[1][6]=-1
-M0 = Matrix.Diag([0]*7); M0[0][6]=-1; M0[6][0]=+1; M0[2][4]=+1; M0[4][2]=-1
-N0 = Matrix.Diag([0]*7); N0[4][1]=-1; N0[1][4]=+1; N0[3][2]=+1; N0[2][3]=-1
-G20 = (A0, B0, C0, D0, E0, F0, G0, H0, I0, J0, K0, L0, M0, N0)
-G202 = (A0+H0, B0+I0, C0+J0, D0+K0, F0+M0, G0+N0, L0-E0)
+_MatrixG2 = "Matrix representation of G2 element A-N."
+_MatrixG22 = "Matrix representation of G2 dual elements in NameG22."
+def _matrixG2(x1,x2,y1,y2):
+  m = Tensor.Diag([0]*7); m[x1][x2]=1; m[x2][x1]=-1; m[y1][y2]=1; m[y2][y1]=-1
+  return m
+MatrixG2 = (_matrixG2(1,2,4,3), _matrixG2(2,0,5,3), _matrixG2(0,1,3,6), # ABC
+            _matrixG2(4,0,1,5), _matrixG2(0,3,6,1), _matrixG2(0,6,1,3), # DEF
+            _matrixG2(5,0,4,1), _matrixG2(3,4,6,5), _matrixG2(3,5,4,6), # GHI
+            _matrixG2(4,5,6,3), _matrixG2(5,1,6,2), _matrixG2(2,5,6,1), # JKL
+            _matrixG2(6,0,2,4), _matrixG2(1,4,3,2))                    # MN
+MatrixG22 = (MatrixG2[0] +MatrixG2[7],  MatrixG2[1] +MatrixG2[8],  # A+H, B+I
+             MatrixG2[2] +MatrixG2[9],  MatrixG2[3] +MatrixG2[10], # C+J, D+K
+             MatrixG2[5] +MatrixG2[12], MatrixG2[6] +MatrixG2[13], # F+M, G+N
+             MatrixG2[11] -MatrixG2[4])                            # L-E
 
-A3 = -A0; B3 = B0; C3 = -C0; D3 = D0; E3 = -E0; F3 = -F0; G3 = -G0; H3 = -H0
-I3 = Matrix.Diag([0]*7); I3[5][3]=-1; I3[3][5]=+1; I3[4][6]=-1; I3[6][4]=+1
-J3 = Matrix.Diag([0]*7); J3[5][4]=-1; J3[4][5]=+1; J3[6][3]=-1; J3[3][6]=+1
-K3 = Matrix.Diag([0]*7); K3[1][5]=-1; K3[5][1]=+1; K3[6][2]=-1; K3[2][6]=+1
-L3 = Matrix.Diag([0]*7); L3[5][2]=-1; L3[2][5]=+1; L3[6][1]=-1; L3[1][6]=+1
-M3 = -M0; N3 = -N0
-G23 = (A3, B3, C3, D3, E3, F3, G3, H3, I3, J3, K3, L3, M3, N3)
-G232 = (A3+H3, B3+I3, C3+J3, C3-J3, D3+K3, D3-K3, F3+M3, G3+N3, G3-N3, K3+M3, L3-E3, L3-M3)
-G233 = (A3+H3, B3+I3, C3+J3, D3+K3, F3+M3, G3+N3, L3-E3)
+_WikiG2 = "Wiki/G2_(mathematics), set lambdas = 1 to get TableG2."
+_WikiG22 = "Wiki representation of G2 dual elements in NameG22."
+WikiG2 = (-MatrixG2[0], MatrixG2[1], -MatrixG2[2], MatrixG2[3], -MatrixG2[4],
+    -MatrixG2[5], -MatrixG2[6], -MatrixG2[7], _matrixG2(3,5,6,4),
+    _matrixG2(4,5,3,6), _matrixG2(5,1,2,6), _matrixG2(2,5,1,6),
+    -MatrixG2[12], -MatrixG2[13])
+WikiG22 = (WikiG2[0] +WikiG2[7],  WikiG2[1] +WikiG2[8],  # A+H, B+I
+             WikiG2[2] +WikiG2[9],  WikiG2[3] +WikiG2[10], # C+J, D+K
+             WikiG2[5] +WikiG2[12], WikiG2[6] +WikiG2[13], # F+M, G+N
+             WikiG2[11] -WikiG2[4])
 
-# tableG2().dump() == tableG2(G21,G212,G2n+G2n2).dump() == TableG2
-# The full table is tableG2(G21+G212,(),G2n+G2n2).dump(G2n+G2n2)
+_G2 = "CA(6) representation of exceptional Lie G2 derived from matrices."
+_G22 = "CA(6) dual element dependent basis, output of setupG2()."
+G2 = Tensor((+e23-e45, -e13-e46, +e12+e47, -e15+e26, +e14-e27, +e17+e24, -e16-e25,
+          +e45-e67, +e46+e57, -e47+e56, -e26-e37, -e27+e36, -e17+e35, +e25-e34))/2
+G22 = (G2[0] +G2[7], G2[1] +G2[8], G2[2] +G2[9],                # A+H, B+I, C+J
+    G2[3] +G2[10], G2[5] +G2[12], G2[6] +G2[13], G2[11] -G2[4]) # D+K,F+M,G+N,L-E
+#G23 = (A1-H1, B1-I1, C1-J1, D1-K1, F1-M1, G1-N1, L1+E1) # TBC
+
+_TableG2 = """TableG2 === tableG2(); The full table is
+              tableG2(MatrixG2+MatrixG22,()).dump(NameG2+NameG22)"""
 TableG2 = Tensor( \
  ("0", "-(C+J)", "B+I", "-(L-E)", "-(D+K)", "N", "F+M", "0", "J", "-I", "L", "-K", "N", "-2(F+M)"),
  ("C+J", "0", "-(A+H)", "-(F+M)", "-(G+N)", "-K", "-(L-E)", "-J", "0", "H", "F", "G+N", "D+K", "-(L-E)"),
@@ -538,7 +547,7 @@ TableG2 = Tensor( \
  ( "-N", "K", "-2E", "-I", "2C", "0", "H", "-G", "D", "E", "-B", "C", "0", "A"),
  ( "-(F+M)", "L-E", "-D", "2(C+J)", "-I", "-H", "0", "F", "E", "-D", "-(C+J)", "-(B+I)", "A+H", "0"),
  ( "0", "J", "-I", "-E", "D", "G", "-F", "0", "-2J", "2I", "L", "-K", "-(G+N)", "F+M"),
- ( "-J", "0", "H", "F", "G", "-D", "-Matrix.Diag([0]*7); A0[2][1]=-1; E", "2J", "0", "-2H", "-(F+M)", "-N", "D+K", "L"),
+ ( "-J", "0", "H", "F", "G", "-D", "-E", "2J", "0", "-2H", "-(F+M)", "-N", "D+K", "L"),
  ( "I", "-H", "0", "-G", "F", "-E", "D", "-2I", "2H", "0", "-N", "F+M", "-(L-E)", "K"),
  ( "-L", "-F", "-(G+N)", "0", "A+H", "B", "C+J", "-L", "F+M", "N", "0", "2(A+H)", "-(B+I)", "-J"),
  ( "K", "-(G+N)", "F", "A+H", "0", "-C", "B+I", "K", "N", "-(F+M)", "-2(A+H)", "0", "C+J", "-I"),
@@ -556,39 +565,23 @@ TableG2 = Tensor( \
 # H^I=-2J, H^J=2I, I^J=-2H   # A cycle of I, J, H
 # A^N=-2(F+M), (F+M)^A=-2N, (F+M)^N=2A
 # L^K=-2(A+H); D^G=-2(C+J)
-
 # Check:
 # for y,x in enumerate(AutoTriads7): print(y,x[1].reflect(triads7all(0).swap(x[0]))\
 # ==triads7all(y,1 if y in (10, 19) else 0), x[1].reflect(triads7all(0).swap(x[0])))
 # for x in range(30): print(x, tableG2(*makeG2(x))==TableG2)
 # for x in range(30): print(x, mapG2(x, g2=makeG2(x)[0]))
 # Use C1.asym(E1)/2=-2F1 or [C2,E2]=-2F2
-A1,A2 = +e23-e45, (+e23-e45)//2   # 4~comb=0-+
-B1,B2 = -e13-e46, (-e13-e46)//2   # 2~comb=0++
-C1,C2 = +e12+e47, (+e12+e47)//2   # 0~comb=0--
-D1,D2 = -e15+e26, (-e15+e26)//2   # 1*comb=1+-
-E1,E2 = +e14-e27, (+e14-e27)//2   # 0~comb=1-+
-F1,F2 = +e17+e24, (+e17+e24)//2   # 0~comb=2--
-G1,G2 = -e16-e25, (-e16-e25)//2   # 1~comb=2++
-H1,H2 = +e45-e67, (+e45-e67)//2   # 6~comb=0-+
-I1,I2 = +e46+e57, (+e46+e57)//2   # 6*comb=1--
-J1,J2 = -e47+e56, (-e47+e56)//2   # 6~comb=2-+
-K1,K2 = -e26-e37, (-e26-e37)//2   # 5*comb=1++
-L1,L2 = -e27+e36, (-e27+e36)//2   # 5~comb=2-+
-M1,M2 = -e17+e35, (-e17+e35)//2   # 3*comb=2-+
-N1,N2 = +e25-e34, (+e25-e34)//2   # 4~comb=2-+
 
-G21 = (A1, B1, C1, D1, E1, F1, G1, H1, I1, J1, K1, L1, M1, N1)
-G212 = (A1+H1, B1+I1, C1+J1, D1+K1, F1+M1, G1+N1, L1-E1)
-G213 = (A1-H1, B1-I1, C1-J1, D1-K1, F1-M1, G1-N1, L1+E1) # TBC
-G22 = (A2, B2, C2, D2, E2, F2, G2, H2, I2, J2, K2, L2, M2, N2)
-G222 = (A2+H2, B2+I2, C2+J2, C2-J2,D2+K2, F2+M2, G2+N2, L2-E2)
-G2n = ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N")
-G2n2 = ("A+H", "B+I", "C+J", "D+K", "F+M", "G+N", "L-E")
-G2n3 = ("A-H", "B-I", "C-J", "D-K", "F-M", "G-N", "L+E") # TBC
-G2n4 = ("(A+H)", "(B+I)", "(C+J)", "(D+K)", "(F+M)", "(G+N)", "(L-E)")
+def setupG2(g2=G2):
+  """setupG2([g2=G2])
+     Setup g2 list as global variables A,B,C,...,N. Return g22 duals list."""
+  global A, B, C, D, E, F, G, H, I, J, K, L, M, N
+  A = g2[0]; B = g2[1]; C = g2[2]; D = g2[3]; E = g2[4]
+  F = g2[5]; G = g2[6]; H = g2[7]; I = g2[8]; J = g2[9]
+  K = g2[10]; L = g2[11]; M = g2[12]; N = g2[13]
+  return (A+H, B+I, C+J, D+K, F+M, G+N, L-E)
 
-def _findG2(elem, basis=G21+G212, names=G2n+G2n2, dump=False): # TBC
+def _findG2(elem, basis=list(G2)+list(G22), names=NameG2+NameG22, dump=False): # TBC
   """_findG2(elem, basis, names, [dump])
      Internal function to find  and return G2 elements name or -name."""
   if elem == 0:
@@ -613,22 +606,22 @@ def _findG2(elem, basis=G21+G212, names=G2n+G2n2, dump=False): # TBC
       print(elem, type(elem), "NOT FOUND")
   return "X"
 
-def tableG2(baseG21=G21, baseG22=G212, names=G2n+G2n2, useAsym=True, fix=0, pp=True):
-  """tableG2([baseG21, baseG22, names, useAsym, pp])
+def tableG2(baseG2=MatrixG2, baseG22=MatrixG22,
+     names=NameG2+NameG22, noAsym=False, fix=0, pp=True):
+  """tableG2([baseG2, baseG22, names, noAsym, pp=True])
      Return G2 multiplication table in name form if pp."""
   out = []
-  bases = baseG21 +baseG22
-  for row in baseG21:
+  bases = baseG2 +baseG22
+  for row in baseG2:
     accum = []
-    for col in baseG21:
-      if useAsym:
-        # XXX TBC
+    for col in baseG2:
+      if noAsym:
+        prod = row *col -col *row
+      else:
         if fix == 1:
           prod = (row.asym(col)).pure([0,2])
         else:
           prod = (row.asym(col))
-      else:
-        prod = row *col -col *row
       if pp:
         accum.append(_findG2(prod, bases, names))
       else:
@@ -637,8 +630,8 @@ def tableG2(baseG21=G21, baseG22=G212, names=G2n+G2n2, useAsym=True, fix=0, pp=T
   return Tensor(*out)
       
 def makeG2(idx=0, pos=None):
-  """makeG2([idx]) -> (allG2, allG22)
-     Return lists of G2 and common G2 sums. Also set global G2 elements."""
+  """makeG2([idx]) -> (G2')
+     Return a list of G2 element reps for a calibration translated from G2."""
   if pos is None:
     pos = triads7class(next(triadsOhalf(idx)), True)[3]
   swap,ref1 = AutoTriads7[idx]
@@ -649,27 +642,24 @@ def makeG2(idx=0, pos=None):
   ref2 = AutoTriadsO[idx][listO.index(pos if pos < 64 else 127 -pos)]
   if pos > 63:
     ref2 *= e1234567
-  global A, B, C, D, E, F, G, H, I, J, K, L, M, N, allG2, allG22
-  A = ref2.reflect(ref1.reflect(G21[0].swap(swap)))
-  B = ref2.reflect(ref1.reflect(G21[1].swap(swap)))
-  C = ref2.reflect(ref1.reflect(G21[2].swap(swap)))
-  D = ref2.reflect(ref1.reflect(G21[3].swap(swap)))
-  E = ref2.reflect(ref1.reflect(G21[4].swap(swap)))
-  F = ref2.reflect(ref1.reflect(G21[5].swap(swap)))
-  G = ref2.reflect(ref1.reflect(G21[6].swap(swap)))
-  H = ref2.reflect(ref1.reflect(G21[7].swap(swap)))
-  I = ref2.reflect(ref1.reflect(G21[8].swap(swap)))
-  J = ref2.reflect(ref1.reflect(G21[9].swap(swap)))
-  K = ref2.reflect(ref1.reflect(G21[10].swap(swap)))
-  L = ref2.reflect(ref1.reflect(G21[11].swap(swap)))
-  M = ref2.reflect(ref1.reflect(G21[12].swap(swap)))
-  N = ref2.reflect(ref1.reflect(G21[13].swap(swap)))
-  allG2 = (A, B, C, D, E, F, G, H, I, J, K, L, M, N)
-  allG22 = (A+H, B+I, C+J, D+K, F+M, G+N, L-E)
-  return (allG2, allG22)
+  A = ref2.reflect(ref1.reflect(G2[0].swap(swap)))
+  B = ref2.reflect(ref1.reflect(G2[1].swap(swap)))
+  C = ref2.reflect(ref1.reflect(G2[2].swap(swap)))
+  D = ref2.reflect(ref1.reflect(G2[3].swap(swap)))
+  E = ref2.reflect(ref1.reflect(G2[4].swap(swap)))
+  F = ref2.reflect(ref1.reflect(G2[5].swap(swap)))
+  G = ref2.reflect(ref1.reflect(G2[6].swap(swap)))
+  H = ref2.reflect(ref1.reflect(G2[7].swap(swap)))
+  I = ref2.reflect(ref1.reflect(G2[8].swap(swap)))
+  J = ref2.reflect(ref1.reflect(G2[9].swap(swap)))
+  K = ref2.reflect(ref1.reflect(G2[10].swap(swap)))
+  L = ref2.reflect(ref1.reflect(G2[11].swap(swap)))
+  M = ref2.reflect(ref1.reflect(G2[12].swap(swap)))
+  N = ref2.reflect(ref1.reflect(G2[13].swap(swap)))
+  return (A, B, C, D, E, F, G, H, I, J, K, L, M, N)
 
-def mapG2(idx=0, pos=0, g2=G21, dump=False):
-  """mapG2([idx, pos=0, g2=G21, dump=True]) -> G2 class list
+def mapG2(idx=0, pos=0, g2=G2, dump=False):
+  """mapG2([idx, pos=0, g2=G2, dump=True]) -> G2 class list
      Print classes for G2 trials. Use g2=makeG2(idx)[0] for correct g2."""
   if not (isinstance(g2, (list, tuple)) and isinstance(g2[0], CA)):
     raise Exception("Invalid g2 input to mapG2")
@@ -944,7 +934,7 @@ def constructG2(idx, pos, trial=0, pp=False, dump=False):
   return out
 
 def constructAll():
-  extraG2s = (G2n,
+  extraG2s = (NameG2,
     ("A+H", "B", "C+J", "F", "G", "D", "E", "H", "I", "J", "F+M", "N", "D+K", "L"),
     ("H", "D", "L-E", "F", "G+N", "B", "C", "A+H", "K", "L", "F+M", "N", "B+I", "J"),
     ("H", "F", "G+N", "D", "L-E", "B", "C+J", "A", "F+M", "N", "K", "L", "B+I", "J"))
@@ -1003,7 +993,6 @@ G02 = (ha+3*hb, 2*ha+3*hb, ha+hb, ha+2*hb)
 Gn1 = ("ha", "hb", "X1", "Y1", "X2", "Y2", "X3", "Y3", "X4", "Y4", "X5", "Y5", "X6", "Y6")
 Gn2 = ("h13", "h23", "h11", "h12")
 
-# 
 #--------------------------------------------------------------------------
 # http://gokovagt.org/proceedings/2013/ggt13-canhowe.pdf (Branching through g2)
 # Can & Howe assuming: X1=Xa, X2=Xb, X3=Xa+b, X4=X2a+b, X5=3a+b, X6=3a+2b, same for Y's
@@ -1070,7 +1059,7 @@ def generateXyG2():
 # The Cartan root diagram for G2 is a 12 pointed star. Adding X and Y roots above
 # gives 3 terms of Triads7[14].allSigns()[27] (without sr2 terms) & so the G2 sub-
 # algebras match some of the symmetry of the G2 diagram. We have 6 terms from the
-#  A,B...,N basis in G23 above from the wikipedia. I don't see how to get the
+#  A,B...,N basis in WikiG2 above from the wikipedia. I don't see how to get the
 # remaining terms or how to revese this mapping.
 g00s = (g10+g01, g20+g02, g30+g03, g12-g21, g23-g32, g13-g31) # g order
 g23s = (sr2*(e12+e15)-e37+e46, sr2*(e13+e16)-e45+e27, sr2*(14+e17)-e26+e35,

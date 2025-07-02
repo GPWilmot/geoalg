@@ -1835,7 +1835,9 @@ class O():
   def _getCalcDetails():
     """Return the calculator help, module heirachy and classes for O."""
     cHelp = """Octonion/Sedenion/Ultra Calculator - Process 30-dimensional basis
-          numbers (o1..F or u1..F) and multiples."""
+          numbers (o1..F or u1..F) and multiples. The form oijk, for example,
+          means left expansion, oi*oj*ok = ((oi*oj)*ok, and is internalised as
+          a graded form with a subset of ordered indices from o123456789ABCDEF."""
     ijk = O.SetQuaternions()[0]
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 
