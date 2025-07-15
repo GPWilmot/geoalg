@@ -32,11 +32,13 @@ print("Wiki representation:", AO7 == Tensor(
 # isomorphic permutation.
 bo7 = Tensor(O.Basis(3)).permute([1, 2, 4, 3, 7, 5, -6], invert=True)
 BO7 = Tensor.Table(bo7).morph(bo7,f7Basis)
-O.CayleyDicksonRule(True)
-co7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
-CO7 = Tensor.Table(co7).morph(co7,f7Basis)
-O.CayleyDicksonRule(False)
-print("Baez representation:", BO7 == CO7, BO7 == Tensor(
+if "doBaez" not in globals() or doBaez:
+  doBaez = False
+  O.CayleyDicksonRule(True)
+  co7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
+  CO7 = Tensor.Table(co7).morph(co7,f7Basis)
+  O.CayleyDicksonRule(False)
+  print("Baez representation:", BO7 == CO7, BO7 == Tensor(
       ("-1", "f4", "f7", "-f2", "f6", "-f5", "-f3"),
       ("-f4", "-1", "f5", "f1", "-f3", "f7", "-f6"),
       ("-f7", "-f5", "-1", "f6", "f2", "-f4", "f1"),
@@ -638,11 +640,11 @@ b3 = O.Basis(3); b4= O.Basis(4); b5= O.Basis(5)
 cp3 = triadCycles(3)
 ac3 = list(Lib.triadDump(Lib.assocCycles(b3), b3))
 if "do5" not in globals() or do5:
-
+  do5 = False
   # First of table 7 primary == last of table 6 extended
-  list(Lib.triadDump(O.ZeroDivisors(b5),b5))[906]  # (o123, o25, o345) #a = o14
-  t5=[[]]*(31*30);t5[8*31+17]=(27,);list(Lib.triadDump(t5,b5)) # b=o14,a = o123
-  
+  #list(Lib.triadDump(O.ZeroDivisors(b5),b5))[906]  # (o123, o25, o345) #a = o14
+  #t5=[[]]*(31*30);t5[8*31+17]=(27,);list(Lib.triadDump(t5,b5)) # b=o14,a = o123
+
   # See triadCyclesModes(5)[0] to match tables in structure paper
   cp4 = triadCycles(4); CP4 = list(list(Lib.expandPairList(x)) for x in cp4)
   cp5 = triadCycles(5); epl = Lib.expandPairList; dcp50 = dict(cp5[0])
@@ -658,7 +660,6 @@ if "do5" not in globals() or do5:
   zp5 = list(Lib.chain(*list(Lib.cycles(x) for x in t3+t4+t50+t512+t6)))
   print("zd4 check:", "Pass" if zd4==sorted(zp4) else "Fail", \
         "and zd5 check:", "Pass" if zd5==sorted(zp5) else "Fail") 
-  do5 = False
 
 # O(3)  (A2*o1+B1*o2 +B2*o12+C1*o3 +C2*o13+D1*o23 +D2*o123)
 #     * (c2*o1+d1*o2 +d2*o12+e1*o3 +e2*o13+f1*o23 +f2*o123)

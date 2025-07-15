@@ -1841,7 +1841,7 @@ class CA():
     return CA(W, **kw)
 
   @staticmethod
-  def Eval(sets):
+  def Eval(terms):
     """Eval(terms)
        Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
     Lib._checkList(terms, None, "Eval", [1,0])

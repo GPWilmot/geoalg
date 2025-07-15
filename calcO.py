@@ -173,8 +173,8 @@ class O():
        index is taken from _BasisArray()."""
     def __init__(self, value, bases):
       """Element with scalar and p, o & u bases as Product index & BasisArgs."""
-      self.__init(value, bases)
-    def __init(self, value, bases):
+      self._init(value, bases)
+    def _init(self, value, bases):
       self.value = value
       self.__pBase = bases[0]
       self.__oBase = bases[1]
@@ -1128,10 +1128,10 @@ class O():
   jacobiAssoc = jacobiAssociator
 
   def moufang(self, p, q, number=0):
-    """moufang(p,q,[number])
+    """moufang(p,q,[number=0])
        Return differences of the four Moufang tests or sum of all if number=0,
-         1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
-         3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
+         1: q*(s*(q*p)) -((q*s)*q)*p, 2: s*(q*(p*q)) -((s*q)*p)*q,
+         3: (q*s)*(p*q) -(q*(s*p))*q, 4: (q*s)*(p*q) -q*((s*p)*q)."""
     Lib._checkType(p, O, "moufang")
     Lib._checkType(q, O, "moufang")
     Lib._checkType(number, int, "moufang")
