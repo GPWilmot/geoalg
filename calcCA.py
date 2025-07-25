@@ -62,6 +62,12 @@ class CA():
       self.value = value
       self.__eBase = bases[0]
       self.__iBase = bases[1]
+    def new(self, value):
+      inherit = self.__new__(CA.Grade)
+      inherit.value = 0
+      inherit.__eBase = ""
+      inherit.__iBase = ""
+      return inherit
     def bases(self):
       return (self.__eBase, self.__iBase)
     def lens(self):
@@ -264,7 +270,7 @@ class CA():
   def __float__(self):
     return float(self.w)
   def __int__(self):
-    return trunc(self.w)
+    return math.trunc(self.w)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
     out = ""
@@ -647,7 +653,7 @@ class CA():
         out.__add(grade2.mergeBasis(grade1.value *0.5 *sgn, grade1.bases()))
     return out
 
-  def __vectorSizes(self):
+  def _vectorSizes(self):
     """Return the CA vector sizes. Can't handle negative signatures."""
     dims = self.basis()
     if dims[0] < 3:
@@ -841,10 +847,10 @@ class CA():
         out.__g.append(self.Grade(grade.value, grade.bases()))
     return out
 
-  def vector(self):
-    """vector()
-       Return the pure vector part as a Matrix."""
-    v = [0] *(sum(self.__vectorSizes()))
+  def vector(self, size=None):
+    """vector([size])
+       Return the pure vector part as a Matrix optionally reshaped."""
+    v = [0] *(sum(self._vectorSizes()))
     for grade in self.__g:
       bases = grade.bases()
       if len(bases[0]) +len(bases[1]) > 1:
@@ -855,6 +861,8 @@ class CA():
           pos += int(base[0], self.__HEX_BASIS +1) -1
           pos += 1 if idx==1 and base[0] else 0
       v[pos] = grade.value
+    if size:
+      return Matrix(*v).reshape(size)
     return Matrix(*v)
 
   def grades(self, maxSize=0):
@@ -1404,7 +1412,7 @@ class CA():
       raise Exception("Illegal versor for euler")
     if p2 <= precision:
       return Euler()
-    dims = self.__vectorSizes()
+    dims = self._vectorSizes()
     xyz = CA._VersorArgs(*dims, rotate=True)
     cnt = len(xyz)
     angles = [0] *cnt
@@ -1711,9 +1719,6 @@ class CA():
     implicit = kwargs["implicit"] if "implicit" in kwargs else False
     Lib._checkType(order, (list, tuple), "Euler")
     Lib._checkType(implicit, bool, "Euler")
-    for key in kwargs:
-      if key not in ("order", "implicit"):
-        raise TypeError("Euler() got unexpected keyword argument %s" %key)
     if len(args) == 1 and isinstance(args[0], Euler):
       args = list(args[0])
     out = CA(1.0)
@@ -1767,7 +1772,6 @@ class CA():
       else:
         store.append(key)
       out = rot * out
-      #out *= rot
     return out
 
   @staticmethod

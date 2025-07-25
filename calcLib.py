@@ -1324,14 +1324,14 @@ class Tensor(list):
   def reshape(self, shape):
     """reshape(shape)
        Return copy with new 2-D shape or square if shape is integer."""
+    twoD = self and isinstance(self[0], (list, tuple))
     if not isinstance(shape, (list, tuple)):
-      shape = (shape, shape)
-    Lib._checkType(shape, (list, tuple), "reshape")
-    Lib._checkType(shape[0], int, "reshape")
-    if len(shape) != 2:
-      raise Exception("Invalid shape length in reshape")
+      shape = (shape, shape if twoD else 1)
+    Lib._checkList(shape, int, "reshape", 2)
+    if shape[0] < 1 or shape[1] < 1:
+      raise Exception("Invalid reshape size")
     out = []
-    if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+    if twoD: 
       Lib._checkType(shape[1], int, "reshape")
       for idx1 in range(max(1,shape[0])):
         out.append([])
@@ -1346,21 +1346,7 @@ class Tensor(list):
       return out
     elif shape[1] == 1:
       return Tensor(self[:shape[0]])
-    for idx1 in range(shape[0]):
-      out.append([0] *shape[1])
-    for idx,val in enumerate(self):
-      if shape[0] > 1 and shape[1] > 1:
-        if self.__size[0] > 1:
-          out[idx][0] = val
-        else:
-          out[0][idx] = val
-      else:
-        out.append(val)
-      if idx >= max(shape[0], shape[1]):
-        break
-    out = Tensor(*out)
-    out.__size = (shape[0], shape[1])
-    return out
+    raise Exception("Invalid reshape size for matrix")
 
   def scalar(self):
     """scalar()

@@ -61,12 +61,12 @@ class O():
      found with the seach method. Note that package math methods only work on
      the scalar part eg sin(a)==sin(a.scalar()).
      """
-  __HEX_BASIS   = 16                     # e and i basis size
+  __HEX_BASIS   = 15                     # e and i basis size
   __HEX_CHARS   = ('A', 'B', 'C', 'D', 'E', 'F')
   __CA_CHARS    = ('e', 'i')             # CA basis chars only
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
   __allChars    = ['o', 'u']             # Include CA
-  __maxBasis    = ['', '']               # Store the dimension characters
+  __basisList   = ['', '']               # Store the dimension characters
   __loadedCalcs = []                     # Notify any other calc loaded
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
@@ -202,6 +202,10 @@ class O():
           idx += 1
       return out, (sgn %2 == 1)
 
+    def new(self, value):
+      inherit = self.__new__(O.Grade)
+      inherit._init(value, (0, "", ""))
+      return inherit
     def bases(self):
       return (self.__pBase, self.__oBase, self.__uBase)
     def lens(self):
@@ -217,8 +221,10 @@ class O():
              + (uCh +self.__uBase) if self.__uBase else ""
 
     def copy(self, value=None):
-      return O.Grade(self.value if value is None else value,
+      inherit = super().__new__(self.__class__)
+      inherit._init(self.value if value is None else value,
                     (self.__pBase, self.__oBase[:], self.__uBase[:]))
+      return inherit
 
     def isEq(self, cf, precision):
       """Return true if the grades are equal within precision."""
@@ -285,7 +291,9 @@ class O():
           bases = rhs
       else:
         bases = lhs
-      return O.Grade(value, bases)
+      inherit = super().__new__(self.__class__)
+      inherit._init(value, bases)
+      return inherit
 
   ##############################################################################
   ## Class overwritten functionality methods
@@ -303,7 +311,7 @@ class O():
     Lib._checkType(self.w, (int, float), "O")
     if len(args) > 1:
       dim = int(math.log(len(args))/math.log(2) +1)       # l=pow(2,dim)
-      if dim > self.__HEX_BASIS +1:
+      if dim > self.__HEX_BASIS:
         raise Exception("Too many basis elements")
       xyz = O._BasisArray(dim)[0]   # Setup global dimension
       for idx,val in enumerate(args[1:]):
@@ -315,12 +323,16 @@ class O():
       if not key:
         self.w += value
       elif value:
-        self.__add(O._init(key, value, O.__BASIS_CHARS,
-                           O.Grade(1, (0, "", ""))))
+        self.__add(O._init(key, value, O.__BASIS_CHARS))
+
+  def _initAdd(self, grade):
+    """Used internally to add grades to this O."""
+    self.__add(grade)
 
   @staticmethod
-  def _init(key, value, baseChars, lGrade):
+  def _init(key, value, baseChars):
     """Return the Grade for basis string key. Separate o & u parts."""
+    lGrade = O.Grade(1, (0, "", ""))  # Base for o and u, resp
     grades = [lGrade, lGrade.copy()]
     rBases = [0, "", ""]
     typ = None
@@ -336,7 +348,7 @@ class O():
       offset = int(typ == baseChars[1]) # o==0, u==1
       oneByOne = (oneByOne or char <= lastChar)
       if typ and char.isdigit():
-        if char in O.__maxBasis[1 -offset]:
+        if char in O.__basisList[1 -offset]:
           raise Exception("Dimension already used by %s%s" \
                            %(baseChars[1 -offset], char))
         if oneByOne:
@@ -344,20 +356,20 @@ class O():
           grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
-        if char not in O.__maxBasis[offset]:
-          O.__maxBasis[offset] += char
+        if char not in O.__basisList[offset]:
+          O.__basisList[offset] += char
         rBases[offset +1] += char
         baseCh = False
       elif typ and char in O.__HEX_CHARS:
-        if char in O.__maxBasis[1 -offset]:
+        if char in O.__basisList[1 -offset]:
           raise Exception("Invalid basis: %s%s" %(typ, char))
         if oneByOne:
           rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
           grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", ""]
         lastChar = char
-        if char not in O.__maxBasis[offset]:
-          O.__maxBasis[offset] += char
+        if char not in O.__basisList[offset]:
+          O.__basisList[offset] += char
         rBases[offset +1] += char
         baseCh = False
       elif char in baseChars and not baseCh:
@@ -390,19 +402,22 @@ class O():
   def __float__(self):
     return float(self.w)
   def __int__(self):
-    return trunc(self.w)
+    return math.trunc(self.w)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
     out = ""
     sign = ""
-    for base in [None] +self.__g:
-      if base:
-        val = base.value
-        oOut,uOut = base.strs()
+    for grade in [None] +self.__g:
+      if grade:
+        val = grade.value
+        gOut = "".join(grade.strs())
+        if gOut[:1] == "-":
+          val = -grade.value
+          gOut = gOut[1:]
       else:
         val = self.w
-        oOut = uOut = ""
-      out += Lib._resolutionDump(sign, val, oOut +uOut)
+        gOut = ""
+      out += Lib._resolutionDump(sign, val, gOut)
       if out:
         sign = " +"
     return out if out else "0"
@@ -529,10 +544,10 @@ class O():
   def __mul__(self, q):
     """Multiplication of 2 Os or self by scalar."""
     if isinstance(q, O):
-      out = O(self.w *q.w)
+      out = self.__class__(self.w *q.w)
       if self.w:
         for grade2 in q.__g:
-          grade = self.Grade(self.w, (0, "", ""))
+          grade = grade2.new(self.w)
           out.__add(grade.mergeBasis(grade2.value, grade2.bases()))
       if q.w:
         for grade1 in self.__g:
@@ -544,10 +559,10 @@ class O():
       out = q.__rmul__(self)
     else:
       Lib._checkType(q, (int, float), "mul")
-      out = O(self.w *q)
+      out = self.__class__(self.w *q)
       if q:
         for grade in self.__g:
-          out.__g.append(self.Grade(grade.value *q, grade.bases()))
+          out.__g.append(grade.copy(grade.value *q))
     return out
   __rmul__ = __mul__
 
@@ -564,9 +579,9 @@ class O():
       raise Exception("Illegal divide by zero")
     if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
       q = float(q)
-    out = O(self.w /q)
+    out = self.__class__(self.w /q)
     for grade in self.__g:
-      out.__g.append(self.Grade(grade.value /q, grade.bases()))
+      out.__g.append(grade.copy(grade.value /q))
     return out 
   __truediv__ = __div__
   __floordiv__ = __div__
@@ -659,13 +674,6 @@ class O():
       v[base.str()] = base.value
     return v
 
-  def _copyGrades(self):
-    """Used by other calculators to copy the grades."""
-    out = []
-    for grade in self.__g:
-      out.append(grade.copy())
-    return out
-
   def __invertible(self, conj=True):
     """Return (conjugate, simple, hyperbolic, sum of basis squares).
        This is correct for simple forms but may fail otherwise.
@@ -675,8 +683,8 @@ class O():
        Even = not appropriate as octonions are not graded
        Commutes = +ve/-ve terms commute.
        Hyperbolic = has x*x>0 terms but no imaginary terms."""
-    sgnOut = O()
-    out = O(self.w) 
+    sgnOut = self.__class__(0)
+    out = self.__class__(self.w)
     p2 = 0
     lastDim = (0, 0)
     cnt = 0        # Count of total basis terms
@@ -694,7 +702,7 @@ class O():
       if conj:
         if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
-          sgnOut.__g.append(self.Grade(value, grade.bases()))
+          sgnOut.__g.append(grade.copy(value))
     scalar = (1 if self.w else 0)
     simple = False
     if conj:
@@ -718,14 +726,63 @@ class O():
         return conj *tmp.inverse(False)
     return 0
 
-  def __vectorSizes(self, local=False):
+  def _vectorSizes(self, local=False):
     """Return the Octonian vector sizes. Can't handle negative signatures."""
     dims = self.basis(local)
     if dims[0] == 1:
       dims[0] = 2
-    xyz = O.BasisArgs(*dims)
-    dim = len(xyz)
-    return dim, xyz
+    xyz = self.__class__._BasisArgs(*dims)
+    return len(xyz), xyz
+
+  def _basisType(self):
+    """Return index position +1 of paired sum over all grades or 0 for mixed."""
+    if not self.__g:
+      return 1   # For scalar only
+    cnts = [0] *(len(self.__g[0].lens()) //2)
+    for grade in self.__g:
+      lens = grade.lens()
+      for idx in range(len(lens) //2):
+        cnts[idx] += sum(lens[idx*2: idx*2 +2])
+    for idx in range(len(lens) //2):
+      cnts[idx] = int(bool(cnts[idx]))
+    if sum(cnts) == 1:
+      return cnts.index(1) +1
+    return 0
+
+  @staticmethod
+  def _BasisConvert(q, part=0, cls=None):
+    """Return basis[part] as a dictionary if class is None else return first
+       part using empty class as the output with basis[part] set."""
+    if not isinstance(q, O):
+      raise Exception("Conversion needs octonion class input")
+    if not q.__g:
+      return {} if cls is None else q.w  # For scalar only
+    if cls is None:
+      if part < 0 or part >= len(q.__g[0].lens()) //2:
+        raise Exception("Invalid part size in conversion")
+      out = {}
+      idx = (part -1) *3 +2
+      for grade in q.__g:
+        if part == 0:
+          bases = grade.strs()[0] +grade.strs()[1]
+          if bases:
+            out[bases] = grade.value
+        else:
+          bases = grade.bases()[idx:idx+3]
+          if bases[0]:
+            out[(O.__BASIS_CHARS[0] +bases[1]) if bases[1] else "" \
+              +(O.__BASIS_CHARS[1] +bases[2]) if bases[2] else ""] = grade.value
+      return out
+    if q.__class__ != O:
+      raise Exception("Conversion needs octonion input")
+    if not isinstance(cls, O):
+      raise Exception("Conversion needs octonion class")
+    if part < 1 or part >= len(cls.Grade(0, [None,[]]).new(0).lens()) //2:
+      raise Exception("Invalid part size in conversion")
+    cls.w = q.w
+    for grade in q.__g:
+      cls.__g.append(cls.Grade(0, [None, []]).new(grade.value, part, grade.bases()))
+    return cls
 
   @staticmethod
   def _BasisArray(dim=0, exact=False):
@@ -748,13 +805,12 @@ class O():
     return out, O.__basisDim, O.__baezMulRule
 
   @staticmethod
-  def _BasisArgs(oDim, uDim, och="o", uch="u", dims=None):
+  def _BasisArgs(oDim, uDim, och="o", uch="u"):
     """Used by BasisArgs and externally to return the basis strs."""
-    if dims is None:
-      dims = O.__maxBasis
+    dims = O.__basisList
     pDim = max(oDim, len(dims[0])) +max(uDim, len(dims[1])) 
     xyz = O._BasisArray(pDim, True)[0]
-    typs = [och] *pDim                    # Setup maxBasis o/u types
+    typs = [och] *pDim                    # Setup basisList o/u types
     for idx in dims[1]:
       typs[int(idx, O.__HEX_BASIS +1) -1] = uch
     if oDim > len(dims[0]) or uDim > len(dims[1]):
@@ -858,13 +914,13 @@ class O():
   def dup(self, scalar=None):
     """dup([scalar])
        Fast copy with optional scalar overwrite."""
-    out = O()
     if scalar is None:
-      out.w = self.w
+      out = self.__class__(self.w)
     else:
       Lib._checkType(scalar, (int, float), "dup")
-      out.w = scalar
-    out.__g = self._copyGrades()
+      out = self.__class__(scalar)
+    for grade in self.__g:
+      out.__g.append(grade.copy())
     return out
 
   def copy(self, *args, **kwargs):
@@ -874,7 +930,7 @@ class O():
     kw.update(kwargs)
     if len(args) == 0:
       args = [self.w]
-    out = O(*args, **kw)
+    out = self.__class__(*args, **kw)
     return out
 
   def copyTerms(self):
@@ -922,10 +978,10 @@ class O():
       precision = Lib._getPrecision()
     else:
       Lib._checkType(precision, float, "trim")
-    out = O(0 if abs(self.w) < precision else self.w)
+    out = self.__class__(0 if abs(self.w) < precision else self.w)
     for grade in self.__g:
       if abs(grade.value) >= precision:
-        out.__g.append(self.Grade(grade.value, grade.bases()))
+        out.__g.append(grade.copy())
     return out
 
   def pure(self):
@@ -933,14 +989,17 @@ class O():
        Return the pure imaginary or unity part of self."""
     return self.dup(0)
 
-  def vector(self):
-    """vector()
-       Return the coefficients as a 1-D Matrix."""
-    dim,xyz = self.__vectorSizes()
+  def vector(self, local=False, size=None):
+    """vector([local,size])
+       Return the coefficients as a 1-D Matrix optionally reshaped."""
+    dim,xyz = self._vectorSizes(local)
     vec = [0] *dim
     for grade in self.__g:
       pos = xyz.index(grade.str())
-      vec[pos] = grade.value
+      if pos < dim:
+        vec[pos] = grade.value
+    if size:
+      return Matrix(*vec).reshape(size)
     return Matrix(*vec)
 
   def grades(self, maxSize=0):
@@ -966,8 +1025,9 @@ class O():
     b = '0'
     for grade in self.__g:
       bases = grade.strs()
-      l = (len(bases[0]) -1) if bases[0] else 0
-      l += (len(bases[1]) -1) if bases[1] else 0
+      l = 0
+      for base in bases:
+        l += (len(base) -1) if base else 0
       if len(g) < l +1:
         g.extend([0] *(l -len(g) +1))
       basis = bases[0]
@@ -985,17 +1045,17 @@ class O():
   def basis(self, local=False):
     """basis([local])
        Return the local signature or max. dimension basis of basis elements."""
-    dims = self.__class__.__maxBasis
+    dims = self.__basisList
     if local:
-      dims = ['',''] 
+      dims = [''] *local if isinstance(local, int) else ['', '']
       for grade in self.__g:
-        bases = grade.strs()
-        dims[0] = max(dims[0], bases[0][-1:])
-        dims[1] = max(dims[1], bases[1][-1:])
-    # Convert max. char to hex-digit
-    out0 = int(dims[0][-1], self.__HEX_BASIS +1) if dims[0] else 0
-    out1 = int(dims[1][-1], self.__HEX_BASIS +1) if dims[1] else 0
-    return [out0, out1]
+        for idx,bases in enumerate(grade.strs()):
+          if idx < local:
+            dims[idx] = max(dims[idx][-1:], bases[-1:])
+    out = []       # Convert max. char to hex-digit
+    for val in dims:
+      out.append(int(sorted(val)[-1], self.__HEX_BASIS +1) if val else 0)
+    return out
 
   def len(self):
     """len()
@@ -1047,7 +1107,15 @@ class O():
   def inverse(self, noError=False):
     """inverse([noError])
        Return inverse of self which is conj()/len() if len()!=0 and is a versor.
-       Raise an error on failure or return 0 if noError."""
+       Simple forms with only two grades can be checked immediately. Simple
+       odd and mixed forms are also immediate. But with more than two grades
+       an inverse is possible so try self*self & self*conj(). If this produces a
+       single term then divide by this term which captures examples 3e1234567 
+       +e123 +e145 +e167 +e246 +e257 +e347 +e356 and (e0+e1+e2+e12)^2 = 2e012
+       (ie inverse -e0+e01-e02-e12). If not invertible then raise an exception
+       unless not noError in which case 0 is returned.
+       NB: Row11,0(paper)*e1234567 = 3 idempotents+2 is invertible but factors
+       aren't eg (1+e1236)(1+e1467)(1+e3567)."""
     out,simple,isHyperbolic,p2 = self.__invertible()
     l2 = float(p2 +self.w *self.w)
     if l2 < Lib._getPrecision() or not simple:
@@ -1077,9 +1145,9 @@ class O():
     """cross(q)
        Return half asym product of pure parts."""
     Lib._checkType(q, O, "cross")
-    x = O()
+    x = self.__class__()
     x.__g = self.__g    # Shallow copies
-    y = O()
+    y = self.__class__()
     y.__g = q.__g
     out = (x *y -y *x) *0.5 
     return out
@@ -1287,7 +1355,7 @@ class O():
       return q.dup()
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
-    return conj *q *self /l2
+    return self *q *conj /l2
 
   def rotation(self, rot):
     """rotation(rot)
@@ -1306,7 +1374,7 @@ class O():
       return
     if abs(math.sqrt(l2) -1.0) <= precision:
       l2 = 1.0
-    newSelf = conj *self *rot /l2
+    newSelf = rot *self *conj /l2
     self.w = newSelf.w
     self.__g = newSelf.__g
 
@@ -1326,7 +1394,7 @@ class O():
       if self.__versible(conj) == 0:
         raise Exception("Illegal versor for frame")
     if p2 < precision:
-      return O(1)
+      return self.__class__(1)
     if isHyperbolic:
       w = abs(self.w)
       if w < 1.0:
@@ -1357,7 +1425,7 @@ class O():
     if isHyperbolic and not hyperbolic:
       raise Exception("Illegal hyperbolic versor for versor")
     if p2 < precision:
-      return O(1)
+      return self.__class__(1)
     if isHyperbolic:
       sw = math.sinh(self.w /2.0)
       cw = math.cosh(self.w /2.0)
@@ -1396,7 +1464,7 @@ class O():
        Normalise - reduces error accumulation. Versors have norm 1."""
     n = self.norm()
     if n <= Lib._getPrecision():
-      return O(1.0)
+      return self.__class__(1.0)
     out = self.dup(self.w /n)
     for base in out.__g:
       base.value /= n
@@ -1407,7 +1475,7 @@ class O():
        For even q=w+v then a=|q|cos(a) & v=n|q|sin(a), n unit."""
     Lib._checkType(exp, (int, float), "pow")
     if isinstance(exp, int):
-      out = O(1.0)
+      out = self.__class__(1.0)
       for cnt in range(exp):
         out *= self
       return out
@@ -1416,14 +1484,14 @@ class O():
       l1 = math.sqrt(p2 +self.w *self.w)
       w = pow(l1, exp)
       if l1 <= Lib._getPrecision():
-        return O(w)
+        return self.__class__(w)
       a = math.acos(self.w /l1)
       s,c = Lib._sincos(a *exp)
       s *= w /math.sqrt(p2)
-      out = O(w *c)
+      out = self.__class__(w *c)
       for grade in self.__g:
         oStr,uStr = grade.strs()
-        out += O(**{oStr +uStr: grade.value *s})
+        out += self.__class__(**{oStr +uStr: grade.value *s})
       return out
     raise Exception("Invalid float exponent for non-hyperbolic, non-versor pow")
   __pow__ = pow
@@ -1433,15 +1501,15 @@ class O():
        For even q=w+v then exp(q)=exp(w)exp(v), exp(v)=cos|v|+v/|v| sin|v|."""
     tmp,simple,isHyperbolic,p2 = self.__invertible()
     if p2 <= Lib._getPrecision():
-      return O(self.w)
+      return self.__class__(self.w)
     if not isHyperbolic:
       n1 = math.sqrt(p2)
       s,c = Lib._sincos(n1)
       exp = pow(math.e, self.w)
       s *= exp /n1
-      out = O(exp *c)
+      out = self.__class__(exp *c)
       for grade in self.__g:
-        out += O(**{grade.str(): grade.value *s})
+        out += self.__class__(**{grade.str(): grade.value *s})
       return out
     raise Exception("Invalid non-hyperbolic, non-versor for exp")
 
@@ -1451,12 +1519,12 @@ class O():
     tmp,simple,isHyperbolic,p2 = self.__invertible()
     l1 = math.sqrt(p2 +self.w *self.w)
     if p2 <= Lib._getPrecision():
-      return O(math.log(l1))
+      return self.__class__(math.log(l1))
     if not isHyperbolic:
       s = math.acos(self.w /l1) /math.sqrt(p2)
-      out = O(math.log(l1))
+      out = self.__class__(math.log(l1))
       for grade in self.__g:
-        out += O(**{grade.str(): grade.value *s})
+        out += self.__class__(**{grade.str(): grade.value *s})
       return out
     raise Exception("Invalid non-hyperbolic, non-versor for log")
 
@@ -1478,7 +1546,7 @@ class O():
       raise Exception("Illegal hyperbolic versor for versor")
     if p2 <= precision:
       return Euler()
-    dim,xyz = self.__vectorSizes()
+    dim,xyz = self._vectorSizes()
     angles = [0] *dim
     args = [0] *dim
     for grade in conj.__g:
@@ -1503,7 +1571,7 @@ class O():
        Only defined for o1, o2, o12 quaternion part. Set hyperbolic to try
        hyperbolic angles."""
     out = self.euler(hyperbolic)
-    dim,xyz = self.__vectorSizes()
+    dim,xyz = self._vectorSizes()
     return Euler(*out).matrix().reshape(dim)
 
   def frameMatrix(self, hyperbolic=False):
@@ -1514,15 +1582,15 @@ class O():
        versor then to euler then matrix. Set hyperbolic to try hyperbolic
        angles."""
     out = self.versor().euler(hyperbolic)
-    dim,xyz = self.__vectorSizes()
+    dim,xyz = self._vectorSizes()
     return Euler(*out).matrix().reshape(dim)
 
   def morph(self, pairs):
     """morph(pairs)
        Morphism with a list of pairs of names with o1,o2 meaning map o1->o2."""
-    out = O(self.w)
+    out = self.__class__(self.w)
     for grade in self.__g:
-      out += O(**Lib._morph(grade.str(), grade.value, pairs))
+      out += self.__class__(**Lib._morph(grade.str(), grade.value, pairs))
     return out
 
   ##############################################################################
@@ -1548,7 +1616,7 @@ class O():
     Lib._checkType(uDim, int, "Basis")
     if oDim < 0 or uDim < 0 or oDim > O.__HEX_BASIS or uDim > O.__HEX_BASIS:
       raise Exception("Invalid Basis argument size")
-    return tuple((O(**{x: 1}) for x in O.BasisArgs(oDim, uDim)))
+    return tuple((O(**{x: 1}) for x in O._BasisArgs(oDim, uDim)))
 
   @staticmethod
   def BasisArgs(oDim, uDim=0):
@@ -1574,8 +1642,7 @@ class O():
   def Versor(*args, **kwargs):
     """Versor([scalar, o1 multiplier, ...][basis=multiplier, ...])
        Every O is a 7-D versor if scaled. Return versor() of inputs."""
-    q = O(*args, **kwargs)
-    return q.versor()
+    return O.Euler(*args, **kwargs)
 
   @staticmethod
   def Euler(*args, **kwargs): #order=[], implicit=False):
@@ -1596,9 +1663,6 @@ class O():
     implicit = kwargs["implicit"] if "implicit" in kwargs else False
     Lib._checkType(order, (list, tuple), "Euler")
     Lib._checkType(implicit, bool, "Euler")
-    for key in kwargs:
-      if key not in ("order", "implicit"):
-        raise TypeError("Euler() got unexpected keyword argument %s" %key)
     if len(args) == 1 and isinstance(args[0], Euler):
       args = list(args[0])
     out = O(1.0)
@@ -1606,6 +1670,7 @@ class O():
     store = []
     dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) # l=comb(dim,2)
     xyz = O._VersorArgs(dim,0)
+    args = list(args)
     for bi,val in kwargs.items():
       if bi not in ("order", "implicit"):
         while bi not in xyz:
@@ -1760,7 +1825,7 @@ class O():
   @staticmethod
   def Eval(sets):
     """Eval(sets)
-       Return the O evaluated from sets of o-basis, str lists or dict pairs."""
+       Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
     Lib._checkType(sets, (list, tuple), "Eval")
     if not (len(sets) and isinstance(sets[0], (list, tuple))):
       sets = [sets]
@@ -1817,12 +1882,12 @@ class O():
 
   @staticmethod
   def SetQuaternions():
-    if len(O.__maxBasis[0]) >= 2:
-      x1,x2 = O.__maxBasis[0][0], O.__maxBasis[0][1]
+    if len(O.__basisList[0]) >= 2:
+      x1,x2 = O.__basisList[0][0], O.__basisList[0][1]
       return ("i,j,k=O(o%s=1),O(o%s=1),O(o%s=1)" %(x1, x2, x1+x2),
               "o%s,o%s,o%s" %(x1, x2, x1 +x2))
-    elif len(O.__maxBasis[1]) >= 3:
-      x1,x2,x3 = O.__maxBasis[1][0], O.__maxBasis[1][1], O.__maxBasis[1][2]
+    elif len(O.__basisList[1]) >= 3:
+      x1,x2,x3 = O.__basisList[1][0], O.__basisList[1][1], O.__basisList[1][2]
       return ("i,j,k=O(u%s=1),O(u%s=1),O(u%s=1)" %(x1 +x2, x2 +x3, x3+x1),
               "u%s,u%s,u%s" %(x1 +x2, x2 +x3, x3 +x1))
     else:
@@ -1968,7 +2033,7 @@ if __name__ == '__main__':
        test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
-       Rx=d60+o12; rx=O.Versor(d60,o12=1)
+       Rx=d60-o12; rx=O.Versor(o12=d60)
        test = Rx.frameMatrix() *c.vector(); store = (rx.rotate(c)).vector()
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.
@@ -1999,9 +2064,9 @@ if __name__ == '__main__':
        store = (d45+o1+o2+o12).versor().versorMatrix()
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
-       r = d45 +o1+o2 +o12; store = r.normalise().euler().matrix()
+       r = d45 +o1 +o2 +o12; store = r.normalise().euler().matrix()
        if O.IsCalc("Q"):
-         test = r.normalise().versorMatrix()
+         test = (d45+i+j+k).normalise().versorMatrix()
        else:
          test = r.normalise().versorMatrix()
        Calculator.log(store == test, store)""",
