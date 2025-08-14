@@ -479,8 +479,9 @@ class Lib():
 
   @staticmethod
   def combinations(n, r, basis=False, dump=False):
-    """comb[inations]/choose/binom(n,r,[basis=False,dump])
-       Return number of combinations of r in n, basis list or list generator."""
+    """comb[inations]/choose/binom(n,r,[basis,dump])
+       Return number of combinations of r in n or list generator if basis as
+       boolean or as a list of length n of items to form the combinations."""
     Lib._checkType(n, (int,float), "comb")
     Lib._checkType(r, (int,float), "comb")
     Lib._checkType(basis, (bool, list, tuple), "comb")
@@ -663,7 +664,8 @@ class Lib():
   @staticmethod
   def _save(filename, name, value, path="", ext="", mode="w"):
     """save(filename, name, value,[path,ext,mode="w"])
-       Print value into a file which needs an extension. Used by Calculator."""
+       Print value into a file which needs an extension.
+       Used by Calculator."""
     Lib._checkType(filename, Lib._basestr, "save")
     Lib._checkType(name, Lib._basestr, "save")
     Lib._checkType(path, Lib._basestr, "save")
@@ -1824,7 +1826,7 @@ class Tensor(list):
       neg = (str(mul)[0] == "-")
       idx = scalar * (-1 if neg else 1)
     else:
-      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul)) -1
+      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul))-1
     if (x1 < 0) != (x2 < 0):
       idx = -idx
     return idx
@@ -1867,7 +1869,7 @@ class Tensor(list):
       if ass:
         if alternate:
           none = True
-          for y in ((x[1], x[0], [2]), (x[1], x[2], x[0]), (x[0], x[2], x[1])):
+          for y in ((x[1], x[0], x[2]), (x[1], x[2], x[0]), (x[0], x[2], x[1])):
             if ass != self.__assocTriads2(y, False, basis, mBasis) \
                      -self.__assocTriads2(y, True, basis, mBasis):
               none = False
@@ -1884,10 +1886,10 @@ class Tensor(list):
     """moufangTriads(basis,[moufang,dump])
        Return moufang traids depending on moufang=0-5 where 0 is none and 5 is
        the sum of all four. See Lib.triadDump() for return and other values.
-         1: a*(b*(a*c)) -((a*b)*a)*c, 2: b*(a*(c*a)) -((b*a)*c)*a,
-         3: (a*b)*(c*a) -(a*(b*c))*a, 4: (a*b)*(c*a) -a*((b*c)*a)."""
+         1: c*(a*(c*b)) -((c*a)*c)*b, 2: a*(c*(b*c)) -((a*c)*b)*c,
+         3: (c*a)*(b*c) -(c*(a*b))*c, 4: (c*a)*(b*c) -c*((a*b)*c)."""
     self.__checkSquare(basis, "moufangTriads", "basis")
-    Lib._checkType(moufang, int, "moufangTriads")
+    Lib._checkType(moufang, int, "moufangTriads", (0,5))
     Lib._checkType(dump, bool, "moufangTriads")
     pBasis = list((str(x) for x in basis))
     mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
@@ -1905,33 +1907,31 @@ class Tensor(list):
       doAll = code in (0,5)
       x = (a+1, b+1, c+1)
       if code == 1 or doAll:
-        lhs = self.__assocTriads2((x[1], x[0], x[2]), False, basis, mBasis)
-        rhs = self.__assocTriads2((x[0], x[1], x[0]), True, basis, mBasis)
+        lhs = self.__assocTriads2((x[0], x[2], x[1]), False, basis, mBasis)
+        rhs = self.__assocTriads2((x[2], x[0], x[2]), True, basis, mBasis)
         if self.__assocTriads1(x[0], lhs, basis, mBasis) \
           -self.__assocTriads1(rhs, x[2], basis, mBasis):
           found = True
           doAll = False
       if code == 2 or doAll:
-        lhs = self.__assocTriads2((x[0], x[2], x[0]), False, basis, mBasis)
-        rhs = self.__assocTriads2((x[1], x[0], x[2]), True, basis, mBasis)
-        if self.__assocTriads1(x[1], lhs, basis, mBasis) \
-          -self.__assocTriads1(rhs, x[0], basis, mBasis):
+        lhs = self.__assocTriads2((x[2], x[1], x[2]), False, basis, mBasis)
+        rhs = self.__assocTriads2((x[0], x[2], x[1]), True, basis, mBasis)
+        if self.__assocTriads1(x[0], lhs, basis, mBasis) \
+          -self.__assocTriads1(rhs, x[2], basis, mBasis):
           found = True
           doAll = False
       if code == 3 or doAll:
-        lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
-        rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
-        ths = self.__assocTriads2(x, False, basis, mBasis)
-        if self.__assocTriads1(lhs, rhs, basis, mBasis) \
-          -self.__assocTriads1(x[0], ths, basis, mBasis):
+        lhs = self.__assocTriads1((x[2], x[0]), basis, mBasis)
+        rhs = self.__assocTriads2((x[2], x[0], x[1]), False, basis, mBasis)
+        if self.__assocTriads2((lhs, x[1], x[2]), False, basis, mBasis) \
+          -self.__assocTriads1(rhs, x[2], basis, mBasis):
           found = True
           doAll = False
       if code == 4 or doAll:
-        lhs = self.__assocTriads1(x[0], x[1], basis, mBasis)
-        rhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
-        ths = self.__assocTriads2((x[1], x[2], x[0]), True, basis, mBasis)
-        if self.__assocTriads1(lhs, rhs, basis, mBasis) \
-          -self.__assocTriads1(x[0], ths, basis, mBasis):
+        lhs = self.__assocTriads1(x[2], x[0], basis, mBasis)
+        rhs = self.__assocTriads2((x[0], x[1], x[2]), True, basis, mBasis)
+        if self.__assocTriads2((lhs, x[1], x[2]), False, basis, mBasis) \
+          -self.__assocTriads1(x[2], rhs, basis, mBasis):
           found = True
           doAll = False
       if code == 0:
@@ -1941,6 +1941,58 @@ class Tensor(list):
       elif found:
         buf.append(c)
         cnt += 1
+    out[a *lr +b] = buf
+    return cnt
+
+  def abcTriads(self, basis, abc=0, nonAssoc=False, dump=False):
+    """abcTriads(basis,[abc,nonAssocdump])
+       Return traids for abc=0-3 where 0 is triple associator and 1-3: [a,c,b],
+       [a,b,c], [b,a,c]. See Lib.triadDump() for return and other params."""
+    self.__checkSquare(basis, "abcTriads", "basis")
+    Lib._checkType(abc, int, "abcTriads", (0,3))
+    Lib._checkType(nonAssoc, bool, "assocTriads")
+    Lib._checkType(dump, bool, "abcTriads")
+    pBasis = list((str(x) for x in basis))
+    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
+    if isinstance(self[0][0], Lib._basestr):
+      basis = pBasis
+    tmp = Lib.triadPairs(self.__abcTriads, basis, "abcTriads", dump,
+                          (abc, mBasis))
+    if not nonAssoc:  return tmp
+    return Lib.triadPairs(Lib._allTriads, basis, "abcTriads", dump, tmp)
+  def __abcTriads(self, out, basis, lr, a, b, params):
+    cnt = 0
+    buf = []
+    aa,bb,param = params
+    code,mBasis = param
+    for c in range(b +1, lr):
+      found = False
+      x = (a+1, b+1, c+1)
+      if code == 0:
+        lhs1 = self.__assocTriads2((x[0], x[2], x[1]), True, basis, mBasis)
+        rhs1 = self.__assocTriads2((x[0], x[2], x[1]), False, basis, mBasis)
+        lhs2 = self.__assocTriads2((x[0], x[1], x[2]), True, basis, mBasis)
+        rhs2 = self.__assocTriads2((x[0], x[1], x[2]), False, basis, mBasis)
+        lhs3 = self.__assocTriads2((x[1], x[0], x[2]), True, basis, mBasis)
+        rhs3 = self.__assocTriads2((x[1], x[0], x[2]), False, basis, mBasis)
+        if lhs1 -rhs1 +lhs2 -rhs2 +lhs3 -rhs3 == 0:
+          buf.append(c)
+          cnt += 1
+      elif code == 1:
+        if self.__assocTriads2((x[0], x[2], x[1]), True, basis, mBasis) \
+          -self.__assocTriads2((x[0], x[2], x[1]), False, basis, mBasis) == 0:
+          buf.append(c)
+          cnt += 1
+      elif code == 2:
+        if self.__assocTriads2((x[0], x[1], x[2]), True, basis, mBasis) \
+          -self.__assocTriads2((x[0], x[1], x[2]), False, basis, mBasis) == 0:
+          buf.append(c)
+          cnt += 1
+      elif code == 3:
+        if self.__assocTriads2((x[1], x[0], x[2]), True, basis, mBasis) \
+          -self.__assocTriads2((x[1], x[0], x[2]), False, basis, mBasis) == 0:
+          buf.append(c)
+          cnt += 1
     out[a *lr +b] = buf
     return cnt
 
@@ -2184,7 +2236,8 @@ class Tensor(list):
       raise Exception("Tensor needs to be able to subtract for allSigns")
     stopCnt = -1
     if not isinstance(half, bool):
-      stopCnt = half
+      Lib._checkType(half, int, "allSigns", (0, pow(2, dim) -1))
+      stopCnt = half +1
       half = False
     Lib._checkType(half, bool, "allSigns")
     halfStop = (half and dim %2 == 0)

@@ -1187,13 +1187,13 @@ class O():
   def __assoc(self, p, q):
     return (self * p) *q  -self *(p * q)
 
-  def jacobiAssociator(self, c, d, abc=0):
+  def tripleAssociator(self, c, d, abc=0):
     """jabobiAssoc[iator](c,d)
        Return [b,d,c]+[b,c,d]+[c,b,d]. 0 if associative else non-associative."""
-    Lib._checkType(c, O, "jabociAssociator")
-    Lib._checkType(d, O, "jabociAssociator")
+    Lib._checkType(c, O, "tripleAssociator")
+    Lib._checkType(d, O, "tripleAssociator")
     return self.__assoc(d,c) +self.__assoc(c,d) + c.__assoc(self,d)
-  jacobiAssoc = jacobiAssociator
+  tripleAssoc = tripleAssociator
 
   def moufang(self, p, q, number=0):
     """moufang(p,q,[number=0])

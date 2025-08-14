@@ -121,21 +121,19 @@ def nac7subalg(tri, pos=None):
   """nac7subalg(tri, [pos])
      Return non-associative count for tri or tri.allSigns()[pos] sub-algebra."""
   if pos is not None:
-    if pos not in range(8):
-      raise Exception("Invalid nac7subalg signed position")
-    tri = list(Triads7[idx].allSigns(8))[pos]
+    tri = list(abs(tri).allSigns(pos))[pos]
   return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f7Basis)) \
                  .assocTriads(f7Basis,True),f7Basis)))
 
 # Map algebras to remainders with repeats shown with *,#,$
-# S4:  [e123, e567]
-# S8:  [e124, e467]
-# S10: [e125$, e134, e234, e367$, e456, e457]
-# S12: [e125$, e126, e127, e135*, e145*, e167, e235*, e245*, e267, e345,
+# P4:  [e123, e567]
+# P8:  [e124, e467]
+# P10: [e125$, e134, e234, e367$, e456, e457]
+# P12: [e125$, e126, e127, e135*, e145*, e167, e235*, e245*, e267, e345,
 #       e346*, e347*, e356*, e357*, e367$]
-# S14: [e135*, e136, e137, e145*, e146#, e147#, e156, e157, e235*, e236,
+# P14: [e135*, e136, e137, e145*, e146#, e147#, e156, e157, e235*, e236,
 #       e237, e245*, e246#, e247#, e256, e257, e346*, e347*, e356*, e357*]
-# S16: [e146#, e147#, e246#, e247#]
+# P16: [e146#, e147#, e246#, e247#]
 
 _Nac7Mirrors = "Sign combination indices for mirrors from the first 8 combinations (add all 128-idx)"
 Nac7Mirrors = [[0, 29, 38, 43, 49, 52, 56, 57], [1, 14, 23, 28, 50, 51, 55, 58],
@@ -489,6 +487,13 @@ def triads7autos(idx):
     print("%sFOUND %d:%d from %d = %s %s %s %s" %("" if fnd==phi1 else "NOT ",
            idx, x1, x0, fnd, p0, p1, p2))
     x0 = x1
+
+
+PX = list((x[0], Tensor.Triads(*triads7all(*x[1]).spin(f7Basis))) for x in \
+       ((4,(0,5)), (8,(7,0)), (10,(7,6)), (12,(0,0)), (14,(0,6)), (16,(12,0))))
+for x in PX: print("P%-2d" %x[0] +" has {:2d}A, {:2d}B, {:2d}C, 4X".format(   \
+    *list(len(list(Lib.triadDump(x[1].abcTriads(f7Basis,y,True),f7Basis)))-4 \
+     for y in (1,2,3))))
 
 #--------------------------------------------------------------------------
 #  G2 matrix and spin representations.
