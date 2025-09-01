@@ -59,19 +59,20 @@ class Lexer:
     self.__linePos = 0
     self.__lineNum = 0
     self.__oldLineNum = 0
-  tokens = ('NAME', 'NUMBER', 'EQUALS', 'QUOTES', "SIGNS", "MULTS", "BRACKS",
-            'COMMENT', 'NEWLINE')
+  tokens = ('NAME', 'NUMBER', 'EQUALS', 'QUOTES', 'QUOTE', 'SIGNS', 'MULTS',
+            'BRACKS', 'COMMENT', 'NEWLINE')
 
   # Regular expression rules for simple token types
   t_NAME   = r'\.?[a-zA-Z_]+[a-zA-Z_0-9]*'
   t_NUMBER = r'[0-9]*\.?[0-9]+(E(\+|-)?[0-9]+)?'
   t_EQUALS = r'=='
   t_QUOTES = r'"""'
+  t_QUOTE  = r'("|\')'
   t_SIGNS  = r'(\+|-)'
   t_MULTS  = r'(\*|//|/)'
   t_BRACKS = r'(\(|\))'
   t_COMMENT = r'\#'
-  literals = '~!@$%^&?[]{}|,"<>=:;\'\\. \t' 
+  literals = '~!@$%^&?[]{}|,"<>=:;\\. \t' 
   t_ignore = '\r'
 
   # Define a rule so we can track line numbers
@@ -236,9 +237,10 @@ class Calculator:
   __USEFUL_CMDS   = ("load", "test", "version")        # Words with evaluation
   __USEFUL_FILE   = ("show", "clear", "save", "load")  # Ordered filename words
   __PYTHON_WORDS  = ("print", "raise", "from", "with", # Exec not eval
-                     "with", "global", "raise", "import",
-                     "for", "while", "exec", "eval", "del")
-  __PYTHON_FUNCS  = ("def",)                   # Exec & no expand fn
+                     "with", "global", "raise", "for",
+                     "import", "while", "exec", "eval",
+                     "del", "def")
+  #__PYTHON_FUNCS  = ("def",)                   # Exec & no expand fn TBD
   __inCls = None                               # Current processor
   __firstCls = None                            # Initial __inCls
   __oldCls = {}                                # Previous __inCls's
@@ -265,6 +267,7 @@ class Calculator:
     Calculator.__eHelp = eHelp                # Load extra help text
     Calculator.__default = fDef               # Load file default value
     Calculator.__firstCls._processExec(False, ijk)
+    Lib._storeCalc(modList[0])
     self.__line = ""                          # Store to history if OK
     self.__lexer = Lexer() if ply_lex else None
 
@@ -468,6 +471,7 @@ class Calculator:
             if mod not in Calculator.__classList:
               Calculator.__classList.append(mod)
           Calculator.__moduleList.append(modList[0])
+          Lib._storeCalc(modList[0])
           for mod in modList[1:]:
             if mod not in Calculator.__promptList:
               Calculator.__promptList.append(mod)
@@ -765,7 +769,8 @@ class Calculator:
     state = ParseState()    # Store basis & numbers for conversion
     isComment = False       # Ignore commented text
     isAnsAssign = False     # History needs expanded ans
-    quoteCnt = 0            # Ignore inside double quotes only
+    quoteCnt1 = 0           # Ignore inside single quotes
+    quoteCnt2 = 0           # Ignore inside double quotes
     quotesCnt = 0           # Ignore inside triple double quotes only
     bracketCnt = 0          # Ignore inside brackets if noBrackExpand
     checkStore = False      # Process the state immediately
@@ -795,13 +800,16 @@ class Calculator:
         isAns = False
       elif token.type == "QUOTES":
         quotesCnt = 1 - quotesCnt
-        quoteCnt = 0
+        quoteCnt1 = quoteCnt2 = 0
         checkStore = quotesCnt
-      elif token.type == '"':
+      elif token.type == "QUOTE":
         if not quotesCnt:
-          quoteCnt = 1 - quoteCnt
-          checkStore = quoteCnt
-      elif quoteCnt or quotesCnt:
+          if token.type == '"':
+            quoteCnt2 = 1 - quoteCnt2
+          else:
+            quoteCnt1 = 1 - quoteCnt1
+          checkStore = quoteCnt1 or quoteCnt2 
+      elif quoteCnt1 or quoteCnt2 or  quotesCnt:
         pass
       elif token.type == "BRACKS":
         if token.value == '(':
@@ -892,12 +900,9 @@ class Calculator:
               elif token.value == "load":
                 if bracketCnt == 0:
                   loadCmdExpand = 2
-                  token.value = "Lib._checkName"
+                  token.value = "Lib._checkNames"
               doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
-              isAns = False
-            elif token.value in self.__PYTHON_FUNCS:
-              doLineExpand = False
               isAns = False
       else:  # All OTHER tokens
         isSpaced = (token.type in SpaceChars)
@@ -935,7 +940,7 @@ class Calculator:
         code += signVal
         signVal = ""
       code += token.value
-      if not (isSpaced or isComment or quoteCnt or quotesCnt):
+      if not (isSpaced or isComment or quoteCnt1 or quoteCnt2 or quotesCnt):
         state.extendLine = (token.type == "\\")
         state.lastTyp = token.type
         if token.type in (':', ';'):

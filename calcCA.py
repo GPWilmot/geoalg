@@ -1847,44 +1847,53 @@ class CA():
   def Eval(terms):
     """Eval(terms)
        Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
-    Lib._checkList(terms, None, "Eval", [1,0])
+    Lib._checkList(terms, None, "Eval", (1,0))
     if not isinstance(terms[0], (list, tuple)):
       terms = [terms]
-    Lib._checkList(terms, (list, tuple), "Eval", [1,0])
-    Lib._checkList(terms[0], None, "Eval", [1,0])
+    Lib._checkList(terms, (list, tuple), "Eval", (1,0))
     scalar = 0
-    if isinstance(terms[0][0], Lib._basestr):
-      out = {}
-      for item in terms:
-        if len(item) == 0:
-          scalar = 1
-        elif isinstance(item[0], Lib._basestr):
-          base = item[0]
-          if item[0] and item[0][0] not in CA.__BASIS_CHARS:
-            base = "e" +item[0]
-          out[base] = item[1]
-    else:
-      if not isinstance(terms[0][0], (list, tuple)):
-        terms = [terms]
-      terms = list(terms)
-      terms.extend([[]] *(3-len(terms)))
-      out = [[None]] *max(map(len,terms))
-      for term,base in enumerate(("e","","i")):
-        for idx,item in enumerate(terms[term]):
-          if out[idx][0] is None:
-            out[idx] = ["", 1]
-          if not base:
-            Lib._checkType(item, (int, float), "Eval")
-            out[idx][1] *= item
-          elif item:
-            basis = base
-            for num in item:
-              Lib._checkType(num, int, "Eval")
-              basis += "%X" %abs(num)
-              if num < 0:
-                out[idx][1] *= -1
-            out[idx][0] += basis
-      out = dict(out)
+    out = {}
+    if terms[0]:
+      if isinstance(terms[0][0], Lib._basestr):
+        for item in terms:
+          Lib._checkList(item, None, "Eval", 2)
+          Lib._checkType(item[0], Lib._basestr, "Eval")
+          if len(item[0]) == 0:
+            scalar += item[1]
+          elif isinstance(item[0], Lib._basestr):
+            base = item[0]
+            if base and base[0] not in CA.__BASIS_CHARS:
+              base = "e" +base
+            if base in out:
+              out[base] += item[1]
+            else:
+              out[base] = item[1]
+      else:
+        if not isinstance(terms[0][0], (list, tuple)):
+          terms = [terms]
+        terms = list(terms)
+        terms.extend([[]] *(3-len(terms)))
+        if len(terms[1]) == 0:
+          terms[1] = [1] *max(len(terms[0]), len(terms[2]))
+        buf = [[None]] *max(map(len,terms))
+        for term,base in enumerate(("e","","i")):
+          for idx,item in enumerate(terms[term]):
+            if buf[idx][0] is None:
+              buf[idx] = ["", 0]
+            if not base:
+              Lib._checkType(item, (int, float), "Eval")
+              buf[idx][1] = item
+            elif item:
+              basis = base
+              for num in item:
+                Lib._checkType(num, int, "Eval")
+                basis += "%X" %num
+              buf[idx][0] += basis
+        for basis,item in buf:
+          if basis in out:
+            out[basis] += item
+          else:
+            out[basis] = item
     return CA(scalar, **out)
 
   @staticmethod

@@ -1822,38 +1822,57 @@ class O():
     return cnt
 
   @staticmethod
-  def Eval(sets):
-    """Eval(sets)
+  def Eval(terms):
+    """Eval(terms)
        Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
-    Lib._checkType(sets, (list, tuple), "Eval")
-    if not (len(sets) and isinstance(sets[0], (list, tuple))):
-      sets = [sets]
+    Lib._checkList(terms, None, "Eval", (1,0))
+    if not isinstance(terms[0], (list, tuple)):
+      terms = [terms]
+    Lib._checkList(terms, (list, tuple), "Eval", (1,0))
     scalar = 0
-    terms = {}
-    for item in sets:
-      Lib._checkType(item, (list, tuple), "Eval")
-      if isinstance(item, Lib._basestr):
-        base = item[0] if item[0][0] in O.__allChars else ("o" +item[0])
-        terms[base] = 1
-      elif not isinstance(item, (list, tuple)):
-        raise Exception("Invalid basis for Eval: %s" %item)
-      elif len(item) == 0:
-        scalar = 1
-      elif isinstance(item[0], Lib._basestr):
-        base = item[0]
-        if item[0] and item[0][0] not in O.__allChars:
-          base = "o" +item[0]
-        terms[base] = item[1]
+    out = {}
+    if terms[0]:
+      if isinstance(terms[0][0], Lib._basestr):
+        for item in terms:
+          Lib._checkList(item, None, "Eval", 2)
+          Lib._checkType(item[0], Lib._basestr, "Eval")
+          if len(item[0]) == 0:
+            scalar += item[1]
+          elif isinstance(item[0], Lib._basestr):
+            base = item[0]
+            if base and base[0] not in O.__BASIS_CHARS:
+              base = "o" +base
+            if base in out:
+              out[base] += item[1]
+            else:
+              out[base] = item[1]
       else:
-        base = "o"
-        sgn = 1
-        for num in item:
-          Lib._checkType(num, int, "Eval")
-          base += "%X" %abs(num)
-          if num < 0:
-            sgn *= -1
-        terms[base] = sgn
-    return O(scalar, **terms)
+        if not isinstance(terms[0][0], (list, tuple)):
+          terms = [terms]
+        terms = list(terms)
+        terms.extend([[]] *(3-len(terms)))
+        if len(terms[1]) == 0:
+          terms[1] = [1] *max(len(terms[0]), len(terms[2]))
+        buf = [[None]] *max(map(len,terms))
+        for term,base in enumerate(("o","","u")):
+          for idx,item in enumerate(terms[term]):
+            if buf[idx][0] is None:
+              buf[idx] = ["", 0]
+            if not base:
+              Lib._checkType(item, (int, float), "Eval")
+              buf[idx][1] = item
+            elif item:
+              basis = base
+              for num in item:
+                Lib._checkType(num, int, "Eval")
+                basis += "%X" %num
+              buf[idx][0] += basis
+        for basis,item in buf:
+          if basis in out:
+            out[basis] += item
+          else:
+            out[basis] = item
+    return O(scalar, **out)
 
   @staticmethod
   def Q(*args):
