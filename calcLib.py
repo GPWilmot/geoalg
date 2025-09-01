@@ -1456,7 +1456,7 @@ class Tensor(list):
        Return matrix with fn() applied to each element of self."""
     if not hasattr(fn, "__call__"):
       raise Exception("function(fn) needs to be a function")
-    return self.function(fn)
+    return self.__function(fn)
 
   def __function(self, fn):
     """Internal function(fn) method."""
