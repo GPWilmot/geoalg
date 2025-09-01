@@ -1419,61 +1419,80 @@ class Tensor(list):
     return out
   trans=transpose
 
-  def pow(self, exp):
-    """pow(exp)
-       Return matrix with power applied to each element of self."""
-    Lib._checkType(exp, (int, float), "pow")
+
+  def reduce(self, fn):
+    """reduce(fn)
+       Return matrix with x=fn(x,y) applied to each element of self."""
+    if not hasattr(fn, "__call__"):
+      raise Exception("reduce(fn) needs to be a function")
+    return self.__reduce(fn)
+
+  def __reduce(self, fn):
+    """Internal reduce(fn) method."""
+    second = False
+    if self and isinstance(self[0], (list, tuple)):
+      out = self[0][0] if self[0] else 0
+      for val1 in self:
+        for val2 in val1:
+          if second:
+            out = fn(out, val2)
+          second = True
+      return out
+    out = self[0] if self else 0
+    for val1 in self:
+      if second:
+        out = fn(out, val1)
+      second = True
+    return out
+
+  def all(self):
+    """all()
+       Return True if all matrix values are True else False."""
+    return self.__reduce(lambda x,y: x and y)
+
+
+  def function(self, fn):
+    """function(fn)
+       Return matrix with fn() applied to each element of self."""
+    if not hasattr(fn, "__call__"):
+      raise Exception("function(fn) needs to be a function")
+    return self.function(fn)
+
+  def __function(self, fn):
+    """Internal function(fn) method."""
     out = []
     if self and isinstance(self[0], (list, tuple)):
       for idx1,val1 in enumerate(self):
         out.append([])
-        for idx2,val2 in enumerate(val1):
-          out[idx2].append(pow(val2, exp))
+        for val2 in val1:
+          out[idx1].append(fn(val2))
       return Tensor(*out)
     for idx1,val1 in enumerate(self):
-      out.append(pow(val1, exp))
+      out.append(fn(val1))
     return self.copy(out)
+
+  def abs(self):
+    """abs()
+       Return matrix with absolute value applied to each element of self."""
+    return self.__function(abs)
+  __abs__ = abs
+
+  def pow(self, exp):
+    """pow(exp)
+       Return matrix with power applied to each element of self."""
+    Lib._checkType(exp, (int, float), "pow")
+    return self.__function(lambda x: x.__class__.pow(x, exp))
   __pow__ = pow
 
   def exp(self):
     """exp()
        Return matrix with exponentiation applied to each element of self."""
-    out = []
-    if self and isinstance(self[0], (list, tuple)):
-      for idx1,val1 in enumerate(self):
-        out.append([])
-        for idx2,val2 in enumerate(val1):
-          if isinstance(val2, (float, int)):
-            out[idx2].append(exp(val2))
-          else:
-            out[idx2].append(exp(val2))
-      return Tensor(*out)
-    for idx1,val1 in enumerate(self):
-      if isinstance(val1, (float, int)):
-        out.append(val1.exp())
-      else:
-        out.append(val1.exp())
-    return self.copy(out)
+    return self.__function(lambda x: x.__class__.exp(x))
 
   def log(self):
     """log()
        Return matrix with logarithm applied to each element of self."""
-    out = []
-    if self and isinstance(self[0], (list, tuple)):
-      for idx1,val1 in enumerate(self):
-        out.append([])
-        for idx2,val2 in enumerate(val1):
-          if isinstance(val2, (float, int)):
-            out[idx2].append(log(val2))
-          else:
-            out[idx2].append(val2.log())
-      return Tensor(*out)
-    for idx1,val1 in enumerate(self):
-      if isinstance(val1, (float, int)):
-        out.append(log(val1))
-      else:
-        out.append(val1.log())
-    return self.copy(out)
+    return self.__function(lambda x: x.__class__.log(x))
 
   def morph(self, basis, labels=None):
     """morph(basis, [labels])
@@ -1547,7 +1566,7 @@ class Tensor(list):
               if isStrLabel:
                 val2 = str(val2)
             except (ValueError, AttributeError):
-              raise Exception("Swap element not found in basis: %s" %val2)
+              val2 = str(val2) # Swap element not found in basis
           row.append(val2)
       elif val1 in basis:
         row = labels[basis.index(val1)]
@@ -2338,22 +2357,33 @@ class Tensor(list):
                   (-cLng *cLat, -sLng *cLat, -sLat))
 
   @staticmethod
-  def Table(basis, rhsBasis=None):
-    """Table(basis, [rhsBasis])
-       Return Matrix multiplication table for basis times rhsBasis or basis."""
+  def Table(basis, rhsBasis=None, lie=0):
+    """Table(basis, [rhsBasis, lie])
+       Return Matrix mult.or Lie/lie table for basis times rhsBasis or basis."""
     out = []
     if rhsBasis is None:
       rhsBasis = basis
     Lib._checkType(basis, (list, tuple), "Table")
     Lib._checkType(rhsBasis, (list, tuple), "Table")
+    Lib._checkType(lie, int, "Table")
     if len(basis) > 0 and len(rhsBasis) > 0 and not \
           (hasattr(basis[0], "grades") and hasattr(rhsBasis[0], "grades")):
       raise Exception("Table parameter is not a list of basis elements")
     for idx,bas1 in enumerate(rhsBasis):
       row = []
-      for bas2 in basis:
-        val = bas1 * bas2
-        row.append(val)
+      if lie:
+        if lie < 0:
+          for bas2 in basis:
+            val = abs((bas1 * bas2 -bas2 *bas1)/lie)
+            row.append(val)
+        else:
+          for bas2 in basis:
+            val = (bas1 * bas2 -bas2 *bas1)/lie
+            row.append(val)
+      else:
+        for bas2 in basis:
+          val = bas1 * bas2
+          row.append(val)
       out.append(row)
     return Tensor(out)
 

@@ -2080,7 +2080,7 @@ if __name__ == '__main__':
        if Lib.isCalc("Q"):
          test = (d45+i+j+k).normalise().versorMatrix()
        else:
-         test = r.normalise().versorMatrix()
+         test = r.normalise().versorMatrix().reshape(store.shape()[0])
        Calculator.log(store == test, store)""",
        ]
 
