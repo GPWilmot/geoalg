@@ -67,7 +67,7 @@ demo_tests = [\
      # Test 10: Octonions quaternion multiplication table
      #
      Calculator.log(True)
-     if CA.IsCalc("O"):
+     if Lib.isCalc("O"):
        k=O(o12=1); Calculator.calc("O")
        Oijk = [i,j,k]; Tensor.Table(Oijk).dump(Oijk)
      else:
@@ -76,7 +76,7 @@ demo_tests = [\
      # Test 11: Compare CA and O
      #
      Calculator.log(True)
-     if CA.IsCalc("O"):
+     if Lib.isCalc("O"):
        cb = CA.Basis(0,3)
        ob = list(O.Basis(3)); ob = ob[:2] +ob[3:4] +[O(o12=-1)] +ob[4:]
        Tensor.Table(cb).dump(cb,name="CA")

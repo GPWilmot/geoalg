@@ -424,12 +424,15 @@ class Calculator:
 
   @staticmethod
   def calc(calc=None):
-    """Load a different calculator or list them."""
+    """Load a different calculator or list them denoting loaded ones."""
     names = []
     path = os.path.dirname(__file__) +"/calc*.py"
+    loaded = Lib._getCalcList()
     for name in (os.path.basename(fName) for fName in glob.glob(path)):
       name = name[4:-3]
       if name and len(name) < 3:
+        if calc is None and name in loaded:
+          name += "*"
         names.append(name)
     calcs = [None] if calc is None else calc.split(',')
     newCls = None
@@ -454,7 +457,7 @@ class Calculator:
             raise Exception("No importlib: run %s.py from the command line"%mod)
         modList, clsList, ijk, fDef, cHelp, eHelp = newCls._getCalcDetails()
         Calculator.__firstCls._processExec(False, ijk)
-        msg = newCls._setCalcBasis(Calculator.__moduleList, Calculator)
+        msg = newCls._setCalcBasis()
         if msg:
           ijkMsg = msg
         if calc not in Calculator.__moduleList: # Not already loaded
@@ -473,15 +476,14 @@ class Calculator:
             Calculator.__inCls = newCls 
             Calculator.__prompt = modList[0]
             Calculator.__default = fDef
+          Calculator.__inCls._setCalcBasis()
       else:
         raise Exception("No such calculator: calc%s" %calc)
     if newCls:
-      for cls in Calculator.__oldCls.values():
-        cls._setCalcBasis(Calculator.__moduleList, Calculator)
-      msg = "Variables i,j,k reset to " if ijkMsg else ""
+      msg = "Variables i,j,k " +("reset to " if ijkMsg else "not reset")
       if len(Calculator.__moduleList) > 1:
         msg = "Enabled " +", ".join(Calculator.__moduleList)
-        msg += " and i,j,k reset to " if ijkMsg else ""
+        msg += " and i,j,k " +("reset to " if ijkMsg else "not reset")
       if msg + ijkMsg:
         sys.stdout.write(msg +ijkMsg +'\n')
 
@@ -1122,7 +1124,6 @@ class Real(float):
      modified. It has no methods, use math methods instead eg sin(pi) but change
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
-  __loadedCalcs = []                     # Notify any other calc loaded
   def __float__(self):
     return super(self)
   def __int__(self):
@@ -1195,11 +1196,6 @@ class Real(float):
        Return no basis elements since there are none."""
     return ()
 
-  @staticmethod
-  def IsCalc(calc):
-    """Check if named calculator has been loaded."""
-    return (calc in Real.__loadedCalcs)
-
   #########################################################
   ## Calculator class help and basis processing methods  ##
   #########################################################
@@ -1212,9 +1208,8 @@ class Real(float):
             "Use scalar method instead of Real numbers.")
 
   @classmethod
-  def _setCalcBasis(cls, calcs, dummy):
+  def _setCalcBasis(cls):
     """Load this other calculator. Does nothing for reals/floats."""
-    Real.__loadedCalcs = calcs
     return ""
 
   @classmethod

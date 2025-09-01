@@ -244,7 +244,6 @@ class S():
   __calculator = None                    # Last calculator loaded
   __globWordList = []                    # Remember variables
   __keyWordList = []                     # Avoid processing modules
-  __loadedCalcs = []                     # Notify any other calc loaded
 
   def __init__(self, symbol, getLocals=None, isMinus=False):
     """S(symbol, [isTxt])
@@ -506,12 +505,7 @@ class S():
        Return the module version string."""
     return __version__
 
-  @staticmethod
-  def IsCalc(calc):
-    """Check if named calculator has been loaded."""
-    return (calc in S.__loadedCalcs)
-
-  ###################################################
+  ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
   __keyWordList = []
@@ -535,10 +529,9 @@ class S():
     S.__keyWordList.extend(keyword.kwlist)  # Add all python keywords
 
   @classmethod
-  def _setCalcBasis(cls, calcs, Calc):
+  def _setCalcBasis(cls):
     """Load this other calculator. None currently."""
-    S.__loadedCalcs = calcs
-    S._setWordLists(Calc)
+    S._setWordLists(Lib._getCalcList())
     return ""
 
   @classmethod

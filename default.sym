@@ -32,7 +32,7 @@ def fixQ(roll,pitch,yaw,d=1.0):
   sx,cx=Lib.sincos(roll/d)
   sy,cy=Lib.sincos(pitch/d)
   sz,cz=Lib.sincos(yaw/d)
-  if not S.IsCalc("CA"):
+  if not Lib.isCalc("CA"):
     raise Exception("CA must be loaded to use fixQ")
   else:
     global tmp

@@ -60,6 +60,7 @@ class Lib():
   __lastProcTime= 0             # Store program time float seconds
   __checkMemSrt = True          # checkMem to run procTime at start
   __storeName   = []            # Store and check loaded filenames
+  __storeCalc   = []            # Store and check loaded calculators
   _memLimitMB   = 500           # Abort if less mem than this
   if sys.version_info.major == 2:
     _basestr = basestring       # Handle unicode
@@ -270,17 +271,41 @@ class Lib():
     return out
   @staticmethod
   def _storeName(name):
+    """Internal method to store a named file."""
     if name not in Lib.__storeName:
       Lib.__storeName.append(name)
   @staticmethod
-  def _checkName(names):
+  def __checkNames(names):
+    """Internal method to raise an exception if any of the named files
+       are not loaded."""
     out = []
     for name in names.split(','):
       name = name.strip()
       if name not in Lib.__storeName:
         out.append(name)
+    return out
+  @staticmethod
+  def _checkNames(names):
+    out = Lib.__checkNames(names)
     if out:
       raise Exception("Need to load %s" %",".join(out))
+  @staticmethod
+  def _storeCalc(name):
+    """Internal method to store a loaded calculator for isCalc()."""
+    if name not in Lib.__storeCalc:
+      Lib.__storeCalc.append(name)
+  @staticmethod
+  def __isCalc(names):
+    """Internal method to return true is the named calculators are loaded."""
+    for name in names.split(','):
+      name = name.strip()
+      if name not in Lib.__storeCalc:
+        return False
+    return True
+  @staticmethod
+  def _getCalcList():
+    return Lib.__storeCalc
+
   @staticmethod
   def _piRange(a):
     """Return an euler angle to range -pi..+pi."""
@@ -380,6 +405,18 @@ class Lib():
       out[basisNames] = value
     return out
 
+  @staticmethod
+  def isLoaded(names):
+    """isLoaded(names)
+       Return true if comma separated file names are loaded."""
+    Lib._checkType(names, Lib._basestr, "isLoaded")
+    return Lib.__checkNames(names) == []
+  @staticmethod
+  def isCalc(names):
+    """isCalc(names)
+       Return true if comma separated calculator names are loaded."""
+    Lib._checkType(names, Lib._basestr, "isCalc")
+    return Lib.__isCalc(names)
   @staticmethod
   def freeMemMB():
     """free[MemMB]()

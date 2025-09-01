@@ -867,12 +867,6 @@ class Q():
      else:
        sys.stderr.write("PIP: Matlabplot not installed - no plot available\n")
      return (val, a*val*val +b*val +c)
-
-  @staticmethod
-  def IsCalc(calc):
-    """Test loading of other calculators. Not used in this calculator."""
-    return (calc == "Q")
-
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
@@ -886,7 +880,7 @@ class Q():
          "default.quat", calcHelp, "Can also use quaternions with basis i,j,k.")
 
   @classmethod
-  def _setCalcBasis(cls, calcs, dummy):
+  def _setCalcBasis(cls):
     """Load this other calculator. Does nothing for quaternions."""
     return "quaternions"
 

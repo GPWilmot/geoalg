@@ -100,7 +100,7 @@ Spin7O = Tensor(
  ("-f6",  "f5",  "f4",  "-f3", "-f2", "f1", "-1"))
 Spin7Obaez = Spin7O.transpose()
 
-if CA.IsCalc("O"):  # Same code as ultronions.oct
+if Lib.isCalc("O"):  # Same code as ultronions.oct
   AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
   O.CayleyDicksonRule(True)
   BO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
@@ -535,10 +535,10 @@ WikiG22 = (WikiG2[0] +WikiG2[7],  WikiG2[1] +WikiG2[8],  # A+H, B+I
 
 _G2 = "CA(6) representation of exceptional Lie G2 derived from matrices."
 _G22 = "CA(6) dual element dependent basis, output of setupG2()."
-G2 = Tensor((+e23-e45, -e13-e46, +e12+e47, -e15+e26, +e14-e27, +e17+e24, -e16-e25,
-          +e45-e67, +e46+e57, -e47+e56, -e26-e37, -e27+e36, -e17+e35, +e25-e34))/2
+G2 = Tensor((e23-e45, -e13-e46, e12+e47, -e15+e26, e14-e27, e17+e24, -e16-e25,
+         e45-e67, e46+e57, -e47+e56, -e26-e37, -e27+e36, -e17+e35, e25-e34))/2
 G22 = (G2[0] +G2[7], G2[1] +G2[8], G2[2] +G2[9],                # A+H, B+I, C+J
-    G2[3] +G2[10], G2[5] +G2[12], G2[6] +G2[13], G2[11] -G2[4]) # D+K,F+M,G+N,L-E
+  G2[3] +G2[10], G2[5] +G2[12], G2[6] +G2[13], G2[11] -G2[4]) # D+K,F+M,G+N,L-E
 #G23 = (A1-H1, B1-I1, C1-J1, D1-K1, F1-M1, G1-N1, L1+E1) # TBC
 
 _TableG2 = """TableG2 === tableG2(); The full table is

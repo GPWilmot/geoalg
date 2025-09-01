@@ -52,7 +52,6 @@ class CA():
   __HEX_CHARS   = ('A', 'B', 'C', 'D', 'E', 'F')
   __BASIS_CHARS = ('e', 'i')             # CA basis chars only
   __maxBasis    = ['0', '0']             # Store the max dimensions
-  __loadedCalcs = []                     # Notify any other calc loaded
   dumpRepr      = False                  # Repr defaults to str
 
   class Grade:
@@ -1907,7 +1906,7 @@ class CA():
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, e32, e13, e21) with up to 4
        arguments. If calc(Q) included then scalar may instead be a Q object."""
-    if "Q" in CA.__loadedCalcs:      # If module calcQ included can use Q class
+    if Lib.isCalc("Q"):      # If module calcQ included can use Q class
       if len(args) == 1 and isinstance(args[0], Q):
         q = args[0]
         args = [q.w, q.x, q.y, q.z]
@@ -1918,12 +1917,6 @@ class CA():
     for idx,val in enumerate(xyz):
       kw[val] = 0 if len(args) < 4 else args[idx +1]
     return CA(0 if len(args) < 1 else args[0], **kw)
-
-  @staticmethod
-  def IsCalc(calc):
-    """Check if named calculator has been loaded."""
-    return (calc in CA.__loadedCalcs)
-
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
@@ -1936,9 +1929,8 @@ class CA():
     return (("CA", "Q", "R"), ("CA", "math"), ijk, "default.ca", calcHelp, "")
 
   @classmethod
-  def _setCalcBasis(cls, calcs, dummy):
+  def _setCalcBasis(cls):
     """Load this other calculator. Quaternions are redefined."""
-    CA.__loadedCalcs = calcs
     return "e32,e13,e21"
 
   @classmethod
@@ -2051,7 +2043,7 @@ if __name__ == '__main__':
        store = CA.Euler(e,order=[1,2,3],implicit=False)
        Calculator.log( store == test, store)""",
     """# Test 5 Euler implicit rotation == other order, Rzyx==Rxy'z''.
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = CA.Q(Q.Euler(e, order=[1,2,3], implicit=True))
        else:
          test = CA.Euler(e, order=[3,2,1])
@@ -2062,7 +2054,7 @@ if __name__ == '__main__':
        test = CA.Euler(e).pow(2); store = (CA.Euler(e).log() *2).exp()
        Calculator.log(store == test, store)""",
     """# Test 7 Rotate via frameMatrix == versor.versorMatrix(half angle).
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = (d45+i+j+k).frameMatrix()
        else:
          test = (d45+i+j+k).frameMatrix()
@@ -2070,7 +2062,7 @@ if __name__ == '__main__':
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
        r = d45 +i +j +k; store = r.normalise().euler().matrix()
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = r.normalise().versorMatrix()
        else:
          test = r.normalise().versorMatrix()
@@ -2080,7 +2072,7 @@ if __name__ == '__main__':
        store=Euler.Matrix(CA.Euler(*test).versorMatrix())
        Calculator.log(store == Euler(*test), store)""",
     """# Test 10 Geodetic distance = acos(p.w *d.w -p.dot(d)).
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          p = Q.Euler(e); d=(d45+i+2*j+3*k).versor()
          test = math.acos(p.w *d.w -p.dot(d))
          p = CA.Q(p); d = CA.Q(d)
@@ -2099,7 +2091,7 @@ if __name__ == '__main__':
        def perp(a,r,w): return r *math.cos(w) +CA(e321=1)*a.wedge(r) \\
                *math.sin(w) -a *a.dot(r) *math.cos(w)
        store = para(e1,e1+e2,d30)+perp(e1,e1+e2,d30)
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = e123 *CA.Q((d30+i).versor().rotate(i+j))
        else:
          test = (d30+e32).versor().rotate(e1+e2)
@@ -2113,7 +2105,7 @@ if __name__ == '__main__':
        d3 = Ptest(CA(0,1,0,0), CA(0,0,1,2), CA(0,1,2,3))
        Calculator.log(d2 and d3, (d2, d3))""",
     """# Test 15 Euler Matrix is inverse of versorMatrix.
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = Q.Euler(pi/6, pi/4, pi/2).versorMatrix()
        else:
          test = CA.Euler(pi/6, pi/4, pi/2).versorMatrix()
@@ -2121,7 +2113,7 @@ if __name__ == '__main__':
        Calculator.log(store == test, store)""",
     """# Test 16 Check lat-long conversion to ECEF xyz and back.
        lat=45; lng=45; store = Tensor(lat,lng); Lib.precision(1E-8)
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = Q.LatLon(lat,lng)
        else:
          test = CA.LatLon(lat,lng)
@@ -2132,7 +2124,7 @@ if __name__ == '__main__':
        Calculator.log(store.latLonAlt() == test, test)""",
     """# Test 18 Check lat-long conversion from ECEF to NED. Ryz==Rz'y.
        lat=45; lng=45; store = CA.NED(lat,lng)
-       if CA.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = CA.Q(Q.Euler(0,-radians(lat+90), radians(lng), order=[1,2,3]))
        else:
          test = CA.Euler(0,-radians(lat+90), radians(lng), order=[1,2,3])

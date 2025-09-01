@@ -67,7 +67,6 @@ class O():
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
   __allChars    = ['o', 'u']             # Include CA
   __basisList   = ['', '']               # Store the dimension characters
-  __loadedCalcs = []                     # Notify any other calc loaded
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
@@ -1187,8 +1186,8 @@ class O():
   def __assoc(self, p, q):
     return (self * p) *q  -self *(p * q)
 
-  def tripleAssociator(self, c, d, abc=0):
-    """jabobiAssoc[iator](c,d)
+  def tripleAssociator(self, c, d):
+    """tripleAssoc[iator](c,d)
        Return [b,d,c]+[b,c,d]+[c,b,d]. 0 if associative else non-associative."""
     Lib._checkType(c, O, "tripleAssociator")
     Lib._checkType(d, O, "tripleAssociator")
@@ -1861,7 +1860,7 @@ class O():
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, o1, o2, o12) with up to 4
        arguments. If calc(Q) included then w may instead be a Q object."""
-    if "Q" in O.__loadedCalcs:     # If module calcQ included can use Q class
+    if Lib.isCalc("Q"):     # If module calcQ included can use Q class
       if len(args) == 1 and isinstance(args[0], Q):
         q = args[0]
         args = []
@@ -1876,11 +1875,6 @@ class O():
     return O(args[0], **kwargs)
 
   @staticmethod
-  def IsCalc(calc):
-    """Check if named calculator has been loaded."""
-    return (calc in O.__loadedCalcs)
-
-  @staticmethod
   def SetQuaternions():
     if len(O.__basisList[0]) >= 2:
       x1,x2 = O.__basisList[0][0], O.__basisList[0][1]
@@ -1891,7 +1885,7 @@ class O():
       return ("i,j,k=O(u%s=1),O(u%s=1),O(u%s=1)" %(x1 +x2, x2 +x3, x3+x1),
               "u%s,u%s,u%s" %(x1 +x2, x2 +x3, x3 +x1))
     else:
-      return ("", "nothing")
+      return ("", "")
 
   ###################################################
   ## Calc class help and basis processing methods  ##
@@ -1907,10 +1901,9 @@ class O():
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 
   @classmethod
-  def _setCalcBasis(cls, calcs, dummy):
+  def _setCalcBasis(cls):
     """Load this other calculator. Quaternions are redefined."""
-    O.__loadedCalcs = calcs
-    if "CA" in calcs:
+    if Lib.isCalc("CA"):
       for i in cls.__CA_CHARS:
         if i not in cls.__allChars:
           cls.__allChars.append(i)
@@ -2046,7 +2039,7 @@ if __name__ == '__main__':
        Calculator.log( store == test, store)""",
     """# Test 5 Euler implicit rotation == other order, Rzyx==Rxy'z'' QFAIL TBD.
        e=Euler(pi/6)
-       if O.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = O.Q(Q.Euler(e, order=[1,2,3], implicit=True))
        else:
          test = O.Euler(e, order=[3,2,1])
@@ -2057,7 +2050,7 @@ if __name__ == '__main__':
        test = O.Euler(e).pow(2); store = (O.Euler(e).log() *2).exp()
        Calculator.log(store == test, store)""",
     """# Test 7 Rotate via frameMatrix == versor.versorMatrix(half angle).
-       if O.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = (d45+i+j+k).frameMatrix()
        else:
          test = (d45+o1+o2+o12).frameMatrix()
@@ -2065,7 +2058,7 @@ if __name__ == '__main__':
        Calculator.log(store == test, store)""",
     """# Test 8 Rotate via versor.versorMatrix() == versor.euler().matrix().
        r = d45 +o1 +o2 +o12; store = r.normalise().euler().matrix()
-       if O.IsCalc("Q"):
+       if Lib.isCalc("Q"):
          test = (d45+i+j+k).normalise().versorMatrix()
        else:
          test = r.normalise().versorMatrix()
