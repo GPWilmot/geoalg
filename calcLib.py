@@ -551,8 +551,8 @@ class Lib():
         yield tuple(basis[idx -1]  for idx in elem) 
   
   @staticmethod
-  def perm(n, r=None):
-    """perm(n, [r])
+  def permute(n, r=None):
+    """perm[ute](n, [r])
        Return number of permutations of n terms or generator of r in n perms."""
     Lib._checkType(n, (int, float), "perm")
     if isinstance(r, int) and not isinstance(r, bool):
@@ -560,6 +560,7 @@ class Lib():
     elif r is None:
       return math.factorial(n) 
     raise Exception("Invalid r parameter for perm")
+  perm=permute
 
   @staticmethod
   def __perm(n, arr, offset, dump):
@@ -635,7 +636,16 @@ class Lib():
         Lib.__additionTree(splits, out, maxs, idx +1)
         splits[idx +1] -= cnt
     splits[idx] = old
-     
+
+  @staticmethod
+  def allIndices(dim, limit):
+    """allIndices(dim, limit)
+       Yield dim len list of all numbers 0 to limit."""
+    yield [0]*dim
+    for siz in range(1, dim *limit +1):
+      for out in (x for x in Lib.additionTree(siz, dim) if max(x) < limit +1):
+        yield out
+
   @staticmethod
   def triads(dim):
     """triads(dim)
