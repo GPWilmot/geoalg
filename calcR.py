@@ -532,7 +532,7 @@ class Calculator:
           avWidth = sum(map(len, fNames)) //len(fNames) +3
           form = 'Files to load:'
           totWidth = 80
-          if sys.platform !="win32":
+          if sys.platform != "win32":
             try:
               disWidth = int(os.popen('stty size', 'r').read().split()[1])
               totWidth = max(len(form) +avWidth, disWidth) -1
@@ -769,9 +769,9 @@ class Calculator:
     state = ParseState()    # Store basis & numbers for conversion
     isComment = False       # Ignore commented text
     isAnsAssign = False     # History needs expanded ans
-    quoteCnt1 = 0           # Ignore inside single quotes
-    quoteCnt2 = 0           # Ignore inside double quotes
-    quotesCnt = 0           # Ignore inside triple double quotes only
+    quoteCnt1 = False       # Ignore inside single quotes
+    quoteCnt2 = False       # Ignore inside double quotes
+    quotesCnt = False       # Ignore inside triple double quotes only
     bracketCnt = 0          # Ignore inside brackets if noBrackExpand
     checkStore = False      # Process the state immediately
     signVal = ""            # Current sign for number or name
@@ -799,15 +799,16 @@ class Calculator:
         checkStore = True
         isAns = False
       elif token.type == "QUOTES":
-        quotesCnt = 1 - quotesCnt
-        quoteCnt1 = quoteCnt2 = 0
+        quotesCnt = not quotesCnt
+        quoteCnt1 = quoteCnt2 = False
         checkStore = quotesCnt
       elif token.type == "QUOTE":
         if not quotesCnt:
-          if token.type == '"':
-            quoteCnt2 = 1 - quoteCnt2
-          else:
-            quoteCnt1 = 1 - quoteCnt1
+          if token.value == '"':
+            if not quoteCnt1:
+              quoteCnt2 = not quoteCnt2
+          elif not quoteCnt2:
+            quoteCnt1 = not quoteCnt1
           checkStore = quoteCnt1 or quoteCnt2 
       elif quoteCnt1 or quoteCnt2 or  quotesCnt:
         pass
@@ -904,7 +905,7 @@ class Calculator:
               doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
               isAns = False
-      else:  # All OTHER tokens
+      else:  # ALL OTHER TOKENS
         isSpaced = (token.type in SpaceChars)
         if token.type == '=':
           if noBrackExpand and len(state.store) == 1 \
@@ -933,7 +934,7 @@ class Calculator:
           token.value = "load("    # Fix load dependencies
         else:
           checkStore = True
-      if checkStore:
+      if checkStore:  # ALL TOKENS
         checkStore = False
         if state.store:
           code += Calculator.__inCls._processStore(state)
