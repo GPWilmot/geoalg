@@ -569,27 +569,39 @@ class O():
     return self != 0
   __nonzero__ = __bool__
 
-  def __div__(self, q):
+  def __div__(self, q, isFloor=False):
     """Attempted division for 2 versors or self by scalar."""
     if isinstance(q, O):
-      return self.__mul__(q.inverse())
+      out = self.__mul__(q.inverse())
+      if isFloor:
+        out.w = int(out.w)
+        for grade in out.__g:
+          grade.value = int(grade.value)
+      return out
     Lib._checkType(q, (int, float), "div")
     if abs(q) < Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
-      q = float(q)
-    out = self.__class__(self.w /q)
-    for grade in self.__g:
-      out.__g.append(grade.copy(grade.value /q))
+    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
+      if isinstance(q, int) or isFloor:
+        out = self.__class__(int(self.w /q))
+        for grade in self.__g:
+          out.__g.append(grade.copy(int(grade.value /q)))
+        print(out)
+      else:
+        out = CA(float(self.w) /ca)
+        for grade in self.__g:
+          out.__g.append(grade.copy(float(grade.value) /q))
+    else:
+      out = self.__class__(self.w /q)
+      for grade in self.__g:
+        out.__g.append(grade.copy(grade.value /q))
     return out 
   __truediv__ = __div__
-  __floordiv__ = __div__
+  def __floordiv__(self, q): return self.__div__(q, True)
 
-  def __rdiv__(self, q):
-    """Division for number, q, divided by an O."""
-    return self.inverse().__mul__(q)
+  def __rdiv__(self, q):  return self.inverse().__mul__(q) # Scalar / O
   __rtruediv__ = __rdiv__
-  __rfloordiv__ = __rdiv__
+  def __rfloordiv__(self, q): return self.__class__(q).__div__(self, True)
 
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""

@@ -177,23 +177,30 @@ class Q():
     return self != 0
   __nonzero__ = __bool__
 
-  def __div__(self, q):
+  def __div__(self, q, isFloor=False):
     """Quaternion division for 2 quaternions or self by scalar."""
     if isinstance(q, Q):
-      return self.__mul__(q.inverse())
+      out = self.__mul__(q.inverse())
+      if isFloor:
+        return Q(int(out.w /q), int(out.x /q), int(out.y /q), int(out.z /q))
+      return out
     Lib._checkType(q, (int, float), "div")
     if abs(q) <= Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if sys.version_info.major == 2 and isinstance(q, int): # Python v2 to v3
-      q = float(q)
+    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
+      if isinstance(ca, int) or isFloor:
+        return Q(int(self.w /q), int(self.x /q), int(self.y /q), int(self.z /q))
+      else:
+        return Q(float(self.w) /q, float(self.x) /q, float(self.y) /q,
+                 float(self.z) /q)
     return Q(self.w /q, self.x /q, self.y /q, self.z /q)
   __truediv__ = __div__
-  __floordiv__ = __div__
-  def __rdiv__(self, q):
-    """Quaternion division for number, q, divided by a quaternion."""
-    return self.inverse().__mul__(q)
+  def __floordiv__(self, q): return self.__div__(q, True)
+
+  def __rdiv__(self, q): return self.inverse().__mul__(q) # Scalar / Q
   __rtruediv__ = __rdiv__
-  __rfloordiv__ = __rdiv__
+  def __rfloordiv__(self, q): return CA(q).__div__(self, True)
+
   def __mod__(self, q):
     """Modulo % operator for quaternion."""
     Lib._checkType(q, (int, float), "mod")

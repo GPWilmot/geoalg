@@ -440,21 +440,27 @@ class CA():
     return self != 0
   __nonzero__ = __bool__
 
-  def __div__(self, ca):
+  def __div__(self, ca, isFloor=False):
     """Attempted division for 2 versors or self by scalar."""
     if isinstance(ca, CA):
-      return self.__mul__(ca.inverse())
+      out = self.__mul__(ca.inverse())
+      if isFloor:
+        out.w = int(out.w)
+        for grade in out.__g:
+          grade.value = int(grade.value)
+      return out
     Lib._checkType(ca, (int, float), "div")
     if abs(ca) < Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if isinstance(ca, int): # Python v2 to v3
-      tmp1 = int(self.w /ca)
-      tmp2 = float(self.w) /ca
-      out = CA(tmp1 if tmp1 == tmp2 else tmp2)
-      for grade in self.__g:
-        tmp1 = int(grade.value /ca)
-        tmp2 = float(grade.value) /ca
-        out.__g.append(self.Grade(tmp1 if tmp1==tmp2 else tmp2, grade.bases()))
+    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
+      if isinstance(ca, int) or isFloor:
+        out = CA(int(self.w /ca))
+        for grade in self.__g:
+          out.__g.append(self.Grade(int(grade.value /ca), grade.bases()))
+      else:
+        out = CA(float(self.w) /ca)
+        for grade in self.__g:
+          out.__g.append(self.Grade(float(grade.value) /ca, grade.bases()))
     else:
       out = CA(self.w /ca)
       for grade in self.__g:
@@ -462,13 +468,11 @@ class CA():
     out.__entered0 = self.__entered0
     return out 
   __truediv__ = __div__
-  __floordiv__ = __div__
+  def __floordiv__(self, ca): return self.__div__(ca, True)
 
-  def __rdiv__(self, ca):
-    """Division for number, ca, divided by a CA."""
-    return self.inverse().__mul__(ca)
+  def __rdiv__(self, ca): return self.inverse().__mul__(ca) # Scalar / CA
   __rtruediv__ = __rdiv__
-  __rfloordiv__ = __rdiv__
+  def __rfloordiv__(self, ca): return CA(ca).__div__(self, True)
 
   def __cf(self, cf, oper):
     """Return inside/outside graded comparisons for operator."""
