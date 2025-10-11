@@ -30,6 +30,10 @@
 __version__ = "0.7"
 import math, sys, os
 import time, datetime
+try:
+  import numpy as np
+except:
+  pass
 
 ################################################################################
 class Lib():
@@ -739,6 +743,23 @@ class Lib():
           value = '"%s"' %value
         fp.write("%s = %s\n" %(name, value))
   save=_save
+
+  @staticmethod
+  def _basisStrs(basis):
+    """Return basis and mBasis as strings."""
+    pBasis = []
+    mBasis = []
+    for val in basis:
+      txt = isinstance(val, Lib._basestr)
+      if txt and ("-" in val or "+" in val):
+        raise Exception("Multiple text terms not supported: %s" %val)
+      if str(val)[:1] == "-":
+        mBasis.append(str(val))
+        pBasis.append("-" +val if txt else str(-val))
+      else:
+        pBasis.append(str(val))
+        mBasis.append("-" +val if txt else str(-val))
+    return pBasis,mBasis
   
   @staticmethod
   def cycles(x,y=None, xy=None):
@@ -889,7 +910,7 @@ class Lib():
 
   @staticmethod
   def associativeCycles(basis, table=None, dump=False):
-    """assoc[iative]Cycles(basis,[table,dump])
+    """assoc[iative]Cycles(basis,[table,dump]) See Tensor.assocTriads()
        Return a list of independent simplex 3-cycle faces. See allCycles()."""
     return Lib.triadPairs(Lib.__assocCycles, basis, "assocCycles", dump, table)
   @staticmethod
@@ -961,7 +982,7 @@ class Tensor(list):
      vectors. If g_lo = Tensor(e0,e1,e2,e3) and g_hi = Tensor(-e0,e1,e2,e3) then
      metric tensor is (g_lo*g_hi.transpose()).scalar() = Tensor.Diag([1]*4).
      Class Matrix maps to this class if numpy is not available."""
-     
+
   def __init__(self, *args):
     """Tensor(list)
        Define a nx1 or nxm matrix as a list or list of lists."""
@@ -1028,9 +1049,11 @@ class Tensor(list):
     return (out[:-2] +')') if out[-1]=='\n' else out +')'
 
   def __eq__(self, mat):
-    """Return True if 2 matricies are equal taking resolution into account."""
-    if not isinstance(mat, Tensor):
-      mat = Tensor(mat).reshape(self.__size)
+    """Return True if 2 matrices are equal taking resolution into account."""
+    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
+      mat = Tensor(mat)
+    else:
+      return self.__reduce(lambda x,y: x and y == mat, True)
     if self.__size != mat.__size:
       return False
     precision = Lib._getPrecision()
@@ -1429,37 +1452,34 @@ class Tensor(list):
     return out
   trans=transpose
 
-
-  def reduce(self, fn):
-    """reduce(fn)
-       Return matrix with x=fn(x,y) applied to each element of self."""
+  def reduce(self, fn, init=0):
+    """reduce(fn, [init=0])
+       Return matrix with x=fn(x[=init],y) applied to each element of self."""
     if not hasattr(fn, "__call__"):
       raise Exception("reduce(fn) needs to be a function")
-    return self.__reduce(fn)
+    return self.__reduce(fn, init)
 
-  def __reduce(self, fn):
+  def __reduce(self, fn, init):
     """Internal reduce(fn) method."""
-    second = False
+    out = init
     if self and isinstance(self[0], (list, tuple)):
-      out = self[0][0] if self[0] else 0
       for val1 in self:
         for val2 in val1:
-          if second:
-            out = fn(out, val2)
-          second = True
+          out = fn(out, val2)
       return out
-    out = self[0] if self else 0
     for val1 in self:
-      if second:
-        out = fn(out, val1)
-      second = True
+      out = fn(out, val1)
     return out
 
   def all(self):
     """all()
        Return True if all matrix values are True else False."""
-    return self.__reduce(lambda x,y: x and y)
+    return self.__reduce(lambda x,y: x and y, True)
 
+  def any(self):
+    """any()
+       Return True if any matrix values are True else False."""
+    return self.__reduce(lambda x,y: x or y, False)
 
   def function(self, fn):
     """function(fn)
@@ -1521,9 +1541,7 @@ class Tensor(list):
       for idx1,val1 in enumerate(self):
         out.append(Lib._morph(val1, 1, basis)[val1])
       return self.copy(out)
-    Lib._checkType(labels, (list, tuple), "morph")
-    if len(basis) != len(labels):
-      raise Exception("Swap length is not valid")
+    Lib._checkList(labels, None, "morph", len(basis))
     val1 = self[0]
     if isinstance(val1, (list, tuple)) and len(val1) > 0:
       for val2 in val1[:]:
@@ -1533,6 +1551,20 @@ class Tensor(list):
     if type(val1) != type(basis[0]):
       raise Exception("Invalid swap basis type: %s !~ %s" %(type(val1),
                        type(basis[0])))
+    if isinstance(val1, Matrix):
+      out = Tensor.Diag([0] *self.shape()[0])
+      for x in range(self.shape()[0]):
+        for y in range(self.shape()[1]):
+          if self.get(x,y) in basis:
+            out[x][y] = labels[basis.index(self.get(x,y))]
+          elif -self.get(x,y) in basis:
+            lab = labels[basis.index(-self.get(x,y))]
+            out[x][y] = lab[1:] if lab[0]=="-" else ("-" +lab)
+          elif self.get(x,y) == 0:
+            out[x][y] = "0"
+          else:
+            out[x][y] = "XXX"
+      return out
     return self.__morph(basis, labels)
 
   def __morph(self, basis, labels):
@@ -1798,101 +1830,66 @@ class Tensor(list):
       sys.stdout.write("NOT FOUND for %d: %s\n" %(cnt, p0))
     return p0
   
-  def cycles(self, basis, degree=0, dump=False, indicies=True):
-    """cycles(basis, [grade,dump])
-       Return or dump a list of multiplication triads for degree using basis."""
-    self.__checkSquare(basis, "cycles", "basis")
-    Lib._checkType(dump, bool, "cycles")
-    if degree and not hasattr(basis[0], "grades"):
+  def cycles(self, basis, degree=0, indices=False):
+    """cycles(basis, [degree,indices])
+       Return a list of multiplication triads for degree using basis."""
+    size = self.shape()
+    #self.__checkSquare(basis, "cycles", "basis")
+    Lib._checkType(degree, int, "cycles")
+    Lib._checkType(indices, bool, "cycles")
+    if degree and (isinstance(val, Lib._basestr) or not hasattr(val, "grades")):
       raise Exception("Parameter grade for cycles needs graded basis")
-    pBasis = list((str(x) for x in basis))
-    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
+    pBasis,mBasis = Lib._basisStrs(basis)
     prod = {}
     out = []
-    for i1 in range(len(basis)):
-      for i2 in range(i1 +1, len(basis)):
+    for i1 in range(size[0]):
+      for i2 in range(i1 +1, size[1]):
         p1 = pBasis[i1]
         p2 = pBasis[i2]
         p3 = self[i1][i2]  # p1 * p2
-        isGrade = (not degree or p3.grades(degree)[degree])
         p3 = str(p3)
-        if p1 not in prod:
-          prod[p1] = []
-          prod[mBasis[i1]] = []
-        if p2 not in prod:
-          prod[p2] = []
-          prod[mBasis[i2]] = []
-        sgn3 = "-" if p3 in mBasis else ""
-        i3 = mBasis.index(p3) if sgn3 else pBasis.index(p3)
-        mp3 = pBasis[i3] if sgn3 else mBasis[i3]
-        if p3 not in prod:
-          prod[p3] = []
-          prod[mp3] = []
-        if not (p1 in prod[p2] or p1 in prod[p3] \
-             or p2 in prod[p1] or p2 in prod[p3] \
-             or p3 in prod[p1] or p3 in prod[p2]) and isGrade:
-          p4 = sgn3 +str(self[i2][i3])  #p2 *p3
-          p4 = p4[2:] if p4[:2] == "--" else p4
-          sgn4 = "-" if p4 in mBasis else ""
-          if p4 == p1 or p4 == mBasis[i1]:
-            i4 = mBasis.index(p4) if sgn4 else pBasis.index(p4)
-            p5 = sgn3 +sgn4 +str(self[i3][i4])  #p3 *p4
-            p5 = p5[2:] if p5[:2] == "--" else p5
-            sgn5 = "-" if p5 in mBasis else ""
-            if p5 == p2 or p5 == mBasis[i2]:
-              i5 = mBasis.index(p5) if sgn5 else pBasis.index(p5)
-              prod[p1].extend([p2, mBasis[i2], p3, mp3])
-              prod[mBasis[i1]].extend([p2, mBasis[i2], p3, mp3])
-              prod[p2].extend([p1, mBasis[i1], p3, mp3])
-              prod[mBasis[i2]].extend([p1, mBasis[i1], p3, mp3])
-              prod[p3].extend([p1, mBasis[i1], p2, mBasis[i2]])
-              prod[mp3].extend([p1, mBasis[i1], p2, mBasis[i2]])
-              com = 0
-              if str(self[i2][i1]) == p3: com += 1 # p2 *p1
-              if str(self[i3][i2]) == str(self[i2][i3]): com += 1 # p3 *p2
-              if str(self[i4][i3]) == str(self[i3][i4]): com += 1 # p4 *p3
-              row = (i1 +1, i2 +1, (-i3 -1) if sgn3 else i3 +1,
-                  (-i4 -1) if sgn4 else i4 +1, (-i5 -1) if sgn5 else i5 +1, com)
-              out.append(row)
-    if dump:
-      if len(out) > 1:
-        out0 = []
-        for row in out:
-          p3 = pBasis[row[2]-1] if row[2] > 0 else mBasis[-row[2] -1]
-          p4 = pBasis[row[3]-1] if row[3] > 0 else mBasis[-row[3] -1]
-          p5 = pBasis[row[4]-1] if row[4] > 0 else mBasis[-row[4] -1]
-          cycle = (row[3]==row[0] and row[4]==row[1])
-          out0.append(("%s*%s = %s" %(pBasis[row[0] -1], pBasis[row[1] -1], p3),
-                       "%s*%s = %s" %(pBasis[row[1] -1], p3, p4),
-                       "%s*%s = %s" %(p3, p4, p5), "%s & %d" %(cycle, row[5])))
-        Tensor(out0).dump(("Cycle1", "Cycle2", "Cycle3", "Rotation&Commutes"),
-                         list(range(1, len(out0)+1)))
-      else:
-        Tensor(out).dump()
-      return None
-    if not indicies:
-      out0 = []
-      isStr = isinstance(basis[0], Lib._basestr)
-      for row in out:
-        p1 = basis[row[0]-1]
-        p2 = basis[row[1]-1]
-        p3 = basis[row[2]-1] if row[2] > 0 else (mBasis[-row[2] -1] \
-                                              if isStr else -basis[-row[2] -1])
-        out0.append((p1, p2, p3))
-      out = out0
+        if p3 != "0":
+          if p1 not in prod:
+            prod[p1] = []
+            #prod[mBasis[i1]] = []
+          if p2 not in prod:
+            prod[p2] = []
+            #prod[mBasis[i2]] = []
+          sgn3 = "-" if p3 in mBasis else ""
+          i3 = mBasis.index(p3) if sgn3 else pBasis.index(p3)
+          pp3 = pBasis[i3]
+          if pp3 not in prod:
+            prod[pp3] = []
+          if p1 not in prod[pp3] and p2 not in prod[pp3]:
+            prod[p1].extend((p2, pp3))
+            prod[p2].extend((p1, pp3))
+            prod[pp3].extend((p1, p2))
+            if not degree or basis[i3].grades(degree)[degree]:
+              if indices:
+                out.append((i1 +1, i2 +1, (-i3 -1) if sgn3 else i3 +1))
+              else:
+                p1 = basis[i1]
+                p2 = basis[i2]
+                if isinstance(basis[i3], Lib._basestr):
+                  p3 = mBasis[i3] if sgn3 else pBasis[i3]
+                else:
+                  p3 = -basis[i3] if sgn3 else basis[i3]
+                out.append((p1, p2, p3))
     return Tensor(*out)
 
   def __assocTriads1(self, x1, x2, basis, mBasis):
     """Internal function to return +/- index of x1 * x2 from square table."""
-    scalar = len(basis) +1  # Represent +-1 as +-(len(basis) +1)
+    scalar = len(basis) +1  # Represent +-1 as +-(len(basis) +1) & 0 as +2
     if abs(x1) == scalar: return x2 *(-1 if x1 < 0 else 1)
     if abs(x2) == scalar: return x1 *(-1 if x2 < 0 else 1)
-    mul = self[abs(x1) -1][abs(x2) -1]
+    if x1 > scalar or x2 > scalar: return scalar +1
+    mul = str(self[abs(x1) -1][abs(x2) -1])
+    if mul == "0": return scalar +1
     if abs(x1) == abs(x2):
-      neg = (str(mul)[0] == "-")
+      neg = (mul[0] == "-")
       idx = scalar * (-1 if neg else 1)
     else:
-      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul))-1
+      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(mul)-1
     if (x1 < 0) != (x2 < 0):
       idx = -idx
     return idx
@@ -1915,11 +1912,8 @@ class Tensor(list):
     Lib._checkType(nonAssoc, bool, "assocTriads")
     Lib._checkType(alternate, bool, "assocTriads")
     Lib._checkType(dump, bool, "assocTriads")
-    pBasis = list((str(x) for x in basis))
-    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
-    if isinstance(self[0][0], Lib._basestr):
-      basis = pBasis
-    tmp = Lib.triadPairs(self.__assocTriads, basis, "assocTriads", dump,
+    pBasis,mBasis = Lib._basisStrs(basis)
+    tmp = Lib.triadPairs(self.__assocTriads, pBasis, "assocTriads", dump,
                          (alternate,mBasis))
     if not nonAssoc:  return tmp
     return Lib.triadPairs(Lib._allTriads, basis, "assocTriads", dump, tmp)
@@ -2375,20 +2369,19 @@ class Tensor(list):
       rhsBasis = basis
     Lib._checkType(basis, (list, tuple), "Table")
     Lib._checkType(rhsBasis, (list, tuple), "Table")
-    Lib._checkType(lie, int, "Table")
-    if len(basis) > 0 and len(rhsBasis) > 0 and not \
-          (hasattr(basis[0], "grades") and hasattr(rhsBasis[0], "grades")):
+    Lib._checkType(lie, (int, float), "Table")
+    if len(basis) > 0 and not hasattr(basis[0], "asym"):
       raise Exception("Table parameter is not a list of basis elements")
     for idx,bas1 in enumerate(rhsBasis):
       row = []
       if lie:
         if lie < 0:
           for bas2 in basis:
-            val = abs((bas1 * bas2 -bas2 *bas1)/lie)
+            val = abs((bas1.asym(bas2))/lie)
             row.append(val)
         else:
           for bas2 in basis:
-            val = (bas1 * bas2 -bas2 *bas1)/lie
+            val = (bas1.asym(bas2))/lie
             row.append(val)
       else:
         for bas2 in basis:
@@ -2473,8 +2466,8 @@ if "numpy" in sys.modules:
     """Class Matrix interfaces & extends numpy instead of using Tensor class."""
     def __init__(self, *args):
       """Matrix(ndarray)
-         Define a nx1 or nxm matrix as an numpy.ndarray."""
-      super(Matrix, self).__init__(args)
+         Define a nx1 or nxm matrix as an numpy.ndarray. Needs Matrix(*list)!"""
+      pass
     def __new__(self, *args):
       """Define a nx1 or nxm matrix as a list or list of lists."""
       arr = numpy.array(args)
@@ -2482,8 +2475,6 @@ if "numpy" in sys.modules:
 
     def __eq__(self, mat):
       """Return True if 2 matricies are equal within precision."""
-      if not isinstance(mat, (numpy.ndarray, list, tuple, Matrix)):
-        return False
       return ((self - mat) < Lib._getPrecision()).all()
 
     def get(self, x, y):
@@ -2491,10 +2482,20 @@ if "numpy" in sys.modules:
          Return the value of a matrix element. Used for FrameMatrix."""
       return self[x][y]
 
-    def slice(self, offset, shape):
-      """slice(offset, shape):
+    def slice(self, shape, offset=(0,0)):
+      """slice(shape, [offset=(0,0)])
          Return copy of 2-D selection or square if offset,shape are integers."""
-      return self._getitem(offset, shape) # TBD XXX
+      Lib._checkList(shape, int, "slice", 2)
+      Lib._checkList(offset, int, "slice", 2)
+      return self[offset[0]:slice[0], offset[1]:slice[1]]
+
+    def sym(self, mat):
+      """Return self*mat +mat*self."""
+      return np.dot(self, mat) +np.dot(mat, self)
+
+    def asym(self, mat):
+      """Return self*mat -mat*self."""
+      return np.dot(self, mat) -np.dot(mat, self)
 
     @staticmethod
     def FromNumpy(array):
@@ -2513,9 +2514,9 @@ if "numpy" in sys.modules:
     def Diag(diag):
       """Diag(diag)
          Return the zero matrix with diag as diagonal entries."""
-      Lib._checkType(diag, (list, tuple, Matrix), "Diag")
-      size = diag.shape[0] if isinstance(diag, Matrix) else len(diag)
-      out = numpy.identity(size)
+      Lib._checkType(diag, (list, tuple), "Diag")
+      size = diag.shape[0] if isinstance(diag, (Matrix)) else len(diag)
+      out = Matrix(*numpy.identity(size, float))
       for ii in range(size):
         if isinstance(diag[ii], (list, tuple)):
           raise Exception("Invalid Diag element")

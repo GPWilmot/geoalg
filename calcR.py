@@ -794,7 +794,8 @@ class Calculator:
             token.value = ""
       elif isComment:
         pass
-      elif (token.type == "COMMENT" and not quotesCnt):
+      elif (token.type == "COMMENT" and not \
+           (quotesCnt or quoteCnt1 or quoteCnt2)):
         isComment = True
         checkStore = True
         isAns = False

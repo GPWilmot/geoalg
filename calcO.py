@@ -1034,23 +1034,25 @@ class O():
        Return a list of maximum basis at each grade with scalar first (0/1)."""
     g = [1 if self.w else 0]
     b = '0'
+    l = 1
     for grade in self.__g:
       bases = grade.strs()
       l = 0
       for base in bases:
         l += (len(base) -1) if base else 0
       if len(g) < l +1:
-        g.extend([0] *(l -len(g) +1))
+        g.extend(['0'] *(l -len(g) +1))
+        b = '0'
       basis = bases[0]
       if basis and basis[-1] > b:
         b = basis[-1]
       basis = bases[1]
       if basis and basis[-1] > b:
         b = basis[-1]
-      b0 = int(b, self.__HEX_BASIS +1)
-      if b0 > g[l]:
-        g[l] = b0
-        b = '0'
+      if b > g[l]:
+        g[l] = b
+    for l in range(1,len(g)):
+      g[l] =  int(g[l], self.__HEX_BASIS +1)
     return g
 
   def basis(self, local=False):

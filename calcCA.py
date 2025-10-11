@@ -888,21 +888,22 @@ class CA():
     """dims()
        Return a list of maximum basis at each grade with scalar first (0/1)."""
     g = [1 if self.w else 0]
-    b = 0
-    l = 1
+    b = '0'
     for grade in self.__g:
       eStr,iStr = grade.strs()
       l = (len(eStr) -1) if eStr else 0
       l += (len(iStr) -1) if iStr else 0
       if len(g) < l +1:
-        g.extend([0] *(l -len(g) +1))
+        g.extend(['0'] *(l -len(g) +1))
+        b = '0'
       if eStr and eStr[-1] > b:
-        b = int(eStr[-1], self.__HEX_BASIS +1)
+        b = eStr[-1]
       if iStr and iStr[-1] > b:
-        b = int(iStr[-1], self.__HEX_BASIS +1)
+        b = iStr[-1]
       if b > g[l]:
         g[l] = b
-        b = 0
+    for l in range(1,len(g)):
+      g[l] =  int(g[l], self.__HEX_BASIS +1)
     return g
 
   def basis(self, *maxBasis):
@@ -1509,6 +1510,8 @@ class CA():
        degrees with the advantage that rounding errors do not need to be
        trimmed. Terms as lists of indicies are added without sign and a single
        term may contain indicies directly."""
+    if abs(basisTerms) == 1:
+      return self
     if isinstance(basisTerms, CA):
       basisTerms = basisTerms.basisTerms()
       if signTerms:
