@@ -495,7 +495,7 @@ class O():
       out = self.dup(self.w +q.w)
       for grade in q.__g:
         out.__add(grade)
-    elif isinstance(q, Tensor):
+    elif isinstance(q, (Tensor, Matrix)):
       out = q.__add__(self)
     else:
       Lib._checkType(q, (int, float), "add")
@@ -514,7 +514,7 @@ class O():
         else:
           lhs[key] = -val
       return self.copy(self.w -q.w, **lhs)
-    if isinstance(q, Tensor):
+    if isinstance(q, (Tensor, Matrix)):
       return q.__add__(-self)
     Lib._checkType(q, (int, float), "sub")
     out = self.dup(self.w -q)
@@ -554,7 +554,7 @@ class O():
       for grade1 in self.__g:
         for grade2 in q.__g:
           out.__add(grade1.mergeBasis(grade2.value, grade2.bases()))
-    elif isinstance(q, Tensor):
+    elif isinstance(q, (Tensor, Matrix)):
       out = q.__rmul__(self)
     else:
       Lib._checkType(q, (int, float), "mul")
@@ -664,6 +664,7 @@ class O():
     if sum(grade.lens()) == 0:
       self.w += grade.value
       return
+    order = self.__g[0].order(grade) if self.__g else 0
     pos = 0
     for idx,base in enumerate(self.__g[:]):
       order = base.order(grade)
@@ -1060,7 +1061,7 @@ class O():
        Return the local signature or max. dimension basis of basis elements."""
     dims = self.__basisList
     if local:
-      dims = [''] *local if isinstance(local, int) else ['', '']
+      dims = ['', '']
       for grade in self.__g:
         for idx,bases in enumerate(grade.strs()):
           if idx < local:
@@ -2055,16 +2056,19 @@ if __name__ == '__main__':
     """d30=radians(30); d60=radians(60); d45=radians(45); d90=radians(90)
        e=Euler(pi/6,pi/4,pi/2); c=o1+2o2+3o12""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
-       Rx=d60-o12; rx=(d60 -o12).versor()
-       test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()
+       Rx=d60-o12; rx=(d60 -o12).versor(); Mx = Rx.frameMatrix()
+       test = Mx.dot(c.vector(size=Mx.shape[0]))
+       store = (rx.inverse()*c*rx).vector(size=Mx.shape[0])
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
-       Rx=d60-o12; rx=O.Versor(o12=d60)
-       test = Rx.frameMatrix() *c.vector(); store = (rx.rotate(c)).vector()
+       Rx=d60-o12; rx=O.Versor(o12=d60); Mx = Rx.frameMatrix()
+       test = Mx.dot(c.vector(size=Mx.shape[0]))
+       store = (rx.rotate(c)).vector(size=Mx.shape[0])
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.
-       Rx=d60+o12; rx=math.cos(d30) +o12*math.sin(d30)
-       test = Rx.frameMatrix() *c.vector(); store = (rx.inverse()*c*rx).vector()
+       Rx=d60+o12; rx=math.cos(d30) +o12*math.sin(d30); Mx = Rx.frameMatrix()
+       test = Mx.dot(c.vector(size=Mx.shape[0]))
+       store = (rx.inverse()*c*rx).vector(size=Mx.shape[0])
        Calculator.log(store == test, store)""",
     """# Test 4 Quat Euler == O Euler.
        test = O.Euler(pi/6,pi/4,pi/2)
@@ -2094,7 +2098,7 @@ if __name__ == '__main__':
        if Lib.isCalc("Q"):
          test = (d45+i+j+k).normalise().versorMatrix()
        else:
-         test = r.normalise().versorMatrix().reshape(store.shape()[0])
+         test = r.normalise().versorMatrix().reshape(store.shape[0])
        Calculator.log(store == test, store)""",
        ]
 

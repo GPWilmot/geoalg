@@ -1036,7 +1036,7 @@ class Calculator:
             Lib.verbose(True)
           elif ch == "n" or arg == "--noLoad":
             doLoad = False
-          elif ch != '-':
+          elif ch != '-' and (ch != "s" and arg != "--skipNumpy"):
             raise Exception("Invalid option: %s" %opt)
       doCmd = "load(noError=True)" if doLoad else ""
       ans = None
@@ -1110,7 +1110,7 @@ class Calculator:
         traceback.print_exc()
     except Exception as e:
       cmd = "%s" %os.path.basename(args[0])
-      opts = "[-r|--resolution] [-v|--verbose] [-n|--noLoad]"
+      opts = "[-r|--resolution] [-v|--verbose] [-n|--noLoad] [-s|--skipNumpy]"
       outLines = ("Usage: %s [-h|--help]" %cmd,
         "Usage: %s %s [<cmd|calculation>]" %(cmd, opts),
         "Summary:  %s" %e,
@@ -1132,7 +1132,7 @@ class Real(float):
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
   def __float__(self):
-    return super(self)
+    return super(Real, self).__float__()
   def __int__(self):
     return trunc(self)
   def __str__(self):
@@ -1264,13 +1264,13 @@ if __name__ == '__main__':
     """""",
     """# Test 1 Check Tensor.Rotations identities. From Wikipedia Matrix Exp.
        def Rtest(G,P,N):
-         b1 = (P == -G * G)
-         b2 = (P * P == P)
-         b3 = (P *G == G)
-         b4 = (G *P == G)
-         b5 = (N *N == N)
-         b6 = (N *P == Tensor.Diag([0] *G.shape()[0]))
-         b7 = (N *G == Tensor.Diag([0] *G.shape()[0]))
+         b1 = (P == -G.dot(G))
+         b2 = (P.dot(P) == P)
+         b3 = (P.dot(G) == G)
+         b4 = (G.dot(P) == G)
+         b5 = (N.dot(N) == N)
+         b6 = (N.dot(P) == Tensor.Diag([0] *G.shape[0]))
+         b7 = (N.dot(G) == Tensor.Diag([0] *G.shape[0]))
          return b1 and b2 and b3 and b4 and b5 and b6 and b7
 
        # Case for G = Tensor((0,-1),(1,0))==i, P=I, so R(a) = I*cos(a) +G*sin(a)
@@ -1282,7 +1282,7 @@ if __name__ == '__main__':
        store=Euler.Matrix(test).matrix()
        Calculator.log(store == test, store)""",
     """# Test 3 Euler 10-D Matrix is inverse of Euler.matrix.
-       test=Matrix(list((x *0.01 for x in range(1,46))))
+       test=Matrix(list(x *0.01 for x in range(1,46)))
        store=Euler.Matrix(Euler(*test).matrix())
        Calculator.log(Matrix(store) == test, store)""",
     """# Test 4 Euler 15-D Matrix is inverse of Euler.matrix.

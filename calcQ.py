@@ -965,15 +965,15 @@ if __name__ == '__main__':
        e=Euler(pi/6,pi/4,pi/2); q=i+2*j+3*k""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
        Rx=d60+i; rx=(d60 +i).versor()
-       test = Rx.frameMatrix() *q.vector(); store = (rx*q*rx.inverse()).vector()
+       test = Rx.frameMatrix().dot(q.vector()); store = (rx*q*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
        Rx=d60+j; rx=Q.Versor(d60,0,1)
-       test = Rx.frameMatrix() *q.vector(); store = (rx.rotate(q)).vector()
+       test = Rx.frameMatrix().dot(q.vector()); store = (rx.rotate(q)).vector()
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.
        Rx=d60+k; rx=math.cos(d30) +k*math.sin(d30)
-       test = Rx.frameMatrix() *q.vector(); store = (rx*q*rx.inverse()).vector()
+       test = Rx.frameMatrix().dot(q.vector()); store = (rx*q*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 4 Euler default rotation == explicit ordered rotation.
        test = Q.Euler(pi/6,pi/4,pi/2); store = Q.Euler(e, order=[1,2,3])
@@ -1046,7 +1046,7 @@ if __name__ == '__main__':
     """# Test 19 Compare Tensor projection and Q.projects.
        def Ptest(a, b, x):
          G,P,N = Tensor.Rotations(a.unit().vector(), b.unit().vector())
-         p = (a * b).projects(x); x0 = P *x.vector()
+         p = (a * b).projects(x); x0 = P.dot(x.vector())
          return [p[0].vector(), p[1].vector().trim()] == [x0, x.vector()-x0]
        d2 = Ptest(i, j, i+2j);  d3 = Ptest(i, j+2*k, i+j+k)
        Calculator.log(d2 and d3, (d2, d3))""",
@@ -1056,9 +1056,9 @@ if __name__ == '__main__':
        rot_30 = (pi/6 +a*b).unit().frameMatrix()
        rot_60 = (pi/3 +a*b).frameMatrix()       # frameMatrix converts to versor
        rot_90 = (pi/2 +a.cross(b+Q(0,1))).frameMatrix()     # works for a.b != 0
-       Rot_6 = N +P *cos(pi/6) +G *sin(pi/6)
-       Rot_3 = N +P *cos(pi/3) +G *sin(pi/3)
-       Rot_2 = N +P *cos(pi/2) +G *sin(pi/2)
+       Rot_6 = N +P.dot(cos(pi/6)) +G.dot(sin(pi/6))
+       Rot_3 = N +P.dot(cos(pi/3)) +G.dot(sin(pi/3))
+       Rot_2 = N +P.dot(cos(pi/2)) +G.dot(sin(pi/2))
        r30,r60,r90 = (rot_30==Rot_6, rot_60==Rot_3, rot_90==Rot_2)
        Calculator.log(r30 and r60 and r90, (r30, r60, r90))"""]
 

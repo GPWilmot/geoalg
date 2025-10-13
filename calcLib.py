@@ -31,9 +31,16 @@ __version__ = "0.7"
 import math, sys, os
 import time, datetime
 try:
-  import numpy as np
+  np = True
+  for arg in sys.argv:
+    if arg == "--skipNumpy":
+      np = None
+    elif arg[:1] == "-" and arg[1:2] != "-" and "s" in arg[1:]:
+      np = None
+  if np:
+    import numpy as np
 except:
-  pass
+  np = None
 
 ################################################################################
 class Lib():
@@ -224,7 +231,7 @@ class Lib():
   def _checkList(arg, typ, method, size=[]):
     """Raise exception if not a list/tuple of typ types and optional size as 
        int or range with (x,0) meaning length at least x."""
-    Lib._checkType(arg, (list, tuple), method)
+    Lib._checkType(arg, (list, tuple, Matrix), method)
     Lib._checkType(size, (int, list, tuple), method)
     if size:
       Lib._checkSize(size, len(arg), method, "list length")
@@ -982,6 +989,7 @@ class Tensor(list):
      vectors. If g_lo = Tensor(e0,e1,e2,e3) and g_hi = Tensor(-e0,e1,e2,e3) then
      metric tensor is (g_lo*g_hi.transpose()).scalar() = Tensor.Diag([1]*4).
      Class Matrix maps to this class if numpy is not available."""
+  shape = (0,0)
 
   def __init__(self, *args):
     """Tensor(list)
@@ -989,24 +997,24 @@ class Tensor(list):
     super(Tensor, self).__init__()
     Lib._checkType(args, (list, tuple), "Tensor")
     if not args:
-      self.__size = (0, 0)
+      self.shape = (0, 0)
     else:
       if not args or len(args) == 1 and not args[0]:
         args = (0,)
-      self.__size = (len(args), 1)
+      self.shape = (len(args), 1)
       if isinstance(args[0], (list, tuple)):
         if len(args) == 1:
           args = args[0]
-          self.__size = (len(args), 1)
+          self.shape = (len(args), 1)
         if isinstance(args[0], (list, tuple)):
-          self.__size = (len(args), len(args[0]))
+          self.shape = (len(args), len(args[0]))
     for row in args:
       if isinstance(row, (list, tuple)):
-        if len(row) == 1 and self.__size[1] == 1:
+        if len(row) == 1 and self.shape[1] == 1:
           self.append(row[0])
         else:
           self.append(list(row))
-          if len(self[-1]) != self.__size[1]:
+          if len(self[-1]) != self.shape[1]:
             raise Exception("Inconsistant Tensor row lengths")
       else:
         self.append(row)
@@ -1016,15 +1024,10 @@ class Tensor(list):
        Return the value of a matrix element. Used for FrameMatrix."""
     return self[x][y]
 
-  def shape(self):
-    """shape()
-       Return the dimensions of a 2D tensor. Used for FrameMatrix."""
-    return self.__size
-
   def len(self):
     """len()
        Return the vector length or total number of tensor cells."""
-    return self.__size[0] *self.__size[1]
+    return self.shape[0] *self.shape[1]
 
   def __str__(self):
     """Overload standard string output."""
@@ -1050,13 +1053,14 @@ class Tensor(list):
 
   def __eq__(self, mat):
     """Return True if 2 matrices are equal taking resolution into account."""
-    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
-      mat = Tensor(mat)
-    else:
-      return self.__reduce(lambda x,y: x and y == mat, True)
-    if self.__size != mat.__size:
-      return False
     precision = Lib._getPrecision()
+    if not isinstance(mat, (Tensor, Matrix)):
+      if isinstance(mat, (list, tuple)):
+        mat = Tensor(mat)
+      else:
+        return self.__reduce(lambda x,y: x and (y -mat) < precision, True)
+    if self.shape != (mat.shape if len(mat.shape)==2 else (mat.shape[0], 1)):
+      return False
     for idx1,val1 in enumerate(self):
       if isinstance(val1, (list, tuple)):
         for idx2,val2 in enumerate(val1):
@@ -1078,16 +1082,21 @@ class Tensor(list):
     return True
  
   def __mul__(self, mat):
+    """Numpy multpily is element by element - use Tensor.dot()."""
+    raise Exception("Tensor does not need numpy multipy - use Matrix.dot().")
+
+  def dot(self, mat):
     """Matrix multiplication for ranks 3x3 * 3x3 and 3x3 * 3x1."""
-    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
-      mat = Tensor(*mat)
+    if not isinstance(mat, Matrix):
+      if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
+        mat = Tensor(*mat)
     a = []
-    if isinstance(mat, Tensor):
-      if self.__size[1] != mat.__size[0]:
+    if isinstance(mat, (Tensor, Matrix)):
+      if self.shape[1] != mat.shape[0]:
         raise Exception("Invalid Matrix sizes for multiplying: %sx%s" \
-                     %(self.__size, mat.__size))
-      if self and isinstance(self[0], (list, tuple)): # self.__size > (1,1)
-        if mat.__size[1] > 1:                         # matrix * matrix
+                     %(self.shape, mat.shape))
+      if self and isinstance(self[0], (list, tuple)): # self.shape > (1,1)
+        if mat.shape[1] > 1:                         # matrix * matrix
           for row,val1 in enumerate(self):
             a.append([None] *len(mat))
             for k,val2 in enumerate(val1):
@@ -1101,15 +1110,15 @@ class Tensor(list):
             a.append(val1[0] *mat[0])
             for col,val2 in enumerate(val1[1:]):
               a[row] += val2 *mat[col +1]
-      elif isinstance(mat[0], (list, tuple)):        # mat.__size > (1,1)
+      elif isinstance(mat[0], (list, tuple)):        # mat.shape > (1,1)
         for row,val1 in enumerate(mat):              # vector * matrix
           a.append(self[0] *val1[0])
           for col,val2 in enumerate(val1[1:]):
             a[row] += self[col +1] *val2
-      elif self.__size[1] != mat.__size[0]:
+      elif self.shape[1] != mat.shape[0]:
         raise Exception("Invalid Matrix sizes for product: %sx%s" \
-                     %(self.__size, mat.__size))
-      elif self.__size[0] == 1:
+                     %(self.shape, mat.shape))
+      elif self.shape[0] == 1:
         a.append(self[0] *mat[0])                    # inner product
         for row,val1 in enumerate(self[1:]):
           a[0] += val1 *mat[row +1]
@@ -1202,10 +1211,11 @@ class Tensor(list):
   def __add__(self, mat):
     """Return addition matrix."""
     out = []
-    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
-      mat = Tensor(*mat)
-    Lib._checkType(mat, Tensor, "add")
-    if self.__size != mat.__size:
+    if not isinstance(mat, Matrix):
+      if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
+        mat = Tensor(*mat)
+    Lib._checkType(mat, (Tensor, Matrix), "add")
+    if self.shape != (mat.shape if len(mat.shape)==2 else (mat.shape[0],1)):
       raise Exception("Invalid Matrix size for add/sub")
     if self and isinstance(self[0], (list, tuple)):
       for idx1,val1 in enumerate(self):
@@ -1231,12 +1241,13 @@ class Tensor(list):
 
   def __neg__(self):
     """Use matrix multiplication for negation."""
-    return self.__mul__(-1)
+    return self.dot(-1)
   def __sub__(self, mat):
     """Subtract 2 matricies."""
-    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
-      mat = Tensor(*mat)
-    Lib._checkType(mat, Tensor, "sub")
+    if not isinstance(mat, (Tensor, Matrix)):
+      if isinstance(mat, (list, tuple)) and not isinstance(mat, (Tensor, Matrix)):
+        mat = Tensor(*mat)
+    Lib._checkType(mat, (Tensor, Matrix), "sub")
     return self.__add__(-mat)
   def __rsub__(self, mat):
     """Subtract matricies"""
@@ -1264,10 +1275,10 @@ class Tensor(list):
     if arr is None:
       arr = self
     Lib._checkType(arr, (list, tuple), "copy")
-    if arr and isinstance(arr[0], (list, tuple)):  # arr.__size > (1,1)
+    if arr and isinstance(arr[0], (list, tuple)):  # arr.shape > (1,1)
       return Tensor([row[:] for row in arr])
     out = Tensor(*arr)
-    out.__size = self.__size  # Keep transpose
+    out.shape = self.shape  # Keep transpose
     return out
 
   def sym(self, mat):
@@ -1286,7 +1297,7 @@ class Tensor(list):
        Complex, Quaternion and Octernion numbers) as Tensor(R,Q(1),Q(2), O(3)).
        Addition is via + and multiplication via diag(v)."""
     out = []
-    shape = self.shape()
+    shape = self.shape
     if vector is None:
       if shape[0] != shape[1]:
         raise Exception("Matrix for diag must be square")
@@ -1303,12 +1314,13 @@ class Tensor(list):
   def multiply(self, mat):
     """Return Hadamard product matrix."""
     out = []
-    if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
-      mat = Tensor(*mat)
-    Lib._checkType(mat, Tensor, "multiply")
-    if self.__size != mat.__size:
+    if not isinstance(mat, Matrix):
+      if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
+        mat = Tensor(*mat)
+    Lib._checkType(mat, (Tensor, Matrix), "multiply")
+    if self.shape != mat.shape:
       raise Exception("Invalid Matrix sizes for multiply %sx%s" \
-                     %(self.__size, mat.__size))
+                     %(self.shape, mat.shape))
     if self and isinstance(self[0], (list, tuple)):
       for idx1,val1 in enumerate(self):
         out.append([])
@@ -1343,7 +1355,7 @@ class Tensor(list):
     """trim()
        Return copy with cells smaller than precision set to zero."""
     out = []
-    if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+    if self and isinstance(self[0], (list, tuple)):  # self.shape > (1,1)
       for idx1 in range(len(self[0])):
         out.append([])
       for idx1,val1 in enumerate(self):
@@ -1359,23 +1371,17 @@ class Tensor(list):
        Return copy of 2-D selection or square if offset, shape are integers."""
     if not isinstance(offset, (list, tuple)):
       offset = (offset, offset)
-    Lib._checkType(offset, (list, tuple), "slice")
-    if len(offset) != 2:
-      raise Exception("Invalid offset length in slice")
-    Lib._checkType(offset[0], int, "slice")
-    Lib._checkType(offset[1], int, "slice")
-    if shape is not None:
+    Lib._checkList(offset, int, "slice", 2)
+    if shape is None:
+        shape = (self.shape[0], self.shape[1])
+    else:
       if not isinstance(shape, (list, tuple)):
         shape = (shape, shape)
-      Lib._checkType(shape, (list, tuple), "slice")
-      if len(shape) != 2:
-        raise Exception("Invalid shape length in slice")
-      Lib._checkType(shape[0], int, "slice")
-      Lib._checkType(shape[1], int, "slice")
+    Lib._checkList(shape, int, "slice", 2)
     out = []
-    if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+    if self and isinstance(self[0], (list, tuple)):  # self.shape > (1,1)
       if shape is None:
-        shape = (self.__size[0] -offset[0], self.__size[1] -offset[1])
+        shape = (self.shape[0] -offset[0], self.shape[1] -offset[1])
       for idx1 in range(max(1,shape[0])):
         out.append([])
       for idx1 in range(max(1,shape[0])):
@@ -1386,11 +1392,11 @@ class Tensor(list):
             out[idx1].append(val1[offset[1] +idx2])
       return Tensor(*out)
     if shape is None:
-      shape = (self.__size[0] -offset[0], )
+      shape = (self.shape[0] -offset[0], )
     out = self[offset[0]:offset[0] +shape[0]]
     out = Tensor(*out)
-    if self.__size[1] > 1:
-      out.__size = (1, out.size[0])
+    if self.shape[1] > 1:
+      out.shape = (1, out.size[0])
     return out
 
   def reshape(self, shape):
@@ -1414,7 +1420,7 @@ class Tensor(list):
       return Tensor(*out)
     if shape[0] == 1:  # Transpose case
       out = Tensor(self[:shape[1]])
-      out.__size = (1, shape[1])
+      out.shape = (1, shape[1])
       return out
     elif shape[1] == 1:
       return Tensor(self[:shape[0]])
@@ -1424,7 +1430,7 @@ class Tensor(list):
     """scalar()
        Return copy with non-scalar cells set to the scalar part."""
     out = []
-    if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+    if self and isinstance(self[0], (list, tuple)):  # self.shape > (1,1)
       for idx1 in range(len(self[0])):
         out.append([])
       for idx1,val1 in enumerate(self):
@@ -1437,9 +1443,9 @@ class Tensor(list):
     return self.copy(out)
 
   def transpose(self):
-    """trans[pose]()
+    """transpose()
        Return transpose matrix."""
-    if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+    if self and isinstance(self[0], (list, tuple)):  # self.shape > (1,1)
       out = []
       for idx1 in range(len(self[0])):
         out.append([])
@@ -1448,9 +1454,8 @@ class Tensor(list):
           out[idx2].append(val2)
       return Tensor(*out)
     out = Tensor(self)
-    out.__size = (self.__size[1], self.__size[0])
+    out.shape = (self.shape[1], self.shape[0])
     return out
-  trans=transpose
 
   def reduce(self, fn, init=0):
     """reduce(fn, [init=0])
@@ -1510,19 +1515,21 @@ class Tensor(list):
   def pow(self, exp):
     """pow(exp)
        Return matrix with power applied to each element of self."""
-    Lib._checkType(exp, (int, float), "pow")
-    return self.__function(lambda x: x.__class__.pow(x, exp))
+    return self.__function(lambda x: pow(x, exp) if isinstance(x, \
+                    (int, float)) else x.__class__.pow(x, exp))
   __pow__ = pow
 
   def exp(self):
     """exp()
        Return matrix with exponentiation applied to each element of self."""
-    return self.__function(lambda x: x.__class__.exp(x))
+    return self.__function(lambda x: exp(x) if isinstance(x, \
+                    (int, float)) else x.__class__.exp(x))
 
   def log(self):
     """log()
        Return matrix with logarithm applied to each element of self."""
-    return self.__function(lambda x: x.__class__.log(x))
+    return self.__function(lambda x: log(x) if isinstance(x, \
+                    (int, float)) else x.__class__.log(x))
 
   def morph(self, basis, labels=None):
     """morph(basis, [labels])
@@ -1532,7 +1539,7 @@ class Tensor(list):
     Lib._checkType(basis, (list, tuple), "morph")
     if labels is None:
       out = []
-      if self and isinstance(self[0], (list, tuple)):  # self.__size > (1,1)
+      if self and isinstance(self[0], (list, tuple)):  # self.shape > (1,1)
         for idx1,val1 in enumerate(self):
           out.append([])
           for val2 in val1:
@@ -1552,9 +1559,9 @@ class Tensor(list):
       raise Exception("Invalid swap basis type: %s !~ %s" %(type(val1),
                        type(basis[0])))
     if isinstance(val1, Matrix):
-      out = Tensor.Diag([0] *self.shape()[0])
-      for x in range(self.shape()[0]):
-        for y in range(self.shape()[1]):
+      out = Tensor.Diag([""] *self.shape[0])
+      for x in range(self.shape[0]):
+        for y in range(self.shape[1]):
           if self.get(x,y) in basis:
             out[x][y] = labels[basis.index(self.get(x,y))]
           elif -self.get(x,y) in basis:
@@ -1673,14 +1680,14 @@ class Tensor(list):
     xName = "" if name is None else name
     if xLabels:
       Lib._checkType(xLabels, (list, tuple), "dump")
-      if not self or len(xLabels) != self.__size[1]:
+      if not self or len(xLabels) != self.shape[1]:
         raise Exception("Invalid xLabels length for Matrix dump")
-      if not yLabels and len(xLabels) == self.__size[0]:
+      if not yLabels and len(xLabels) == self.shape[0]:
         yLabels = xLabels
       s = max(map(lambda x :len(str(x)), xLabels))
     if yLabels:
       Lib._checkType(yLabels, (list, tuple), "dump")
-      if len(yLabels) != self.__size[0]:
+      if len(yLabels) != self.shape[0]:
         raise Exception("Invalid yLabels length for Matrix dump")
       t = max(map(lambda x :len(str(x)), yLabels))
     if isinstance(self, list) and len(self) > 0 and isinstance(self[0], list):
@@ -1697,9 +1704,9 @@ class Tensor(list):
     for ii,vals in enumerate(self):
       if yLabels:
         sys.stdout.write(formY %yLabels[ii] +"| ")
-      if self.__size[1] == 1:
+      if self.shape[1] == 1:
         sys.stdout.write(formX %vals)
-      elif self.__size[0] == 1:
+      elif self.shape[0] == 1:
         for val in self:
           sys.stdout.write(formX %val)
         sys.stdout.write("\n")
@@ -1715,7 +1722,7 @@ class Tensor(list):
     if len(self) != len(basis) or len(self) == 0:
       raise Exception("Parameter %s length invalid for %s" \
                        %(basisName, name))
-    if self.__size[0] != self.__size[1]:
+    if self.shape[0] != self.shape[1]:
       raise Exception("Tensor is not square for %s" %name)
     if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
       raise Exception("Tensor is not the same type as basis for %s" %name)
@@ -1833,7 +1840,7 @@ class Tensor(list):
   def cycles(self, basis, degree=0, indices=False):
     """cycles(basis, [degree,indices])
        Return a list of multiplication triads for degree using basis."""
-    size = self.shape()
+    size = self.shape
     #self.__checkSquare(basis, "cycles", "basis")
     Lib._checkType(degree, int, "cycles")
     Lib._checkType(indices, bool, "cycles")
@@ -2181,11 +2188,11 @@ class Tensor(list):
     """permute(perm, [invert])
        Return self with rows and columns swapped and signed by perm."""
     Lib._checkType(perm, (list, tuple), "permute")
-    if self.__size[0] <= 1 or self.__size[0] != len(perm):
+    if self.shape[0] <= 1 or self.shape[0] != len(perm):
       raise Exception("Swap parameter length is not valid")
     if not all(map(lambda x:abs(x) in range(1,len(perm) +1), perm)):
       raise Exception("Swap perm index is out of range")
-    isStr = isinstance(self[0] if self.__size[1]<2 else self[0][1],
+    isStr = isinstance(self[0] if self.shape[1]<2 else self[0][1],
                        Lib._basestr)
     compPerm = Tensor(perm).permInvert() if invert else perm
     rows = []
@@ -2194,16 +2201,16 @@ class Tensor(list):
         rows.append(self[idx -1])
       elif isStr:
         val = self[-idx -1][:]
-        if self.__size[1] == 1:
+        if self.shape[1] == 1:
           rows.append(val[1:] if val=="-" else "-" +val)
         else:
           rows.append(list((v[1:] if v[0]=="-" else "-" +v for v in val)))
-      elif self.__size[1] == 1:
+      elif self.shape[1] == 1:
         rows.append(-self[-idx -1])
       else:
         rows.append(list((-v for v in self[-idx -1])))
     out = []  # Swap columns
-    if self.__size[1] == 1:
+    if self.shape[1] == 1:
       if len(self) != len(compPerm):
         raise Exception("Invalid permute row length")
       out = rows
@@ -2290,7 +2297,7 @@ class Tensor(list):
        int] of the signed combinations of self, (eg allSigns(e1)=[e1,-e1]).
        If dump log progress and abort if memory is below the limit."""
     dim = len(self)
-    if dim > 0 and 1 not in self.__size:
+    if dim > 0 and 1 not in self.shape:
       raise Exception("Tensor must be a vector for allSigns")
     if dim > 0 and not hasattr(self, "__sub__"):
       raise Exception("Tensor needs to be able to subtract for allSigns")
@@ -2321,7 +2328,7 @@ class Tensor(list):
     """allSignsIndices()
        Return index and minus sign count of self in allSigns."""
     dim = len(self)
-    if dim > 0 and 1 not in self.__size:
+    if dim > 0 and 1 not in self.shape:
       raise Exception("Tensor must be a vector for allSigns")
     if dim > 0 and not hasattr(self, "__sub__"):
       raise Exception("Tensor needs to be able to subtract for allSigns")
@@ -2343,7 +2350,7 @@ class Tensor(list):
   def Resolution(digits):
     """Resolution([digits])
        Set print format digits or reset to Lib.resolution default."""
-    Lib.resolution(digits)
+    return Lib.resolution(digits)
 
   @staticmethod
   def NED(lat, lng):
@@ -2417,9 +2424,9 @@ class Tensor(list):
             exp(D) = tr(exp(a1),...,exp(an)), det(exp(X)) = exp(tr(X)).
        For P^2 = P, exp(P) = I +(exp(1) -1)*P   by Fourier expansion, so
        R(a) = exp(G*a) = I+G*sin(a)+G*G*(1-cos(a)) = I-P +P*cos(a) +G*sin(a)."""
-    I = Tensor.Diag([1] *vect1.shape()[0])
-    G = vect2 *vect1.transpose() - vect1 *vect2.transpose()
-    P = vect1 *vect1.transpose() + vect2 *vect2.transpose()
+    I = Matrix.Diag([1.0] *vect1.shape[0])
+    G = vect2.dot(vect1.transpose()) - vect1.dot(vect2.transpose())
+    P = vect1.dot(vect1.transpose()) + vect2.dot(vect2.transpose())
     M = I - P
     return G,P,M
 
@@ -2460,16 +2467,18 @@ class Tensor(list):
 ###############################################################################
 ## Matrix = numpy if loaded else use a development class based on lists.      #
 ###############################################################################
-if "numpy" in sys.modules:
+if np and "numpy" in sys.modules:
   import numpy   # Rename
   class Matrix(numpy.ndarray):
     """Class Matrix interfaces & extends numpy instead of using Tensor class."""
+    __transpose = False
     def __init__(self, *args):
       """Matrix(ndarray)
          Define a nx1 or nxm matrix as an numpy.ndarray. Needs Matrix(*list)!"""
-      pass
+      self.__transpose = False
     def __new__(self, *args):
       """Define a nx1 or nxm matrix as a list or list of lists."""
+      self.__transpose = False
       arr = numpy.array(args)
       return arr.view(Matrix)
 
@@ -2482,12 +2491,26 @@ if "numpy" in sys.modules:
          Return the value of a matrix element. Used for FrameMatrix."""
       return self[x][y]
 
-    def slice(self, shape, offset=(0,0)):
-      """slice(shape, [offset=(0,0)])
-         Return copy of 2-D selection or square if offset,shape are integers."""
-      Lib._checkList(shape, int, "slice", 2)
-      Lib._checkList(offset, int, "slice", 2)
-      return self[offset[0]:slice[0], offset[1]:slice[1]]
+    def transpose(self, axes=None):
+      """transpose([axes])
+         Return transpose matrix."""
+      if len(self.shape) == 1:
+        out = self[:]
+        out.__transpose = not self.__transpose
+        return out
+      return super(Matrix, self).transpose(axes)
+
+    def dot(self, b, out=None):
+      """dot(b, [out])
+         Return inner product or outer product for vector with transpose on RHS."""
+      if len(self.shape)==1 and len(b.shape)==1 and b.__transpose:
+        return Matrix(*Tensor(list(self)).dot(Tensor(list(b)).transpose()))
+      return super(Matrix, self).dot(b,out)
+
+    def copy(self, arr=None):
+      """copy(arr)
+         Return deep copy at both levels and shape set with optional overwrite."""
+      return Matrix(*Tensor(list(self)).copy(arr))
 
     def sym(self, mat):
       """Return self*mat +mat*self."""
@@ -2497,31 +2520,295 @@ if "numpy" in sys.modules:
       """Return self*mat -mat*self."""
       return np.dot(self, mat) -np.dot(mat, self)
 
-    @staticmethod
-    def FromNumpy(array):
-      """FromNumpy(array)
-         Convert from numpy.ndarray to Matrix to process."""
-      return array.view(Matrix)
+    def multiply(self, mat):
+      """Return Hadamard product matrix."""
+      return Matrix(*Tensor(list(self)).multiply(mat))
 
+    def cayleyDicksonMult(self, vector, baezRule=False):
+      """cayleyDicksonMult(vector, [baezRule])
+         Multiply Tensor pairs using Cayley-Dickson rule, Wikipedia or J.C.Baez:
+         q1=(p,q); q2=(r,s); q1*q2 = (pr -s*q, sp +qr*) [wikiRule]
+         q1=(p,q); q2=(r,s); q1*q2 = (pr -sq*, p*s +rq) [baezRule]."""
+      return Matrix(*Tensor(list(self)).cayleyDicksonMult(vector, baezRule))
+
+    def diag(self, vector=None):
+      """diag([vector])
+         Return diagonal of square matrix or diagonal of self * vector.transpose
+         as vector. Hence trace=sum(matrix.diag()) and dot product is
+         sum(v.diag(vector)). This allows Dickson algebra (the product of Real,
+         Complex, Quaternion and Octernion numbers) as Tensor(R,Q(1),Q(2), O(3)).
+         Addition is via + and multiplication via diag(v)."""
+      return Matrix(*Tensor(list(self)).diag(vector))
+
+    def trim(self):
+      """trim()
+         Return copy with cells smaller than precision set to zero."""
+      return Matrix(*Tensor(list(self)).trim())
+
+    def slice(self, offset, shape=None):
+      """slice(offset, [shape])
+         Return copy of 2-D selection or square if offset,shape are integers."""
+      if not isinstance(offset, (list, tuple)):
+        offset = (offset, offset)
+      Lib._checkList(offset, int, "slice", 2)
+      if shape is None:
+        shape = (self.shape[0], 1 if len(self.shape)==1 else self.shape[1])
+      elif not isinstance(shape, (list, tuple)):
+        shape = (shape, shape)
+      Lib._checkList(shape, int, "slice", 2)
+      if len(self.shape) ==1:
+        return self[offset[0]:shape[0]]
+      return self[offset[0]:shape[0], offset[1]:shape[1]]
+
+    def reshape(self, shape):
+      """reshape(shape)
+         Return copy with new 2-D shape or square if shape is integer."""
+      return Matrix(*Tensor(list(self)).reshape(shape))
+
+    def scalar(self):
+      """scalar()
+         Return copy with non-scalar cells set to the scalar part."""
+      return Matrix(*Tensor(list(self)).scalar())
+
+    def reduce(self, fn, init=0):
+      """reduce(fn, [init=0])
+         Return matrix with x=fn(x[=init],y) applied to each element of self."""
+      return self.__reduce(fn, init)
+
+    def __reduce(self, fn, init):
+      """Internal reduce(fn) method."""
+      out = init
+      if len(self.shape) > 1:
+        for val1 in range(self.shape[0]):
+          for val2 in range(self.shape[1]):
+            out = fn(out, self[val1][val2])
+        return out
+      for val1 in range(self.shape[0]):
+        out = fn(out, self[val1])
+      return out
+
+    def all(self):
+      """all()
+         Return True if all matrix values are True else False."""
+      return self.__reduce(lambda x,y: x and y, True)
+
+    def any(self):
+      """any()
+         Return True if any matrix values are True else False."""
+      return self.__reduce(lambda x,y: x or y, False)
+
+    def function(self, fn):
+      """function(fn)
+         Return matrix with fn() applied to each element of self."""
+      return Matrix(*Tensor(list(self)).function(fn))
+
+    def __function(self, fn):
+      """Internal function(fn) method."""
+      out = []
+      if len(self.shape) > 1:
+        for idx1 in range(self.shape[0]):
+          out.append([])
+          for idx2 in range(self.shape[1]):
+            out[idx1].append(fn(self[idx1][idx2]))
+        return self.copy(out)
+      for idx1 in range(self.shape[0]):
+        out.append(fn(self[idx1]))
+      return self.copy(out)
+
+    def abs(self):
+      """abs()
+         Return matrix with absolute value applied to each element of self."""
+      return self.function(abs)
+    __abs__ = abs
+
+    def pow(self, exp):
+      """pow(exp)
+         Return matrix with power applied to each element of self."""
+      return self.function(lambda x: numpy.pow(x, exp) if isinstance(x, \
+                    (np.int64, int, float)) else x.__class__.pow(x, exp))
+    __pow__ = pow
+
+    def exp(self):
+      """exp()
+         Return matrix with exponentiation applied to each element of self."""
+      return self.function(lambda x: numpy.exp(x) if isinstance(x, \
+                    (np.int64, int, float)) else x.__class__.exp(x))
+
+    def log(self):
+      """log()
+         Return matrix with logarithm applied to each element of self."""
+      return self.function(lambda x: numpy.log(x) if isinstance(x, \
+                    (np.int64, int, float)) else x.__class__.log(x))
+
+    def morph(self, basis, labels=None):
+      """morph(basis, [labels])
+         Return self morphed using a list of pairs or basis->labels. Pairs are
+         string names mapped as first->second. Basis & ones are replaced by
+         labels and +-1 of labels type so may be of basis or string type."""
+      return Matrix(*Tensor(list(self)).morph(basis, labels))
+
+    def differences(self, mat, ignore=None):
+      """diff[erences](mat,[ignore])
+         Return list of indicies for differences of 2 matricies & ignore value."""
+      return Matrix(*Tensor(list(self)).differences(mat, ignore))
+
+    def dump(self, xLabels=[], yLabels=[], name=None):  # Use resolution TBD XXX
+      """dump([xLabels,yLabels,name])
+         Pretty print of Matrix with optional labels."""
+      return Matrix(*Tensor(list(self)).dump(xLabels, yLabels, name))
+
+    def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
+               initPerm=[], permCycle=False, antiiso=False):
+      """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
+       Find self in signed permutation of cf for basis optionallly replacing
+       cfBasis in cf with basis. All n! permutations and 2**n combinations of
+       signs are searched and the histogram of difference counts is returned
+       (default num=-2). If num=-1 then return the first match while num>-1
+       returns this signed permutation. Otherwise diffs>=0 can be used to
+       report each permutation for this many differences or less. Parameter cf
+       is swapped as cfBasis -> basis and text searching is quicker. Parameter
+       cycle is also quicker (default) because it converts to Tensor.cycles
+       and uses morphCycles instead of isomorph. Parameter initPerm is used
+       to fix the first part of all permutations such as octonians when
+       looking for sedenions. permCycle outputs cycles instead of maps."""
+      return Matrix(Tensor(list(self)).search(basis, cf, cfBasis, num, diffs,
+                   cycles, initPerm, permCycle, antiiso))
+
+    def cycles(self, basis, degree=0, indices=False):
+      """cycles(basis, [degree,indices])
+         Return a list of multiplication triads for degree using basis."""
+      return Matrix(*Tensor(list(self)).cycles(basis, degree, indices))
+
+    def assocTriads(self, basis, nonAssoc=False, alternate=False, dump=False):
+      """assocTriads(basis,[nonAssoc,alternate,dump])
+         Return assoc traids [a,b,c]=0 or !=0 if nonAssoc. Alternate associativity
+         is [a,b,c] = 0 if any two of a,b,c are equal. See Lib.triadDump()."""
+      return Matrix(*Tensor(list(self)).assocTriads(basis, nonAssoc, alternate, dump))
+
+    def moufangTriads(self, basis, moufang=0, dump=False):
+      """moufangTriads(basis,[moufang,dump])
+         Return moufang traids depending on moufang=0-5 where 0 is none and 5 is
+         the sum of all four. See Lib.triadDump() for return and other values.
+           1: c*(a*(c*b)) -((c*a)*c)*b, 2: a*(c*(b*c)) -((a*c)*b)*c,
+           3: (c*a)*(b*c) -(c*(a*b))*c, 4: (c*a)*(b*c) -c*((a*b)*c)."""
+      return Matrix(*Tensor(list(self)).moufangTriads(basis, moufang, dump))
+
+    def abcTriads(self, basis, abc=0, nonAssoc=False, dump=False):
+      """abcTriads(basis,[abc,nonAssocdump])
+         Return traids for abc=0-3 where 0 is triple associator and 1-3: [a,c,b],
+         [a,b,c], [b,a,c]. See Lib.triadDump() for return and other params."""
+      return Matrix(*Tensor(list(self)).abcTriads(basis, abc, nonAssoc, dump))
+
+    def zeroTriads(self, basis, dump=False):
+      """zeroTriads(basis, [dump])
+         Return all zero divisors (a+b)(c+d) as list of (b,c,d1,d2,...) with
+         a=bcd non-scalar and unique where b > c > d range through the table."""
+      return Matrix(*Tensor(list(self)).zeroTriads(basis, dump))
+
+    def compare(self, cmp, over=False):
+      """compare(cmp,[over])
+         Return differences or overlap if over set."""
+      return Matrix(*Tensor(list(self)).compare(cmp, over))
+
+    def unique(self, dups=False):
+      """unique([dups])
+         Return unique or duplicate elements if dups set."""
+      return Matrix(*Tensor(list(self)).unique(dups))
+
+    def isomorph(self, basis, perm):
+      """isomorph(basis, perm)
+         Return self permuted and cells swapped by signed, inverted perm."""
+      return Matrix(*Tensor(list(self)).isomorph(basis, perm))
+
+    def permInvert(self):
+      """permInvert()
+         Return inverted vector permutation."""
+      return Matrix(*Tensor(list(self)). permInvert())
+
+    def permute(self, perm, invert=False):
+      """permute(perm, [invert])
+         Return self with rows and columns swapped and signed by perm."""
+      return Matrix(*Tensor(list(self)).permute(self, perm, invert))
+
+    def permCycles(self):
+      """permCycles()
+         Change permutation into relative cycles as a list."""
+      return Matrix(*Tensor(list(self)). permCycles())
+
+    def morphCycles(self, perm, tri=False):
+      """morphCycle(perm, [tri])
+         Return cycle sign permuted by perm as a list from (1,2,3,...)."""
+      return Matrix(*Tensor(list(self)).morphCycles(perm, tri))
+
+    def allSigns(self, half=False, dump=False):
+      """allSigns([half,dump])
+         Generate a list of all, half [boolean] or a single indexed term [half=
+         int] of the signed combinations of self, (eg allSigns(e1)=[e1,-e1]).
+         If dump log progress and abort if memory is below the limit."""
+      return Matrix(*Tensor(list(self)).allSigns(half, dump))
+
+    def allSignsIndices(self):
+      """allSignsIndices()
+         Return index and minus sign count of self in allSigns."""
+      return Matrix(*Tensor(list(self)).allSigns(half, dump))
+
+     ############ Other Creators ############
     @staticmethod
     def Resolution(digits):
       """Resolution([digits])
          Set print format digits or reset to Lib.resolution default."""
-      Lib.resolution(digits)
       numpy.set_printoptions(Lib._getResolutions()[0])
+      return Lib.resolution(digits)
+
+    @staticmethod
+    def NED(lat, lng):
+      """BasisNED(lat, lng)
+         Lat/long Earth Centred-Earth Fixed (ECEF) basis changed to
+         North-East-Down returned as a 3x3 Matrix [NT,ET,DT]T. From
+         onlinelibrary.wiley.com/doi/pdf/10.1002/9780470099728.app3.
+         This is introduced to check NED() by rotating i, j & k."""
+      return Matrix(*Tensor.NED(lat, lng))
+
+    @staticmethod
+    def Table(basis, rhsBasis=None, lie=0):
+      """Table(basis, [rhsBasis, lie])
+         Return Matrix mult.or Lie/lie table for basis times rhsBasis or basis."""
+      return Matrix(*Tensor.Table(basis, rhsBasis, lie))
 
     @staticmethod
     def Diag(diag):
       """Diag(diag)
          Return the zero matrix with diag as diagonal entries."""
-      Lib._checkType(diag, (list, tuple), "Diag")
-      size = diag.shape[0] if isinstance(diag, (Matrix)) else len(diag)
-      out = Matrix(*numpy.identity(size, float))
-      for ii in range(size):
-        if isinstance(diag[ii], (list, tuple)):
-          raise Exception("Invalid Diag element")
-        out[ii][ii] = diag[ii]
-      return Matrix(*out)
+      return Matrix(*Tensor.Diag(diag))
+
+    @staticmethod
+    def Rotations(vect1, vect2):
+      """Rotations(vect1, vect2)
+         Return G,P,M for orthonormal vectors vect1 and vect2. Rotation matrix is
+         I-P +Pcos(a) +Gsin(a) == (a +Q(*a)*Q(*b)).frameMatrix() for angle a
+         == (a/2 +Q(*a)*Q(*b)).versor().eulerMatrix(). Use versor().rotate.
+         P is projection into plane of vectors. P=-G*G, P*P=P, N*N=N.
+         From Wikipedia matrix exponential: Any matrix X in M(R,nxn): X = A+N 
+         where A diagonalisable, N nilpotent N^m = 0, m <= n, A & N commute. Then
+                  exp(X) = exp(A + N) + exp(A) + exp(N). 
+         A = UDU^-1, exp(A) = Uexp(D))U^-1, D = tr(a1,...,an) (diagonal),
+              exp(D) = tr(exp(a1),...,exp(an)), det(exp(X)) = exp(tr(X)).
+         For P^2 = P, exp(P) = I +(exp(1) -1)*P   by Fourier expansion, so
+         R(a) = exp(G*a) = I+G*sin(a)+G*G*(1-cos(a)) = I-P +P*cos(a) +G*sin(a)."""
+      G,P,M = Tensor.Rotations(vect1, vect2)
+      return Matrix(*G), Matrix(*P), Matrix(*M)
+
+    @staticmethod
+    def Triads(triList, basis):
+      """Triads(triList, basis)
+         Turn triad list into Table using basis of assumed square -1."""
+      return Matrix(*Tensor.Triads(triList, basis))
+
+    @staticmethod
+    def FromNumpy(array):
+      """FromNumpy(array)
+         Convert from numpy.ndarray to Matrix to process."""
+      return array.view(Matrix)
 else:
   Matrix = Tensor
 
@@ -2534,6 +2821,8 @@ class Euler(list):
     """Euler([<angles>,...][roll,pitch,yaw])
        Create an n-D Euler object for angles as radians with defaults 0."""
     if len(args) < 3:
+      if len(args) > 0 and isinstance(args[0], Matrix): # Very strange
+        args = args[0]
       args = list(args)
       args.extend([0] *(3 -len(args)))
     super(Euler, self).__init__(args)
@@ -2543,6 +2832,7 @@ class Euler(list):
         raise TypeError("Euler() got unexpected keyword argument %s" %param)
       idx = names.index(param)
       self[idx] = val
+    #print(self)
     for val in self:
       Lib._checkType(val, (int, float), "Euler")
   def __repr__(self):
@@ -2553,7 +2843,7 @@ class Euler(list):
     return str(self)
   def __str__(self):
     """Overload string output. Printing taking resolution into account."""
-    return "%s" %Matrix(*self)
+    return "%s" %Tensor(*self)
   def __eq__(self, cf):
     """Return True if 2 Eulers are equal within precision."""
     if not isinstance(cf, Euler) or len(self) != len(cf):
@@ -2615,7 +2905,7 @@ class Euler(list):
         else:
           xyz.append((j -1,i -1))  # rotated
     names = ('xXroll', 'yYpitch', 'zZyaw')
-    blank = Matrix.Diag([1] *(dim +offset))
+    blank = Matrix.Diag([1.0] *(dim +offset))
     mat = blank.copy()
     implicitRot = blank.copy()
     store = []
@@ -2638,11 +2928,11 @@ class Euler(list):
       rot[idx2][idx2] = cw
       if implicit:
         tmpRot = rot.copy()
-        rot = implicitRot *rot *implicitRot.transpose()
-        implicitRot *= tmpRot
+        rot = implicitRot.dot(rot).dot(implicitRot.transpose())
+        implicitRot = implicitRot.dot(tmpRot)
       else:
         store.append(key)
-      mat = rot *mat
+      mat = rot.dot(mat)
     return mat
 
   @staticmethod
@@ -2668,7 +2958,7 @@ class Euler(list):
        https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.468.5407."""
     Lib._checkType(mat, (Matrix, Tensor), "Matrix")
     rank = len(mat) -offset
-    blank = Matrix.Diag([1] *(rank +offset))
+    blank = Matrix.Diag([1.0] *(rank +offset))
     dim = int((math.sqrt(8*(rank -offset) +1) +1) /2 +0.9) # l=comb(dim,2)
     angles = [0] *(int(Lib.comb(rank, 2)))
     cnt = len(angles)
@@ -2698,7 +2988,7 @@ class Euler(list):
         rot[idx1][idx2] = -sw
         rot[idx2][idx1] = sw
         rot[idx2][idx2] = cw
-        mat = rot *mat
+        mat = rot.dot(mat)
     v0 = mat.get(offset, offset)
     v1 = mat.get(offset +1, offset)
     pitch = -math.atan2(mat.get(offset +2, offset), math.sqrt(v0 *v0 +v1 *v1))

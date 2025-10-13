@@ -364,7 +364,7 @@ class CA():
       out = self.dup(self.w +ca.w)
       for grade in ca.__g:
         out.__add(grade)
-    elif isinstance(ca, Tensor):
+    elif isinstance(ca, (Tensor, Matrix)):
       out = ca.__add__(self)
     else:
       Lib._checkType(ca, (int, float), "add")
@@ -383,7 +383,7 @@ class CA():
         else:
           lhs[key] = -val
       return self.copy(self.w -ca.w, **lhs)
-    if isinstance(ca, Tensor):
+    if isinstance(ca, (Tensor, Matrix)):
       return ca.__add__(-self)
     Lib._checkType(ca, (int, float), "sub")
     out = self.dup(self.w -ca)
@@ -424,7 +424,7 @@ class CA():
       for grade1 in self.__g:
         for grade2 in ca.__g:
           out.__add(grade1.mergeBasis(grade2.value, grade2.bases()))
-    elif isinstance(ca, Tensor):
+    elif isinstance(ca, (Tensor, Matrix)):
       return ca.__rmul__(self)
     else:
       Lib._checkType(ca, (int, float), "mul")
@@ -1571,14 +1571,14 @@ class CA():
     """allSigns([half,dump])
        Generate a list of all, half [boolean] or a single indexed term [half=
        int] of the signed combinations of self, (eg allSigns(e1)=[e1,-e1])."""
-    terms = Tensor(*list(CA(**dict((x,))) for x in self.copyTerms()))
+    terms = Matrix(*list(CA(**dict((x,))) for x in self.copyTerms()))
     for p0 in terms.allSigns(half, dump):
       yield sum(p0)
 
   def allSignsIndices(self):
     """allSignsIndices()
        Return index and minus sign count of self in allSigns."""
-    terms = Tensor(*list(CA(**dict((x,))) for x in self.copyTerms()))
+    terms = Matrix(*list(CA(**dict((x,))) for x in self.copyTerms()))
     return terms.allSignsIndices()
 
   def spin(self, basis=[]):
@@ -1617,7 +1617,7 @@ class CA():
         for term in terms:
           triad.append(sBasis.index(term) +1)
         triads.append(triad)
-    return (Tensor(*triads), basis)
+    return (Matrix(*triads), basis)
 
   ##############################################################################
   ## Other creators and source inverters
@@ -2044,15 +2044,15 @@ if __name__ == '__main__':
        e=Euler(pi/6,pi/4,pi/2); c=e1+2e2+3e3; c.basis(3)""",
     """# Test 1 Rotate via frameMatrix == versor half angle rotation.
        Rx=d60+e23; rx=(d60 +e23).versor()
-       test = Rx.frameMatrix() *c.vector(); store = (rx*c*rx.inverse()).vector()
+       test = Rx.frameMatrix().dot(c.vector()); store = (rx*c*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 2 Rotate via frameMatrix == versor.rotate(half angle)].
        Rx=d60+e13; rx=CA.Versor(e13=d60)
-       test = Rx.frameMatrix() *c.vector(); store = (rx.rotate(c)).vector()
+       test = Rx.frameMatrix().dot(c.vector()); store = (rx.rotate(c)).vector()
        Calculator.log(store == test, store)""",
     """# Test 3 Rotate versor rotate == rotation of copy.
        Rx=d60+e21; rx=math.cos(d30) +e21*math.sin(d30)
-       test = Rx.frameMatrix() *c.vector(); store = (rx*c*rx.inverse()).vector()
+       test = Rx.frameMatrix().dot(c.vector()); store = (rx*c*rx.inverse()).vector()
        Calculator.log(store == test, store)""",
     """# Test 4 Quat Euler == CA Euler.
        test = CA.Euler(pi/6,pi/4,pi/2)
@@ -2115,7 +2115,7 @@ if __name__ == '__main__':
     """# Test 14 Compare Tensor projection and CA.projects.
        def Ptest(a, b, x):
          G,P,N = Tensor.Rotations(a.unit().vector(), b.unit().vector())
-         p = (a * b).projects(x); x0 = P *x.vector()
+         p = (a * b).projects(x); x0 = P.dot(x.vector())
          return [p[0].vector(), p[1].vector()] == [x0, x.vector()-x0]
        d2 = Ptest(CA(0,1), CA(0,0,1), CA(0,1,2))
        d3 = Ptest(CA(0,1,0,0), CA(0,0,1,2), CA(0,1,2,3))
