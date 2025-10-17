@@ -1581,7 +1581,7 @@ class CA():
     terms = Matrix(*list(CA(**dict((x,))) for x in self.copyTerms()))
     return terms.allSignsIndices()
 
-  def spin(self, basis=[]):
+  def spin(self, basis=None):
     """spin([basis])
        Return the Lib.Table triad list and Basis list if basis else
        VersorArgs list from 3-form self finding the largest dimension."""
@@ -1604,10 +1604,8 @@ class CA():
         tmp = rTerms[0]; rTerms[0] = rTerms[1]; rTerms[1] = tmp
       triads.append(terms)
       sTriads.append(rTerms)
-    if basis:
-      Lib._checkType(basis, (list, tuple), "spin")
-      if len(basis) != maxBasis:
-        raise Exception("Invalid basis length for spin")
+    if basis is not None:
+      Lib._checkList(basis, None, "spin", maxBasis)
     else:
       sBasis = CA._VersorArgs(maxBasis)
       basis = list((CA(**{x: 1}) for x in sBasis))

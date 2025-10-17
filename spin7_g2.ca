@@ -35,7 +35,7 @@ Triads7 = (e123 +e145 +e167 +e246 +e257 +e347 +e356, e123 +e145 +e167 +e247 +e25
 
 # G2 paper has Fp = negTriO(Triads7[0])[4] and FFp=-e1247 +e1256 +e1346 +e1357 -e2345 +e2367 +e4567
 # ie Fp^FFp=7e1234567. But Fp*e1234567 negates terms 2,3,5 so that (Fp*Fp +7) = 6*Fp *e1234567.
-P1 = Tensor(e123, e145, e167, e246, e257, e347, e356)  # = (CA(**dict([x])) for x in Triads7[0].copyTerms())
+P1 = Matrix(e123, e145, e167, e246, e257, e347, e356)  # = (CA(**dict([x])) for x in Triads7[0].copyTerms())
 PP1 = (e1247, e1256, e1346, e1357, e2345, e2367, e4567) # = sum(PP1) = -e1234567 *sum(P1)
 PPP1 = list(Lib.chain(*([CA.Eval([x[0],x[1]])+CA.Eval([x[2],x[3]]), CA.Eval([x[0],x[2]])+CA.Eval([x[1],x[3]]),
         CA.Eval([x[0],x[3]])+CA.Eval([x[1],x[2]])] for x in (y.basisTerms()[0][0] for y in PP1))))
@@ -70,9 +70,9 @@ SS1o = e1234567 *S1o
 # Also checked all P not in 480 +/-TriadsOhalf[*]) are not isomorphic to Octonians.
 # Hence 30 * 16 = 480 3-forms generating tables isomorphic to Octonians.
 # TriadsOhalf = list(Lib.chain(*(triadsOhalf(x) for x in range(30)))) # len=240
-# Octonians = TriadsOhalf +(-1*Tensor(TriadsOhalf))                      # len=480
+# Octonians = TriadsOhalf +(-1*Matrix(TriadsOhalf))                      # len=480
 
-# Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Tensor.Table/Cycles(basis)
+# Now have sub-algrebas i*P1 & basis = P1 -i*P1 +[i], i=e1234567. Try Matrix.Table/Cycles(basis)
 
 # So PP1 *PP1 = 7 -2*PP1 +8*f4
 #          e1247  e1256  e1346  e1357  e2345  e2367  e4567
@@ -85,12 +85,12 @@ SS1o = e1234567 *S1o
 # e2367|  -e1346  e1357 -e1247  e1256 -e4567    1.0 -e2345
 # e4567|  -e1256 -e1247  e1357  e1346 -e2367 -e2345    1.0
 
-f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7")) 
+f7Basis = Matrix("f1", "f2", "f3", "f4", "f5", "f6", "f7")
 
 # Octonion representation in calcO is triads7all(0,22) => O+
-# ie Tensor.Triads(*(triads7all(0,22)).spin(f7Basis)) == AO7 (checked below)
+# ie Matrix.Triads(*(triads7all(0,22)).spin(f7Basis)) == AO7 (checked below)
 # Baez rep. in calcO is triads7all(0,105) = -triads7all(0,22) = -O+ = O-
-Spin7O = Tensor( 
+Spin7O = Matrix( 
  ("-1",  "f3",  "-f2", "f5", "-f4",  "-f7",  "f6"),
  ("-f3", "-1",  "f1",  "f6", "f7",  "-f4",  "-f5"),
  ("f2",  "-f1", "-1",  "f7",  "-f6",  "f5", "-f4"),
@@ -101,14 +101,14 @@ Spin7O = Tensor(
 Spin7Obaez = Spin7O.transpose()
 
 if Lib.isCalc("O"):  # Same code as ultronions.oct
-  AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
+  AO7 = Matrix.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
   O.CayleyDicksonRule(True)
-  BO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
+  BO7 = Matrix.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
   O.CayleyDicksonRule(False)
   print("Octonion representations:", Spin7O == AO7, Spin7Obaez == BO7)
 
 # triads7all(0,0) = R+-
-Spin7R = Tensor( \
+Spin7R = Matrix( \
  ("-1", "f3","-f2", "f5","-f4", "f7","-f6"),
  ("-f3", "-1", "f1", "f6", "f7","-f4","-f5"),
  ("f2","-f1", "-1", "f7", "f6","-f5","-f4"),
@@ -122,7 +122,7 @@ def nac7subalg(tri, pos=None):
      Return non-associative count for tri or tri.allSigns()[pos] sub-algebra."""
   if pos is not None:
     tri = list(abs(tri).allSigns(pos))[pos]
-  return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f7Basis)) \
+  return len(list(Lib.triadDump(Matrix.Triads(*tri.spin(f7Basis)) \
                  .assocTriads(f7Basis,True),f7Basis)))
 
 # Map algebras to remainders with repeats shown with *,#,$
@@ -172,7 +172,7 @@ def nac7map(idx):
     if tmp and len(tmp.copyTerms()) == 1:
       nac[abs(tmp)] = triads7all(idx,offs)
   for pos in sorted(nac.keys()):
-    tmp = len(list(Lib.triadDump(Tensor.Triads(*(nac[pos]).spin(f7Basis)) \
+    tmp = len(list(Lib.triadDump(Matrix.Triads(*(nac[pos]).spin(f7Basis)) \
                            .assocTriads(f7Basis,True),f7Basis)))
     if tmp not in nacMap:
       nacMap.append(tmp)
@@ -306,12 +306,12 @@ def triads7all(idx, pos=0):
 
 def triads7terms(idx, pos=0):
   """triads7terms(idx, [pos])
-     Return triads7all(idx,pos) as a Tensor of Eval(copyTerms)."""
+     Return triads7all(idx,pos) as a Matrix of Eval(copyTerms)."""
   Lib._checkType(idx, int, "triads7terms")
   Lib._checkType(pos, int, "triads7terms")
   if idx <0 or idx > 29 or pos < 0 or pos > 127:
     raise Exception("Invalid input range in triads7terms: %d,%d" %(idx,pos))
-  return Tensor(list(CA(**dict([x])) for x in triads7all(idx,pos).copyTerms()))
+  return Matrix(list(CA(**dict([x])) for x in triads7all(idx,pos).copyTerms()))
 
 def triads7remain(phi):
   """triad7remain(phi)
@@ -462,11 +462,11 @@ def triads7autos(idx):
       x2 = (x2 +1) %8     # Wrap to start
     phi0 = triads7all(idx, x0)
     phi1 = triads7all(idx, x2)
-    p0 = Tensor.Triads(*phi0.spin(f7Basis)).search(f7Basis, 
-         Tensor.Triads(*phi1.spin(f7Basis)), num=-1)
+    p0 = Matrix.Triads(*phi0.spin(f7Basis)).search(f7Basis, 
+         Matrix.Triads(*phi1.spin(f7Basis)), num=-1)
     p1 = []
     p2 = [1,2,3,4,5,6,7]
-    for x in Tensor(p0).permCycles():
+    for x in Matrix(p0).permCycles():
       if len(x) == 1:
         if -x[0] in p2:
           p2.remove(-x[0])
@@ -488,8 +488,9 @@ def triads7autos(idx):
            idx, x1, x0, fnd, p0, p1, p2))
     x0 = x1
 
+print("XXX",f7Basis)
 
-PX = list((x, Tensor.Triads(*triads7all(*x[1]).spin(f7Basis))) for x in \
+PX = list((x, Matrix.Triads(*triads7all(*x[1]).spin(f7Basis))) for x in \
        ((4,(0,5)), (8,(7,0)), (10,(7,6)), (12,(0,0)), (14,(0,6)), (16,(12,0))))
 for x in PX: print("P%-2d" %x[0][0] +" has {:2d}A, {:2d}B, {:2d}C, 4X".format(\
     *list(len(list(Lib.triadDump(x[1].abcTriads(f7Basis,y,True),f7Basis)))-4  \
@@ -510,7 +511,7 @@ NameG22 = ("A+H", "B+I", "C+J", "D+K", "F+M", "G+N", "L-E")
 _MatrixG2 = "Matrix representation of G2 element A-N."
 _MatrixG22 = "Matrix representation of G2 dual elements in NameG22."
 def _matrixG2(x1,x2,y1,y2):
-  m = Tensor.Diag([0]*7); m[x1][x2]=1; m[x2][x1]=-1; m[y1][y2]=1; m[y2][y1]=-1
+  m = Matrix.Diag([0]*7); m[x1][x2]=1; m[x2][x1]=-1; m[y1][y2]=1; m[y2][y1]=-1
   return m
 MatrixG2 = (_matrixG2(1,2,4,3), _matrixG2(2,0,5,3), _matrixG2(0,1,3,6), # ABC
             _matrixG2(4,0,1,5), _matrixG2(0,3,6,1), _matrixG2(0,6,1,3), # DEF
@@ -546,9 +547,9 @@ G22name = ['(A+H)', '(B+I)', '(C+J)', '(D+K)', '(F+M)', '(G+N)', '(L-E)']
 G222name = list("2" +x for x in G2name +G22name)
 G2names = G2name +G22name +G222name
 _TableG2 = """TableG2 === tableG2(); Dump with or the full table:
-              Tensor.Table(G2,lie=1).morph(G2vars, G2names).dump(G2name) or
+              Matrix.Table(G2,lie=1).morph(G2vars, G2names).dump(G2name) or
               tableG2(MatrixG2+MatrixG22,()).dump(G2name +G22name)"""
-TableG2 = Tensor( \
+TableG2 = Matrix( \
  ("0", "-(C+J)", "B+I", "-(L-E)", "-(D+K)", "N", "F+M", "0", "J", "-I", "L", "-K", "N", "-2(F+M)"),
  ("C+J", "0", "-(A+H)", "-(F+M)", "-(G+N)", "-K", "-(L-E)", "-J", "0", "H", "F", "G+N", "D+K", "-(L-E)"),
  ( "-(B+I)", "A+H", "0", "-G", "-2F", "2E", "D", "I", "-H", "0", "G+N", "-F", "-E", "-(D+K)"),
@@ -596,7 +597,7 @@ def _findG2(elem, basis=list(G2)+list(G22), names=NameG2+NameG22, dump=False): #
      Internal function to find  and return G2 elements name or -name."""
   if elem == 0:
     return "0"
-  Lib._checkType(elem, (CA, Tensor), "_findG2")
+  Lib._checkType(elem, (CA, (Tensor, Matrix)), "_findG2")
   Lib._checkType(basis, (list, tuple), "_findG2")
   Lib._checkType(names, (list, tuple), "_findG2")
   if len(basis) != len(names):
@@ -610,7 +611,7 @@ def _findG2(elem, basis=list(G2)+list(G22), names=NameG2+NameG22, dump=False): #
           return "%s(%s)" %(scale[0], names[ii])
         return scale[0] +names[ii]
   if dump:
-    if isinstance(elem, Tensor):
+    if isinstance(elem, (Tensor, Matrix)):
       elem.dump(name="NOT FOUND:")
     else:
       print(elem, type(elem), "NOT FOUND")
@@ -621,8 +622,8 @@ def tableG2(baseG2=MatrixG2, baseG22=MatrixG22,
   """tableG2([baseG2, baseG22, names, noAsym, pp=True])
      Return G2 multiplication table in name form if pp."""
   # mats = list(MatrixG2)+list(MatrixG22) # TBD The following don't work:
-  # Tensor.Table(MatrixG2,lie=1).morph(MatrixG2+MatrixG22+\
-  #   list(Tensor(MatrixG2)*2)+list(Tensor(MatrixG22)*2)).dump(G2name)
+  # Matrix.Table(MatrixG2,lie=1).morph(MatrixG2+MatrixG22+\
+  #   list(Matrix(MatrixG2)*2)+list(Matrix(MatrixG22)*2)).dump(G2name)
   out = []
   bases = baseG2 +baseG22
   for row in baseG2:
@@ -640,7 +641,7 @@ def tableG2(baseG2=MatrixG2, baseG22=MatrixG22,
       else:
         accum.append(prod)
     out.append(accum)
-  return Tensor(*out)
+  return Matrix(*out)
       
 def makeG2(idx=0, pos=None):
   """makeG2([idx,pos]) -> (G2')
@@ -1045,13 +1046,13 @@ def generateXyG2():
         elif x == -3 *y:
           out = "-3" +Gn[idx]
       if not out:
-        if x == Tensor.Diag(x.diag()):
+        if x == Matrix.Diag(x.diag()):
           out = x.diag()
         else:
           out = x
       row.append(out)
     Gtt.append(row)
-  return Tensor(Gtt)
+  return Matrix(Gtt)
 #        ha   hb   X1   Y1   X2   Y2   X3   Y3   X4   Y4   X5   Y5   X6   Y6
 #   ------------------------------------------------------------------------
 # ha|     0    0  2X1 -2Y1 -3X2  3Y2  -X3   Y3   X4  -Y4  3X5 -3Y5    0    0
