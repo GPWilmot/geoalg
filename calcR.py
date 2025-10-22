@@ -283,7 +283,8 @@ class Calculator:
     while idx +1 < len(args):
       vers += "(%s: %s)" %(args[idx], args[idx +1])
       idx += 2
-    sys.stdout.write(vers +'\n')
+    ver = sys.version_info
+    sys.stdout.write(vers +' Python: %s.%s\n'%(ver.major, ver.minor))
 
   @staticmethod
   def getWordLists():
@@ -835,10 +836,6 @@ class Calculator:
         token.value = ""
       elif token.type == "MULTS":
         if state.store:
-          if sys.version_info.major == 2: # Upgrade Python2 to v3
-            if token.value == "/" and state.store[-1][0].find(".") < 0 \
-              and state.store[-1][0].find("E") < 0:
-              state.store[-1][0] += ".0"  # 1/3 is 0 in v2
           state.isMults2 = True
           code += Calculator.__inCls._processStore(state)
         else:
@@ -883,6 +880,9 @@ class Calculator:
           signVal = ""
           state.lastBasis = validBasis
         else:
+          if sys.version_info.major == 2 and state.lastTyp == "MULTS" \
+             and state.multVal == "/": #  Upgrade Python to v3: 1/3 is 0 in v2
+            token.value = "Lib._float(%s)" %token.value
           if state.store:
             code += Calculator.__inCls._processStore(state)
           code += signVal
@@ -906,6 +906,8 @@ class Calculator:
               doLineExpand = False
             elif token.value in self.__PYTHON_WORDS:
               isAns = False
+              if token.value == "def":
+                doLineExpand = False
       else:  # ALL OTHER TOKENS
         isSpaced = (token.type in SpaceChars)
         if token.type == '=':
@@ -915,11 +917,11 @@ class Calculator:
             state.reset()
           else:
             doLineExpand = True
+            checkStore = True
           if bracketCnt == 0 and state.lastTyp not in ("!", "<", ">"):
             isAns = False
             if isAnsAssign:
               raise Exception("Can't assign to ans")
-          checkStore = True
         elif isSpaced:
           if state.store:
             state.aftFill += " "

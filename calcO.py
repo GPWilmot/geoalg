@@ -167,7 +167,7 @@ class O():
         idx += 2
       return idx
 
-  class Grade:
+  class Grade(object):
     """Each Grade is a list of Product index, o & u basis element parts. Product
        index is taken from _BasisArray()."""
     def __init__(self, value, bases):
@@ -220,7 +220,7 @@ class O():
              + (uCh +self.__uBase) if self.__uBase else ""
 
     def copy(self, value=None):
-      inherit = super().__new__(self.__class__)
+      inherit = super(self.__class__, self).__new__(self.__class__)
       inherit._init(self.value if value is None else value,
                     (self.__pBase, self.__oBase[:], self.__uBase[:]))
       return inherit
@@ -290,7 +290,7 @@ class O():
           bases = rhs
       else:
         bases = lhs
-      inherit = super().__new__(self.__class__)
+      inherit = super(self.__class__, self).__new__(self.__class__)
       inherit._init(value, bases)
       return inherit
 
@@ -581,16 +581,14 @@ class O():
     Lib._checkType(q, (int, float), "div")
     if abs(q) < Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
-      if isinstance(q, int) or isFloor:
-        out = self.__class__(int(self.w /q))
-        for grade in self.__g:
-          out.__g.append(grade.copy(int(grade.value /q)))
-        print(out)
-      else:
-        out = CA(float(self.w) /ca)
-        for grade in self.__g:
-          out.__g.append(grade.copy(float(grade.value) /q))
+    if isFloor:
+      out = self.__class__(int(self.w /q))
+      for grade in self.__g:
+        out.__g.append(grade.copy(int(grade.value /q)))
+    elif sys.version_info.major == 2:  # Turn Python v2 into v3
+      out = O(float(self.w) /q)
+      for grade in self.__g:
+        out.__g.append(grade.copy(float(grade.value) /q))
     else:
       out = self.__class__(self.w /q)
       for grade in self.__g:

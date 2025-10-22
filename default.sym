@@ -10,17 +10,17 @@
 
 L = Tensor((w,-x,-y,-z),(x,w,-z,y),(y,z,w,-x),(z,-y,x,w))
 R = Tensor((w,x,y,z),(-x,w,-z,y),(-y,z,w,-x),(-z,-y,x,w))
-Q = R * L # = R(q)*L(q^-1)
+Q = R.dot(L) # = R(q)*L(q^-1)
 Lx = Tensor((cx,-sx,0,0),(sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx))
 Rx = Tensor((cx,sx,0,0),(-sx,cx,0,0),(0,0,cx,-sx),(0,0,sx,cx)) # e23
 Ly = Tensor((cy,0,-sy,0),(0,cy,0,sy),(sy,0,cy,0),(0,-sy,0,cy))
 Ry = Tensor((cy,0,sy,0),(0,cy,0,sy),(-sy,0,cy,0),(0,-sy,0,cy)) # e13
 Lz = Tensor((cz,0,0,-sz),(0,cz,-sz,0),(0,sz,cz,0),(sz,0,0,cz))
 Rz = Tensor((cz,0,0,sz),(0,cz,-sz,0),(0,sz,cz,0),(-sz,0,0,cz)) # e12
-Qx = Rx * Lx
-Qy = Ry * Ly
-Qz = Rz * Lz
-Q0 = Qz*Qy*Qx
+Qx = Rx.dot(Lx)
+Qy = Ry.dot(Ly)
+Qz = Rz.dot(Lz)
+Q0 = Qz.dot(Qy).dot(Qx)
 
 def fixQ(roll,pitch,yaw,d=1.0):
   global cx
@@ -104,10 +104,10 @@ E34 = Tensor((1,0,0,0),(0,1,0,0),(0,0,c34,s34),(0,0,-s34,c34))
 I14 = Tensor((c14,0,0,-s14),(0,1,0,0),(0,0,1,0),(s14,0,0,c14))
 I24 = Tensor((1,0,0,0),(0,c24,0,-s24),(0,0,1,0),(0,s24,0,c24))
 I34 = Tensor((1,0,0,0),(0,1,0,0),(0,0,c34,-s34),(0,0,s34,c34))
-I = I14 * I24 *I34
-Q3 = Ez *Ey *Ex
+I = I14.dot(I24).dot(I34)
+Q3 = Ez.dot(Ey).dot(Ex)
 Q4 = matQ(4, Q3)
-E4 = E34 *E24 *E14
+E4 = E34.dot(E24).dot(E14)
 # Last column gives 4-D angles
 #print("E4:", list(lastCol(E4 *Q4)), E4.transpose() *(E4 *Q4) == Q4)
 E15=matE(5,1,5)
@@ -115,7 +115,7 @@ E25=matE(5,2,5)
 E35=matE(5,3,5)
 E45=matE(5,5,4)
 Q5 = matQ(5, Q3)
-E5 = E45 *E35 *E25 *E15
+E5 = E45.dot(E35).dot(E25).dot(E15)
 #print("E5:", list(lastCol(E5 *Q5)), E5.transpose() *(E5 *Q5) == Q5)
 E16=matE(6,1,6)
 E26=matE(6,2,6)
@@ -123,7 +123,7 @@ E36=matE(6,3,6)
 E46=matE(6,6,4)
 E56=matE(6,6,5)
 Q6 = matQ(6,Q3)
-E6 = E56 *E46 *E36 *E26 *E16
+E6 = E56.dot(E46).dot(E36).dot(E26).dot(E16)
 #print("E6:", list(lastCol(E6 *Q6)), E6.transpose() *(E6 *Q6) == Q6)
 E17=matE(7,1,7)
 E27=matE(7,2,7)
@@ -132,7 +132,7 @@ E47=matE(7,7,4)
 E57=matE(7,7,5)
 E67=matE(7,7,6)
 Q7 = matQ(7,Q3)
-E7 = E67 *E57 *E47 *E37 *E27 *E17
+E7 = E67.dot(E57).dot(E47).dot(E37).dot(E27).dot(E17)
 #print("E7:", list(lastCol(E7 *Q7)), E7.transpose() *(E7 *Q7) == Q7)
 
 x = S((.1,.2,.3,.4,.5,.6,.7,.8)) # = LL +LR*o1 +RL*o2 +RR*o12

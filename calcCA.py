@@ -298,6 +298,12 @@ class CA():
   def __hash__(self):
     """Allow dictionary access for basis objects."""
     return hash(str(self))
+  def _dump(self):
+    """Debug method to return scalar +str of grades."""
+    g = [str(self.w)]
+    for base in self.__g:
+      g.append(str(base))
+    return "+".join(g)
 
   def __eq__(self, cf):
     """Return True if 2 CAs are equal within precision."""
@@ -452,15 +458,14 @@ class CA():
     Lib._checkType(ca, (int, float), "div")
     if abs(ca) < Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
-      if isinstance(ca, int) or isFloor:
-        out = CA(int(self.w /ca))
-        for grade in self.__g:
-          out.__g.append(self.Grade(int(grade.value /ca), grade.bases()))
-      else:
-        out = CA(float(self.w) /ca)
-        for grade in self.__g:
-          out.__g.append(self.Grade(float(grade.value) /ca, grade.bases()))
+    if isFloor:
+      out = CA(int(self.w /ca))
+      for grade in self.__g:
+        out.__g.append(self.Grade(int(grade.value /ca), grade.bases()))
+    elif sys.version_info.major == 2:  # Turn Python v2 into v3
+      out = CA(float(self.w) /ca)
+      for grade in self.__g:
+        out.__g.append(self.Grade(float(grade.value) /ca, grade.bases()))
     else:
       out = CA(self.w /ca)
       for grade in self.__g:
@@ -1510,7 +1515,7 @@ class CA():
        degrees with the advantage that rounding errors do not need to be
        trimmed. Terms as lists of indicies are added without sign and a single
        term may contain indicies directly."""
-    if abs(basisTerms) == 1:
+    if basisTerms == 1 or basisTerms == -1:
       return self
     if isinstance(basisTerms, CA):
       basisTerms = basisTerms.basisTerms()

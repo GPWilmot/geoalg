@@ -187,12 +187,11 @@ class Q():
     Lib._checkType(q, (int, float), "div")
     if abs(q) <= Lib._getPrecision():
       raise Exception("Illegal divide by zero")
-    if sys.version_info.major == 2 or isFloor:  # Python v2 to v3
-      if isinstance(ca, int) or isFloor:
-        return Q(int(self.w /q), int(self.x /q), int(self.y /q), int(self.z /q))
-      else:
-        return Q(float(self.w) /q, float(self.x) /q, float(self.y) /q,
-                 float(self.z) /q)
+    if isFloor:
+      return Q(int(self.w /q), int(self.x /q), int(self.y /q), int(self.z /q))
+    elif sys.version_info.major == 2:  # Turn Python v2 into v3
+      return Q(float(self.w) /q, float(self.x) /q, float(self.y) /q,
+               float(self.z) /q)
     return Q(self.w /q, self.x /q, self.y /q, self.z /q)
   __truediv__ = __div__
   def __floordiv__(self, q): return self.__div__(q, True)

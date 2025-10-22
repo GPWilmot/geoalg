@@ -318,7 +318,16 @@ class Lib():
     return True
   @staticmethod
   def _getCalcList():
+    """Internal reuse."""
     return Lib.__storeCalc
+  @staticmethod
+  def _float(val):
+    """Internal late binding for calcR.parsing /int for Python V2."""
+    if np and isinstance(val, np.integer):
+      return float(val)
+    if isinstance(val, int):
+      return float(val)
+    return val
 
   @staticmethod
   def _piRange(a):
@@ -1684,14 +1693,14 @@ class Tensor(list):
     if xLabels:
       Lib._checkList(xLabels, None, "dump")
       if not self or len(xLabels) != self.shape[1]:
-        raise Exception("Invalid xLabels length for Matrix dump")
+        raise Exception("Invalid xLabels length for Tensor dump")
       if not yLabels and len(xLabels) == self.shape[0]:
         yLabels = xLabels
       s = max(map(lambda x :len(str(x)), xLabels))
     if yLabels:
       Lib._checkList(yLabels, None, "dump")
       if len(yLabels) != self.shape[0]:
-        raise Exception("Invalid yLabels length for Matrix dump")
+        raise Exception("Invalid yLabels length for Tensor dump")
       t = max(map(lambda x :len(str(x)), yLabels))
     if isinstance(self, list) and len(self) > 0 and isinstance(self[0], list):
       size = max(map(max, (map(lambda x: len(str(x)), row) for row in self)))
@@ -1840,18 +1849,26 @@ class Tensor(list):
       sys.stdout.write("NOT FOUND for %d: %s\n" %(cnt, p0))
     return p0
   
-  def cycles(self, basis, degree=0, indices=False):
-    """cycles(basis, [degree,indices])
-       Return a list of multiplication triads for degree using basis."""
+  def cycles(self, basis, results=None, degree=0, indices=False):
+    """cycles(basis, [results, degree,indices])
+       Return a list of multiplication triads for degree using basis
+       for table inputs and results for outputs."""
     size = self.shape
-    #self.__checkSquare(basis, "cycles", "basis")
+    self.__checkSquare(basis, "cycles", "basis")
+    if results is None:
+      results = basis
+    Lib._checkList(results, None, "cycles")
     Lib._checkType(degree, int, "cycles")
     Lib._checkType(indices, bool, "cycles")
     if degree and (isinstance(val, Lib._basestr) or not hasattr(val, "grades")):
       raise Exception("Parameter grade for cycles needs graded basis")
     pBasis,mBasis = Lib._basisStrs(basis)
+    pResults,mResults = Lib._basisStrs(results)
     prod = {}
     out = []
+    for el in basis:
+      if el not in results:
+        raise Exception("Basis of cycles missing from results: %s" %el)
     for i1 in range(size[0]):
       for i2 in range(i1 +1, size[1]):
         p1 = pBasis[i1]
@@ -1859,15 +1876,12 @@ class Tensor(list):
         p3 = self[i1][i2]  # p1 * p2
         p3 = str(p3)
         if p3 != "0":
+          sgn3 = "-" if p3[:1] == "-" else ""
+          pp3 = p3[1:] if sgn3 else p3
           if p1 not in prod:
             prod[p1] = []
-            #prod[mBasis[i1]] = []
           if p2 not in prod:
             prod[p2] = []
-            #prod[mBasis[i2]] = []
-          sgn3 = "-" if p3 in mBasis else ""
-          i3 = mBasis.index(p3) if sgn3 else pBasis.index(p3)
-          pp3 = pBasis[i3]
           if pp3 not in prod:
             prod[pp3] = []
           if p1 not in prod[pp3] and p2 not in prod[pp3]:
@@ -1876,15 +1890,13 @@ class Tensor(list):
             prod[pp3].extend((p1, p2))
             if not degree or basis[i3].grades(degree)[degree]:
               if indices:
-                out.append((i1 +1, i2 +1, (-i3 -1) if sgn3 else i3 +1))
+                if pp3 not in pResults:
+                  raise Exception("Basis of cycles not in results: %s" %pp3)
+                i3 = pResults.index(pp3)
+                out.append((pResults.index(p1) +1, pResults.index(p2) +1,
+                        (-i3 -1) if sgn3 else i3 +1))
               else:
-                p1 = basis[i1]
-                p2 = basis[i2]
-                if isinstance(basis[i3], Lib._basestr):
-                  p3 = mBasis[i3] if sgn3 else pBasis[i3]
-                else:
-                  p3 = -basis[i3] if sgn3 else basis[i3]
-                out.append((p1, p2, p3))
+                out.append((p1, p2, pp3))
     return Tensor(*out)
 
   def __assocTriads1(self, x1, x2, basis, mBasis):
@@ -2487,6 +2499,12 @@ if np and "numpy" in sys.modules:
 
     def __eq__(self, mat):
       """Return True if 2 matricies are equal within precision."""
+      if isinstance(mat, numpy.ndarray):
+        if (len(self.shape) > 1 and isinstance(self[0][0], Lib._basestr)) or \
+           (len(mat.shape) > 1 and isinstance(mat[0][0], Lib._basestr)) or \
+           isinstance(self[0], Lib._basestr) or \
+           isinstance(mat[0], Lib._basestr):
+          return super(Matrix, self).__eq__(mat)
       return ((self - mat) < Lib._getPrecision()).all()
 
     def get(self, x, y):
