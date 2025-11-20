@@ -33,7 +33,7 @@
 ## in loaded files in the later case.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.7"
+__version__ = "0.8"
 import math
 from calcLib import *
 
@@ -1977,7 +1977,6 @@ class O():
     lastCnt = len(state.store) -1 if state.isMults2 else -1
     for cnt,value in enumerate(state.store):
       val,key = value
-      isCA = False
       if key and key[0] in cls.__CA_CHARS:
         isCA = O.__useCA
 

@@ -356,21 +356,25 @@ class Calculator:
       sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") \
                         +'\n')
   @staticmethod
-  def load(filename=None, noError=False):
-    """Load filename or default file and add to history."""
-    if not filename:
-      filename = Calculator.__default
-    if not os.path.splitext(filename)[1]:
-      filename += os.path.splitext(Calculator.__default)[1]
-    Lib._storeName(filename)
-    code = Lib.readText(Calculator.fixFilename(filename))
-    if not code:
-      if not noError:
-        raise Exception("File %s is empty" %filename)
-    elif Lib._isVerbose() and readline:
-      readline.read_history_file(Calculator.fixFilename(filename))
+  def load(filenames=None, noError=False):
+    """Load filenames or default file and add to history."""
+    if not filenames:
+      filenames = Calculator.__default
+    code = ""
+    for filename in filenames.replace("\\,","#").split(","):
+      filename = filename.replace("#",",")
+      if not os.path.splitext(filename)[1]:
+        filename += os.path.splitext(Calculator.__default)[1]
+      Lib._storeName(filename)
+      code0 = Lib.readText(Calculator.fixFilename(filename))
+      if not code0:
+        if not noError:
+          raise Exception("File %s is empty" %filename)
+      elif Lib._isVerbose() and readline:
+        readline.read_history_file(Calculator.fixFilename(filename))
+      code += code0 +"\n"
     if Lib._isVerbose():
-      Calculator.__lastCmd = "load(%s)" %filename
+      Calculator.__lastCmd = "load(%s)" %filenames
     return code
 
   @staticmethod
@@ -644,9 +648,12 @@ class Calculator:
         if line.lstrip().find(uWord) == 0:
           word = uWord
           break
-    pline = line.replace(word, "").strip()
+    pline = line.replace(word, "", 1).strip()
+    #pline = line.replace(word, "", count=1).strip()
     pos1 = pline.find("(")
-    pos2 = pline.find(")")
+    pos2 = len(pline) -1
+    while pos2 > 0 and pline[pos2] != ")":
+      pos2 -= pos2
     param = pline[pos1 +1:pos2] if pos1 < pos2 and pos2 > 0 else ""
     extra = pline[pos2 +1:].strip()                # Anything after word or )
     if word and extra:
@@ -701,6 +708,8 @@ class Calculator:
           pline = "(path='%s')" %self.fixFilename("*")
       if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
         if word == "load":    # Need extra large files setup
+          if len(param) > 3 and (param[:4] == '",".' or param[:4] == "','."):
+            param = self.__processExec((True, param)) # Use join to load a list
           loadLine = Calculator.load(param, noError=doFirstLoad)
         elif word == "test":
           loadLine = Calculator.test(param, firstTest)
@@ -931,7 +940,7 @@ class Calculator:
             token.value = ""
           code += signVal
           signVal = ""
-        elif token.type == "," and loadCmdExpand == 1:
+        elif token.type == "," and loadCmdExpand == 1 and bracketCnt == 1:
           bufs.append((isAns, code +")", ansAssigns, doUsefulWord))
           code,ansAssigns = "", []
           token.value = "load("    # Fix load dependencies

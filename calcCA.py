@@ -1590,36 +1590,29 @@ class CA():
     """spin([basis])
        Return the Lib.Table triad list and Basis list if basis else
        VersorArgs list from 3-form self finding the largest dimension."""
-    maxBasis = 0
-    sTriads = []
+    setBasis = set([])
     triads = []
     for term in self.__g:
       bases = term.bases()[0]
       if len(bases) != 3 or term.bases()[1]:
         raise Exception("Invalid 3-form for spin: %s" %"".join(term.strs()))
       terms = []
-      rTerms = []
       for idx,pairs in enumerate(((0,1), (1,2), (0,2))):
-        maxBasis = max(maxBasis, int(bases[idx], self.__HEX_BASIS +1))
-        terms.append(int(bases[idx], self.__HEX_BASIS +1))
-        form = 'e%s%s' %(bases[pairs[0]], bases[pairs[1]])
-        rTerms.append(form)
+        base = int(bases[idx], self.__HEX_BASIS +1)
+        setBasis.add(base)
+        terms.append(base)
       if term.value < 0:
         tmp = terms[0]; terms[0] = terms[1]; terms[1] = tmp
-        tmp = rTerms[0]; rTerms[0] = rTerms[1]; rTerms[1] = tmp
       triads.append(terms)
-      sTriads.append(rTerms)
     if basis is not None:
-      Lib._checkList(basis, None, "spin", maxBasis)
+      Lib._checkList(basis, None, "spin", len(setBasis))
     else:
-      sBasis = CA._VersorArgs(maxBasis)
-      basis = list((CA(**{x: 1}) for x in sBasis))
+      setBasis = sorted(list(setBasis))
+      basis = list((CA(**{"e%X" %x: 1}) for x in setBasis))
+      sTriads = triads[:]
       triads = []
       for terms in sTriads:
-        triad = []
-        for term in terms:
-          triad.append(sBasis.index(term) +1)
-        triads.append(triad)
+        triads.append(list(setBasis.index(x) +1 for x in terms))
     return (Matrix(*triads), basis)
 
   ##############################################################################

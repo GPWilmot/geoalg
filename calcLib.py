@@ -27,7 +27,7 @@
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
 ################################################################################
-__version__ = "0.7"
+__version__ = "0.8"
 import math, sys, os
 import time, datetime
 try:
@@ -299,7 +299,8 @@ class Lib():
         out.append(name)
     return out
   @staticmethod
-  def _checkNames(names):
+  def _checkNames(names=None):
+    Lib._checkType(names, Lib._basestr, "load")
     out = Lib.__checkNames(names)
     if out:
       raise Exception("Need to load %s" %",".join(out))
@@ -429,9 +430,11 @@ class Lib():
     return out
 
   @staticmethod
-  def isLoaded(names):
-    """isLoaded(names)
+  def isLoaded(names=None):
+    """isLoaded([names])
        Return true if comma separated file names are loaded."""
+    if names is None:
+      return Lib.__storeName
     Lib._checkType(names, Lib._basestr, "isLoaded")
     return Lib.__checkNames(names) == []
   @staticmethod
@@ -732,10 +735,23 @@ class Lib():
     return filename
 
   @staticmethod
+  def __save(value):
+    """Internal function to iterate and expand strings."""
+    if isinstance(value, (list, tuple, Matrix, set)):
+      out = []
+      for val in value:
+        out.append(Lib.__save(val))
+    elif isinstance(value, Lib._basestr):
+      out = str(value)
+    else:
+      out = value
+    return out
+
+  @staticmethod
   def _save(filename, name, value, path="", ext="", mode="w"):
     """save(filename, name, value,[path,ext,mode="w"])
        Print value into a file which needs an extension.
-       Used by Calculator."""
+       Used by Calculator. No nested dictionaries."""
     Lib._checkType(filename, Lib._basestr, "save")
     Lib._checkType(name, Lib._basestr, "save")
     Lib._checkType(path, Lib._basestr, "save")
@@ -746,21 +762,18 @@ class Lib():
         for key,var in value.items():
           if isinstance(key, Lib._basestr):
             key = '"%s"' %key
-          if isinstance(var, Lib._basestr):
-            var = '"%s"' %var
-          fp.write(" %s: %s,\n" %(key, var))
+          fp.write(" %s: %s,\n" %(key, Lib.__save(var)))
         fp.write("}\n")
       elif isinstance(value, (list, tuple, Matrix, set)):
-        fp.write("%s = ( \\\n" %name)
-        for var in value:
-          if isinstance(var, Lib._basestr):
-            var = '"%s"' %var
-          fp.write(" %s,\n" %str(var))
+        typ = "Matrix" if isinstance(value, (Tensor, Matrix)) else ""
+        fp.write("%s = %s(\\\n" %(name, typ))
+        for val in value:
+          fp.write("  %s,\n" %Lib.__save(val))
         fp.write(")\n")
+      elif isinstance(value, (Tensor, Matrix)):
+        fp.write("%s = Matrix(%s)\n" %(name, Lib.__save(value)))
       else:
-        if isinstance(value, Lib._basestr):
-          value = '"%s"' %value
-        fp.write("%s = %s\n" %(name, value))
+        fp.write("%s = %s\n" %(name, Lib.__save(value)))
   save=_save
 
   @staticmethod
@@ -1479,7 +1492,8 @@ class Tensor(list):
   def __reduce(self, fn, init):
     """Internal reduce(fn) method."""
     out = init
-    if self and isinstance(self[0], (list, tuple, Matrix)):
+    #if self and isinstance(self[0], (list, tuple, Matrix)):
+    if self.shape[1] > 1:
       for val1 in self:
         for val2 in val1:
           out = fn(out, val2)
@@ -1497,6 +1511,12 @@ class Tensor(list):
     """any()
        Return True if any matrix values are True else False."""
     return self.__reduce(lambda x,y: x or y, False)
+
+  def product(self):
+    """prod[uct]()
+       Return the product of the elements."""
+    return self.__reduce(lambda x,y: x *y, 1)
+  prod = product
 
   def function(self, fn):
     """function(fn)
@@ -1685,47 +1705,45 @@ class Tensor(list):
     return out
   diff=differences
 
-  def dump(self, xLabels=[], yLabels=[], name=None):  # Use resolution TBD XXX
+  def dump(self, xLabels=[], yLabels=[], name=None):
     """dump([xLabels,yLabels,name])
        Pretty print of Matrix with optional labels."""
     s = t = 0
     xName = "" if name is None else name
     if xLabels:
-      Lib._checkList(xLabels, None, "dump")
-      if not self or len(xLabels) != self.shape[1]:
-        raise Exception("Invalid xLabels length for Tensor dump")
+      Lib._checkList(xLabels, None, "dump", self.shape[1])
       if not yLabels and len(xLabels) == self.shape[0]:
         yLabels = xLabels
       s = max(map(lambda x :len(str(x)), xLabels))
     if yLabels:
-      Lib._checkList(yLabels, None, "dump")
-      if len(yLabels) != self.shape[0]:
-        raise Exception("Invalid yLabels length for Tensor dump")
+      Lib._checkList(yLabels, None, "dump", self.shape[0])
       t = max(map(lambda x :len(str(x)), yLabels))
-    if isinstance(self, list) and len(self) > 0 and isinstance(self[0], list):
-      size = max(map(max, (map(lambda x: len(str(x)), row) for row in self)))
+    if self.shape[1] > 1:
+      trans = self.transpose()
+      sizes = list(max(map(lambda x: len(str(x)), row)) for row in trans)
     else:
-      size = max(map(lambda x :len(str(x)), self))
-    formX = " %%%ds" %(max(s,size))
+      sizes = [max(map(lambda x :len(str(x)), self))]
+    formXs = list(" %%%ds" %(max(s, x)) for x in sizes)
     nameX = "%%-%ds" %(max(t,len(str(xName))) +3)
     formY = " %%%ds" %max(t,len(str(xName)))
     if xLabels or name is not None:
-      sys.stdout.write(nameX %str(xName) +"%s\n" %"".join(formX %x for x in xLabels))
+      sys.stdout.write(nameX %str(xName) +"%s\n" %"".join(formXs[x[0]] \
+                    %x[1] for x in enumerate(xLabels)))
       if xLabels:
-        sys.stdout.write(formY %"" +'-' *(len(xLabels) *(max(s,size)+1)+2)+'\n')
+        sys.stdout.write(formY %"" +'-' *(sum(max(s,x)+1 for x in sizes) +2)+'\n')
     for ii,vals in enumerate(self):
       if yLabels:
         sys.stdout.write(formY %yLabels[ii] +"| ")
       if self.shape[1] == 1:
-        sys.stdout.write(formX %vals)
+        sys.stdout.write(formXs[0] %vals)
       elif self.shape[0] == 1:
-        for val in self:
-          sys.stdout.write(formX %val)
+        for jj,val in enumerate(self):
+          sys.stdout.write(formXs[jj] %val)
         sys.stdout.write("\n")
         break
       else:
-        for val in vals:
-          sys.stdout.write(formX %val)
+        for jj,val in enumerate(vals):
+          sys.stdout.write(formXs[jj] %val)
       sys.stdout.write("\n")
 
   def __checkSquare(self, basis, name, basisName):
@@ -1736,11 +1754,11 @@ class Tensor(list):
                        %(basisName, name))
     if self.shape[0] != self.shape[1]:
       raise Exception("Tensor is not square for %s" %name)
-    if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
-      raise Exception("Tensor is not the same type as basis for %s" %name)
+    #if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
+    #  raise Exception("Tensor is not the same type as basis for %s" %name)
 
   def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
-             initPerm=[], permCycle=False, antiiso=False):
+             initPerm=[], permCycle=False, noAntiIso=False):
     """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
@@ -1798,9 +1816,9 @@ class Tensor(list):
       if len(cf) < len(self) or len(cycleIso) < len(self):
         raise Exception("Invalid basis for table.cycles()")
     cnt = 0
-    noAntiIso = dim if antiiso else 0
+    antiIso = 0 if noAntiIso else dim
     for p in perms:                # For all permutations
-      for n in range(noAntiIso +1):      # For all negative sign combinations
+      for n in range(antiIso +1):      # For all negative sign combinations
         for sgns in Lib.comb(dim, n, True):
           p0 = list(x +len(initPerm) for x in p)
           for sgn in sgns:
@@ -1809,7 +1827,8 @@ class Tensor(list):
 
           # iso = self.isomorph(basis, p0)   # Signed swap rows, columns & cells
           if cycles:
-            iso = cycleIso.morphCycles(p0)
+            iso = cycleIso.morphCycles(p0, basis if isinstance(cycleIso[0][0],
+                           Lib._basestr) else None)
           else:
             pBasis = list((basis[x-1] if x>0 else mBasis[-x-1] for x in p0))
             morphed = self.__morph(basis, pBasis)
@@ -2179,12 +2198,11 @@ class Tensor(list):
     Lib._checkList(perm, None, "isomorph", len(basis))
     if len(basis) == 0 or len(basis) != len(self):
       raise Exception("Invalid length for isomorph")
-    isStr = isinstance(basis[0], Lib._basestr)
-    if isStr:
-      mBasis = list((x[1:] if x[:1] == "-" else ("-" +x) for x in basis))
+    if isinstance(basis[0], Lib._basestr):
+      pBasis,mBasis = Lib._basisStrs(basis)
+      pBasis = list((pBasis[x-1] if x>0 else mBasis[-x-1] for x in perm))
     else:
-      mBasis = list((-x for x in basis))
-    pBasis = list((basis[x-1] if x>0 else mBasis[-x-1] for x in perm))
+      pBasis = list((basis[x-1] if x>0 else -basis[-x-1] for x in perm))
     out = self.permute(perm, True)
     return Tensor(*out.morph(basis, pBasis))
 
@@ -2272,16 +2290,22 @@ class Tensor(list):
             nxt = 0
     return out
 
-  def morphCycles(self, perm, tri=False):
-    """morphCycle(perm, [tri])
+  def morphCycles(self, perm, basis=None, tri=False):
+    """morphCycles(perm, [basis,tri])
        Return cycle sign permuted by perm as a list from (1,2,3,...)."""
     s0 = []
     iso = []
     for row in self:
       cycLen = 5 if len(row) > 3 else 3
       isoRow = row[:]
+      if basis:
+        pBasis,mBasis = Lib._basisStrs(basis)
+        for idx in range(cycLen):
+          tmp = str(isoRow[idx])
+          isoRow[idx] = (-mBasis.index(tmp) -1) if tmp[:1]=='-' \
+                        else (pBasis.index(tmp) +1)
       for idx in range(cycLen):
-        tmp = perm[abs(row[idx]) -1]
+        tmp = perm[abs(isoRow[idx]) -1]
         isoRow[idx] = tmp *(-1 if row[idx] < 0 else 1)
       while True:
         for idx,neg in {0: (2,3), 1: (2,4)}.items():
@@ -2303,6 +2327,11 @@ class Tensor(list):
           break
       if tri:
         isoRow = isoRow[:3]
+      if basis:
+        if isinstance(basis[0], Lib._basestr):
+          isoRow = list(pBasis[x-1] if x>0 else mBasis[-x-1] for x in isoRow)
+        else:
+          isoRow = list(-basis[x-1] if x>0 else basis[-x-1] for x in isoRow)
       iso.append(isoRow)
     return Tensor(*sorted(iso))
 
@@ -2484,6 +2513,7 @@ class Tensor(list):
 ###############################################################################
 if np and "numpy" in sys.modules:
   import numpy   # Rename
+  numpy.set_printoptions(edgeitems=30, linewidth=100000)
   class Matrix(numpy.ndarray):
     """Class Matrix interfaces & extends numpy instead of using Tensor class."""
     __transpose = False
@@ -2618,6 +2648,12 @@ if np and "numpy" in sys.modules:
          Return True if any matrix values are True else False."""
       return self.__reduce(lambda x,y: x or y, False)
 
+    def product(self):
+      """prod[uct]()
+         Return the product of the elements."""
+      return Tensor(list(self)).product()
+    prod = product
+
     def function(self, fn):
       """function(fn)
          Return matrix with fn() applied to each element of self."""
@@ -2679,7 +2715,7 @@ if np and "numpy" in sys.modules:
       return Matrix(*Tensor(list(self)).dump(xLabels, yLabels, name))
 
     def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
-               initPerm=[], permCycle=False, antiiso=False):
+               initPerm=[], permCycle=False, noAntiIso=False):
       """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
@@ -2693,7 +2729,7 @@ if np and "numpy" in sys.modules:
        to fix the first part of all permutations such as octonians when
        looking for sedenions. permCycle outputs cycles instead of maps."""
       return Matrix(Tensor(list(self)).search(basis, cf, cfBasis, num, diffs,
-                   cycles, initPerm, permCycle, antiiso))
+                   cycles, initPerm, permCycle, noAntiIso))
 
     def cycles(self, basis, degree=0, indices=False):
       """cycles(basis, [degree,indices])

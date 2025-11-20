@@ -9,42 +9,45 @@ try:
 except:
   shared_memory = None
 
-_spin15 = """Extend G2 construction to Spin(15). Module contains variables:
+_spin15 = """Extend Spin(7) construction to all Cl(15) sedenion representations
+   in Spin(15). There are 64.8E6 14-simplex primaries stored in Triads15 and
+   files. Triads15gen = (CA.Eval(x) for x in Lib.triads(15)) # is too big and
+   slow so the multitask process to build all files is defined below. The files
+   can be loaded with triads15load(path="data") after the files are loaded.
+ Module contains variables:
    f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nacs15map_0,
-   Nacs15names, Nacs15, Nacs15mirrors, PS15, F15, FF15, P15, PP15, S15, SS15,
-   na15, F(*3,4,5)1520, SE15, SO15, phi15
+   Nacs15names, Nacs15, Nacs15mirrors, P15, PP15, F15, FF15, FFF15, FFFF15,
+   SO15, SB15, SOBmap
  and functions:
-   tri2str, str2tri, triads15load, loadCa, saveCa, taskTriads15build,
-   triads15build, triads15parts, nacs15subalg, nacs15map, taskNacs15build,
-   nacs15build, nacs15parts, nacs15mirrors, triadsShalf, triads15all,
-   triads15terms, triads15remain, triads15class."""
+   tri2str, str2tri, triads15load, loadCa, saveCa,, taskTriads15build,
+   triads15build, triads15parts, nacs15subalg, nacs15genSA, nacs15map,
+   taskNacs15build, nacs15build, nacs15parts, nacs15mirrors, triadsShalf,
+   triads15all, triads15terms, triads15remain, triads15class.
+ Extend Triads15 by running triads15parts(0). This was initially created with
+   Triads15 = [Triads15_0] +list(triads15build(Triads15_0)) # and stored here.
+   Each input to triads15build() is rotated by all 105 Spin(7) 90deg rotations
+   and unique ones are stored in out%s.ca files. At the end these are accum.ed,
+   sorted, packed via tri2str() and stored as spin15-triads{1,2,3?,4?,5?,6}.ca
+   files of size 2M primaries. Triads15parts contains the size of each iteration
+   of triads15build() which is run by triads15parts(). Then use nacs15parts() to
+   find sedonions and the 100 subsedenion-like algebras. Nacs15 stores these
+   and Nacs15names continas the Triads15 and allSigns()[] indices for these.
+   On the Adelaide Uni. Pheonix HPC iceman system with 72 nodes triads15parts()
+   takes 2.8 days and nacs15parts() takes 1.6 days. The 2M file size is actually
+   a nice chunk size to generate new primaries and read especially since Windows
+   can't load more in a timely fashion. Also packing is used because 100k triads
+   is >20MB and python exec blows up RAM more than size of structure (ie >13E6)!
+   Hence the use of tri2str to storei primaries."""
 
-# From CA(15) find 64.8E6 14-simplex primaries to iuncover sub-sedenion algs.
-Triads15gen = (CA.Eval(x) for x in Lib.triads(15)) # Too big and slow hence:
-# Create Triads15[0] and rotate using triads15build() to find the first 105
-# rotations 106 unique primaries stored in Triads15 (= tris0).
-# Decode using str2tri() and encode with tri2str() to save RAM.
-# Then use triads15parts(path="data") to build and save the rest.
-# Load all these primaries with triads15load(path="data") from files
-# spin15-triads{1,2,3?,4?,5?,6}.ca where ?=a,b,c... as 2E6 primaries each
-# due to Windows can't load more in a timely fashion. This is actually a nice
-# chunk size to generate new primaries and then use nacs15parts(path="data")
-# to find sedonions and the 100 sub-sedenion algebras.
-# Trying to read triads & expand 100k is >20MB and python exec blows up RAM
-# more than size of structure! Hence use tri2str to store. Too big is > 13E6.
-# so chunk files.
-#
-# On the Adelaide Uni Pheonix HPC iceman system with 72 nodes triads15parts()
-# takes 2.8 days and nacs15parts() takes 1.6 days.
-#
-
+_f15Basis = "String basis names for comparison purposes."
 f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9",
                    "fA", "fB", "fC", "fD", "fE", "fF"))
- 
+_Triads15_0 = "First sedenion prime. Negate e48C to get sedenion calibration."
 Triads15_0 = e123+e145+e167+e189+e1AB+e1CD+e1EF+e246+e257+e28A+e29B+e2CE+e2DF \
             +e347+e356+e38B+e39A+e3CF+e3DE+e48C+e49D+e4AE+e4BF+e58D+e59C+e5AF \
             +e5BE+e68E+e69F+e6AC+e6BD+e78F+e79E+e7AD+e7BC
 
+_Triads15 = "First 106 sedenion primaries packed via tri2str. Extend with triads15load()."
 if "Triads15" in globals():
   Backup15 = Triads15
 Triads15 = [ \
@@ -155,9 +158,10 @@ Triads15 = [ \
  "12F13E1451671891AB1CD23D24A25B2682792CE34735638B39A3CF46E48C49D4BF57E58D59C5AF69F6AC6BD78F7AD7BC8AE9BEDEF",
  "12F13E14915816B17A1CD23D24625728A29B2CE34735638B39A3CF45D48C4AE4BF59C5AF5BE67D68E69F6AC78F79E7BC89DABDDEF",
 ]
+_tris0 = "First 106 of initial Triads15 fixed."
+_Triads15parts = """List of [offset, size of this part in Triads15]. Used by
+   triads15parts(). Part0 is fixed and Part1 is two iterations (4795+121395)."""
 tris0 = Triads15[:]
-# Triads15parts[part] is the [offset, size of this part in Triads15].
-# Part0=triads15build(Triads15[:1]) and Part1 is two iterations (4795+121395).
 Triads15parts = [[0,106], [106, 126190], [126296, 1760332], [1886628, 12925668],
                 [14812296, 29403912], [44216208, 19385232], [63601440, 1263360],
                 [64864800, 0]]
@@ -178,7 +182,7 @@ def str2tri(str):
 def triads15load(codes=[0], path=None, lastVars=False):
   """triads15load([codes=[0],path,lastVars=False])
      Loads spin15-triads<codes>.ca to extend Triads15 with level=code([0]=all)
-     from triads15build() with cardinality given by Triads15parts. All needs
+     from triads15parts() with cardinality given by Triads15parts. All needs
      32GB. Lastvars makes the last levels files global for further building."""
   global Triads15
   global Triads15parts
@@ -261,7 +265,7 @@ def saveCa(basename, varname, var, path="", dump=False):
 # Windows needs to copy this function into calcCA.py due to a scoping bug.
 def taskTriads15build(triads, allTriads, values=list(range(105)), path=None,
                       name="tmp", offs=0, siz=0, status=None, pos=0):
-  """triads15build(triads,allTriads,[values,path,name,offs,siz,status,pos])
+  """taskTriads15build(triads,allTriads,[values,path,name,offs,siz,status,pos])
      Output allTriads updates for values[=0..105] rotation indices of
      triads[offs:siz] via a file with filename <name[=<offs>_<siz>.ca."""
   if siz == 0:
@@ -381,9 +385,9 @@ def triads15parts(code, cpus=2, redo=[], path=""):
   if code not in range(len(Triads15parts) +1):
     raise Exception("Invalid value for code in triads15parts")
   parts = [code] if code else range(1, len(Triads15parts) +1)
-  triname = "spin15-triads%d%s"
-  outname = "out%d%s"
-  tmpname = "tmp%d%s"       # Used for subtask files
+  triname = "spin15-triads%d%s"  # Sorted file 2M chunks
+  outname = "out%d%s"            # Temporary until sorted
+  tmpname = "tmp%d%s"            # Used for subtask files
   global Triads15
   if len(Triads15) < Triads15parts[parts[-1] -1][1] and redo != [-1]:
     raise Exception("Need to load triads for level %d" %(parts[-1] -1))
@@ -452,18 +456,15 @@ def triads15parts(code, cpus=2, redo=[], path=""):
   Triads15 = list(Triads15)
 
 
-# Nacs15 is the unique sub-sedonion algebras. Nacs15Names provides the first
-# occurance name, code, index and signed combination. Check with nacs15map().
+_Nacs15 = "The unique primaries for 101 sedonion-like algs. See Nacs15Names."
+_Nacs15Names = """Dictionary in Nac15 order of non-assoc. cnt to (algebra name,
+   first example part, part's idx, allSigns position) (282:I6=Sedenions). 
+   Check with nacs15map()."""
+_Nacs15map_0 = "list(nacs15subalg(x) for x in Triads15_0.allSigns(36))#."
+Nacs15map_0 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224,
+   200, 208, 208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188,
+   220, 196, 220, 196, 204, 204, 204, 204)
 
-Nacs15map_0 = (
-  (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224, 200, 208,
-   208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188, 220, 196,
-   220, 196, 204, 204, 204, 204),)
-
-# Dictionary of non-assoc. cnt to (sub-algebra name, first example part, idx
-# and allSign position (282:I6=Sedenions). There are 101 S +sub-sedenions.
-# all(list(Nacs15[z[0]]==Triads15parts[z[1][1][1]][z[1][1][2]] \
-#     for z in (x for x in enumerate(Nacs15names.items())))) == True
 Nacs15names = {
  128: ('A1',3,6793710,4), 130: ('A2',2,1106227,4), 132: ('A3',3,7643461,4),
  134: ('A4',3,6980279,22),136: ('A5',2,476144,17), 138: ('A6',2,973626,3),
@@ -503,14 +504,21 @@ Nacs15names = {
 def nacs15subalg(tri, pos=None):
   """nacs15subalg(tri, [pos])
      Return non-assoc. cnt for tri or str2tri(tri).allSigns()[pos] sub-alg."""
+  if isinstance(tri, Lib._basestr):
+    tri = CA.str2tri(tri)
   if pos is not None:
-    if pos not in range(105):
-      raise Exception("Invalid nacs15subalg signed position")
-    tri = list(CA.str2tri(tri).allSigns(36))[pos]
+    Lib._checkType(pos, int, "nacs15subalg", (0,0))
+    tri = list(tri.allSigns(pos))[pos]
   return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f15Basis)) \
-                     .assocTriads(f15Basis,True),f15Basis,1)))
+                     .assocTriads(f15Basis,True),f15Basis)))
 
-# First nacs15subalg() triads in Nacs15names order extracted from Triads15parts
+def nacs15genSA(tri, pos=True):
+  """nacs15genSA(tri, [pos=True ie half of 3E10])
+     Yield each allSigns subalgebra non-assoc. count: for x in gen: print(x)."""
+  for stri in tri.allSigns(pos):
+    yield len(list(Lib.triadDump(Tensor.Triads(*stri.spin(f15Basis)) \
+                     .assocTriads(f15Basis,True),f15Basis)))
+
 Nacs15 = [ \
  "12913B14A15F16E17D18C23425C26728F2AB2DE35E36F37839A3CD45D46847F49B4CE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
  "12A13B14915F16E17D18C23425D26827F29B2CE35E36F37839A3CD45C46748F4AB4DE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
@@ -842,18 +850,6 @@ def nacs15mirrors(idx):
   #return []
   return cmp
 
-# Enabling algebra
-PS15 = CA.Basis(15,0,15)[0]
-F15 = list(CA.Eval(term) for term in str2tri(tris0[0]).copyTerms())
-FF15 = -PS15 *Tensor(F15)
-P15 = e12478BDE +e12479ACF +e12568BCF +e12569ADE +e13468ADF +e13469BCE \
-     +e13578ACE +e13579BDF +e234589EF +e2345ABCD +e236789CD +e2367ABEF \
-     +e456789AB +e4567CDEF +e89ABCDEF 
-PP15 = -e123456789ABCDEF *P15
-# ((7-P15)/8)**2 == 1 & ((7e123456789ABCDEF +PP15)/8)**2 == -1
-
-# Octonians have f*f+7==+-6e1234567*f. Spin7R is a Spin(7) subset.
-# with f*f+7 == +-2*f' +<one term>
 def triadsShalf(idx):
   """triadsShalf(idx)
      Yield Sedenion Triads15[idx].allSigns(<64), 64..127 are minus these."""
@@ -905,23 +901,62 @@ def triads15class(phi, id=False):
     return (clsName, -sgn, idx, int(idxSign))
   return "%s%s:%0.5f" %(clsName, "-" if parity %2 else "+", idx +idxSign/100000.0)
 
-S15 = (-e456789ABCDEF, -e236789ABCDEF, -e234589ABCDEF, -e234567ABCDEF, -e23456789CDEF, -e23456789ABEF, -e23456789ABCD, -e135789ABCDEF, -e134689ABCDEF, -e1345679BCDEF, -e1345678ACDEF, -e13456789ABDF, -e13456789ABCE, -e125689ABCDEF, -e124789ABCDEF, -e1245679ACDEF, -e1245678BCDEF, -e12456789ABDE, -e12456789ABCF, -e1235679ABDEF, -e1235678ABCEF, -e12356789BCDF, -e12356789ACDE, -e1234679ABCEF, -e1234678ABDEF, -e12346789BCDE, -e12346789ACDF, -e1234579ABCDF, -e1234578ABCDE, -e12345789BDEF, -e12345789ACEF, -e1234569ABCDE, -e1234568ABCDF, -e12345689BCEF, -e12345689ADEF)
-# S15**2 -35
-SS15 = -2e1247 -2e1256 -2e128B -2e129A -2e12CF -2e12DE -2e1346 +6e1357 -2e138A +6e139B -2e13CE +6e13DF -2e148D -2e149C -2e14AF -2e14BE -2e158C +6e159D -2e15AE +6e15BF -2e168F -2e169E -2e16AD -2e16BC -2e178E +6e179F -2e17AC +6e17BD -2e2345 -2e2367 -2e2389 -2e23AB -2e23CD -2e23EF -2e248E -2e249F -2e24AC -2e24BD -2e258F -2e259E -2e25AD -2e25BC -2e268C -2e269D +6e26AE +6e26BF -2e278D -2e279C +6e27AF +6e27BE -2e348F -2e349E -2e34AD -2e34BC -2e358E -2e359F -2e35AC -2e35BD -2e368D -2e369C +6e36AF +6e36BE -2e378C -2e379D +6e37AE +6e37BF -2e4567 -2e4589 -2e45AB -2e45CD -2e45EF -2e468A -2e469B -2e46CE -2e46DF -2e478B -2e479A -2e47CF -2e47DE -2e568B -2e569A -2e56CF -2e56DE -2e578A -2e579B -2e57CE -2e57DF -2e6789 -2e67AB -2e67CD -2e67EF -2e89AB -2e89CD -2e89EF -2e8ACE -2e8ADF -2e8BCF -2e8BDE -2e9ACF -2e9ADE -2e9BCE -2e9BDF -2eABCD -2eABEF -2eCDEF
+_P15 = "Enabling algebra, ((7-P15)/8)**2 == 1."
+_PP15 = "-e123456789ABCDEF *P15, ((7e123456789ABCDEF +PP15)/8)**2 == -1."
+P15 = e12478BDE +e12479ACF +e12568BCF +e12569ADE +e13468ADF +e13469BCE \
+     +e13578ACE +e13579BDF +e234589EF +e2345ABCD +e236789CD +e2367ABEF \
+     +e456789AB +e4567CDEF +e89ABCDEF 
+PP15 = -e123456789ABCDEF *P15
 
-#X=sum(F15).allSigns(True) # with [20] being Sedenions
-#for x in X: print(len(Tensor.Triads(*x.spin(f15Basis)).assocCycles(f15Basis,nonAssoc=True)))
-na15 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224, 200, 208, 208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188, 220, 196, 220, 196, 204, 204, 204, 204)
-ia15 = (245, 245, 245, 245, 245, 245, 245, 245, 231, 255, 231, 255, 231, 255, 247, 247, 247, 247, 247, 247, 203, 227, 251, 275, 219, 219, 267, 267, 235, 259, 235, 259, 251, 251, 251, 251)
-FF15 = (e12345689ADEF, e12345689BCEF, e1234568ABCDF, e1234569ABCDE, e12345789ACEF, e12345789BDEF, e1234578ABCDE, e1234579ABCDF, e12346789ACDF, e12346789BCDE, e1234678ABDEF, e1234679ABCEF, e12356789ACDE, e12356789BCDF, e1235678ABCEF, e1235679ABDEF, e12456789ABCF, e12456789ABDE, e1245678BCDEF, e1245679ACDEF, e124789ABCDEF, e125689ABCDEF, e13456789ABCE, e13456789ABDF, e1345678ACDEF, e1345679BCDEF, e134689ABCDEF, e135789ABCDEF, e23456789ABCD, e23456789ABEF, e23456789CDEF, e234567ABCDEF, e234589ABCDEF, e236789ABCDEF, e456789ABCDEF)
-#FF15 = -e123456789ABCDEF *sum(FF15) # x=list(sum(F15).allSigns(21))[20] # x:35 -> xx:105 -> 33 terms:
-#FFF1520 = sum(map(lambda x: CA(**dict([x])) if abs(x[1]) == 6 else 0, (x*x).copyTerms())).copyTerms()
-FFF1520 = (-e1357, -e139B, -e13DF, e148D, e149C, e158C, -e159D, -e15BF, -e179F, -e17BD, e248E, e24AC, e268C, -e26AE, -e26BF, -e27AF, -e27BE, e348F, e34BC, -e36AF, -e36BE, e378C, -e37AE, -e37BF, e4589, e45CD, e468A, e46CE, e478B, e47CF, e89CD, e8ACE, e8BCF)
-FFFF1520 = (-e1357, -e139B, -e13DF, -e15BF, -e179F, -e17BD, -e37BF, +e579B)
-FFFFF1520 = (e1247, e1256, e128B, e129A, e12CF, e12DE, e1346, e138A, e13CE, e14AF, e14BE, e15AE, e168F, e169E, e16AD, e16BC, e178E, e17AC, e2345, e2367, e2389, e23AB, e23CD, e23EF, e249F, e24BD, e258F, e259E, e25AD, e25BC, e269D, e278D, e279C, e349E, e34AD, e358E, e359F, e35AC, e35BD, e368D, e369C, e379D, e4567, e45AB, e45EF, e469B, e46DF, e479A, e47DE, e568B, e569A, e56CF, e56DE, e578A, e579B, e57CE, e57DF, e6789, e67AB, e67CD, e67EF, e89AB, e89EF, e8ADF, e8BDE, e9ACF, e9ADE, e9BCE, e9BDF, eABCD, eABEF, eCDEF)
+_FF15 = "list(-CA.Eval(_)*e123456789ABCDEF for _ in Triads15_0.copyTerms())#."
+FF15 = (e12345689ADEF, e12345689BCEF, e1234568ABCDF, e1234569ABCDE, e12345789ACEF, \
+   e12345789BDEF, e1234578ABCDE, e1234579ABCDF, e12346789ACDF, e12346789BCDE, \
+   e1234678ABDEF, e1234679ABCEF, e12356789ACDE, e12356789BCDF, e1235678ABCEF, \
+   e1235679ABDEF, e12456789ABCF, e12456789ABDE, e1245678BCDEF, e1245679ACDEF, \
+   e124789ABCDEF, e125689ABCDEF, e13456789ABCE, e13456789ABDF, e1345678ACDEF, \
+   e1345679BCDEF, e134689ABCDEF, e135789ABCDEF, e23456789ABCD, e23456789ABEF, \
+   e23456789CDEF, e234567ABCDEF, e234589ABCDEF, e236789ABCDEF, e456789ABCDEF)
+_FFF15 = "sum(FF15)**2 -35"
+FFF15 = -2e1247 -2e1256 -2e128B -2e128B -2e129A -2e12CF -2e12DE -2e1346 +6e1357 \
+  -2e138A +6e139B -2e13CE +6e13DF -2e148D -2e149C -2e14AF -2e14BE -2e158C +6e159D \
+  -2e15AE +6e15BF -2e168F -2e169E -2e16AD -2e16BC -2e178E +6e179F -2e17AC +6e17BD \
+  -2e2345 -2e2367 -2e2389 -2e23AB -2e23CD -2e23EF -2e248E -2e249F -2e24AC -2e24BD \
+  -2e258F -2e259E -2e25AD -2e25BC -2e268C -2e269D +6e26AE +6e26BF -2e278D -2e279C \
+  +6e27AF +6e27BE -2e348F -2e349E -2e34AD -2e34BC -2e358E -2e359F -2e35AC -2e35BD \
+  -2e368D -2e369C +6e36AF +6e36BE -2e378C -2e379D +6e37AE +6e37BF -2e4567 -2e4589 \
+  -2e45AB -2e45CD -2e45EF -2e468A -2e469B -2e46CE -2e46DF -2e478B -2e479A -2e47CF \
+  -2e47DE -2e568B -2e569A -2e56CF -2e56DE -2e578A -2e579B -2e57CE -2e57DF -2e6789 \
+  -2e67AB -2e67CD -2e67EF -2e89AB -2e89CD -2e89EF -2e8ACE -2e8ADF -2e8BCF -2e8BDE \
+  -2e9ACF -2e9ADE -2e9BCE -2e9BDF -2eABCD -2eABEF -2eCDEF
+_FFFF15 = "list(CA.Eval(_)/6 for _ in SS15.copyTerms() if abs(_[1]) == 6)#."
+_FFFF = (e1357, e139B, e13DF, e159D, e15BF, e179F, e17BD, e26AE, e26BF, e27AF,
+         e27BE, e36AF, e36BE, e37AE, e37BF)
 
-# Tensor.Table(O.Basis(4)).morph(O.Basis(4),f15Basis).dump(f15Basis)
-SE15 = Tensor( \
+_SO15 = """Sedenions from Wikipedia (= Cawagas)
+   Tensor.Table(O.Basis(4)).morph(O.Basis(4),f15Basis).dump(f15Basis).#"""
+SO15 = Tensor( \
+ ("-1", "f3", "-f2","f5", "-f4","-f7","f6", "f9", "-f8","-fB","fA", "-fD","fC", "fF", "-fE"),
+ ("-f3","-1", "f1", "f6", "f7", "-f4","-f5","fA", "fB", "-f8","-f9","-fE","-fF","fC", "fD"),
+ ("f2", "-f1","-1", "f7", "-f6","f5", "-f4","fB", "-fA","f9", "-f8","-fF","fE", "-fD","fC"),
+ ("-f5","-f6","-f7","-1", "f1", "f2", "f3", "fC", "fD", "fE", "fF", "-f8","-f9","-fA","-fB"),
+ ("f4", "-f7","f6", "-f1","-1", "-f3","f2", "fD", "-fC","fF", "-fE","f9", "-f8","fB", "-fA"),
+ ("f7", "f4", "-f5","-f2","f3", "-1", "-f1","fE", "-fF","-fC","fD", "fA", "-fB","-f8","f9"),
+ ("-f6","f5", "f4", "-f3","-f2","f1", "-1", "fF", "fE", "-fD","-fC","fB", "fA", "-f9","-f8"),
+ ("-f9","-fA","-fB","-fC","-fD","-fE","-fF","-1", "f1", "f2", "f3", "f4", "f5", "f6", "f7"),
+ ("f8", "-fB","fA","-fD", "fC", "fF", "-fE","-f1","-1", "-f3","f2", "-f5","f4", "f7", "-f6"),
+ ("fB", "f8", "-f9","-fE","-fF","fC", "fD", "-f2","f3", "-1", "-f1","-f6","-f7","f4", "f5"),
+ ("-fA","f9", "f8", "-fF","fE", "-fD","fC", "-f3","-f2","f1", "-1", "-f7","f6", "-f5","f4"),
+ ("fD", "fE", "fF", "f8", "-f9","-fA","-fB","-f4","f5", "f6", "f7", "-1", "-f1","-f2","-f3"),
+ ("-fC","fF", "-fE","f9", "f8", "fB", "-fA","-f5","-f4","f7", "-f6","f1", "-1", "f3", "-f2"),
+ ("-fF","-fC","fD", "fA", "-fB","f8", "f9", "-f6","-f7","-f4","f5", "f2", "-f3","-1", "f1"),
+ ("fE", "-fD","-fC","fB", "fA", "-f9","f8", "-f7","f6", "-f5","-f4","f3", "f2", "-f1","-1"))
+
+_SOBmap = "Basis order of Baez sedenions."
+SOBmap = (1,2,-3,6,7,4,5,-8,9,10,-11,14,15,12,13)
+_SB15 = """Sedenions with Baez rule. SO15.isomorph(f15Basis, SOBmap)==SB15
+   SO15.search(f15Basis,SB15,initPerm=SOBmap[:7],num=-1) # From Spin(7),
+   ie (o1,o2,-o12,o23,o123,o3,o13,-o4,o14,o24,-o124,o234,o1234,o34,o134)."""
+SB15 = Tensor( \
  ("-1","-f3", "f2","-f5", "f4", "f7","-f6","-f9", "f8", "fB","-fA", "fD","-fC","-fF", "fE"),
  ( "f3", "-1","-f1","-f6","-f7", "f4", "f5","-fA","-fB", "f8", "f9", "fE", "fF","-fC","-fD"),
  ("-f2", "f1", "-1","-f7", "f6","-f5", "f4","-fB", "fA","-f9", "f8", "fF","-fE", "fD","-fC"),
@@ -937,29 +972,4 @@ SE15 = Tensor( \
  ( "fC","-fF", "fE","-f9","-f8","-fB", "fA", "f5", "f4","-f7", "f6","-f1", "-1","-f3", "f2"),
  ( "fF", "fC","-fD","-fA", "fB","-f8","-f9", "f6", "f7", "f4","-f5","-f2", "f3", "-1","-f1"),
  ("-fE", "fD", "fC","-fB","-fA", "f9","-f8", "f7","-f6", "f5", "f4","-f3","-f2", "f1", "-1"))
-
-# Sedenions from Wikipedia (= Cawagas)
-# SE15.search(f15Basis,SO15,initPerm=[1, 2, -3, 6, 7, 4, 5]) -> FOUND at 4107 [..., -8, 9, 10, -11, 14, 15, 12, 13]
-# Tensor.Table(O.Basis(4)).isomorph(O.Basis(4),[1, 2, -3, 6, 7, 4, 5, -8, 9, 10, -11, 14, 15, 12, 13]).morph(O.Basis(4),f15Basis)
-# (f1, f2,  f3,  f4,  f5,   f6, f7,   f8, f9,  fA,   fB,   fC,   fD,    fE,  fF)
-# (o1, o2, -o12, o23, o123, o3, o13, -o4, o14, o24, -o124, o234, o1234, o34, o134)
-SO15 = Tensor( \
- ("-1", "f3",  "-f2","f5",  "-f4", "-f7", "f6",  "f9",  "-f8", "-fB", "fA",  "-fD", "fC",  "fF",  "-fE"),
- ("-f3","-1",  "f1", "f6",  "f7",  "-f4", "-f5", "fA",  "fB",  "-f8", "-f9", "-fE", "-fF", "fC",  "fD"),
- ("f2", "-f1", "-1", "f7",  "-f6", "f5",  "-f4", "fB",  "-fA", "f9",  "-f8", "-fF", "fE",  "-fD", "fC"),
- ("-f5","-f6", "-f7","-1",  "f1",  "f2",  "f3",  "fC",  "fD",  "fE",  "fF",  "-f8", "-f9", "-fA", "-fB"),
- ("f4", "-f7", "f6", "-f1", "-1",  "-f3", "f2",  "fD",  "-fC", "fF",  "-fE", "f9",  "-f8", "fB",  "-fA"),
- ("f7", "f4",  "-f5","-f2", "f3",  "-1",  "-f1", "fE",  "-fF", "-fC", "fD",  "fA",  "-fB", "-f8", "f9"),
- ("-f6","f5",  "f4", "-f3", "-f2", "f1",  "-1",  "fF",  "fE",  "-fD", "-fC", "fB",  "fA",  "-f9", "-f8"),
- ("-f9","-fA", "-fB","-fC", "-fD", "-fE", "-fF", "-1",  "f1",  "f2",  "f3",  "f4",  "f5",  "f6",  "f7"),
- ("f8", "-fB",  "fA","-fD", "fC",  "fF",  "-fE", "-f1", "-1",  "-f3", "f2",  "-f5", "f4",  "f7",  "-f6"),
- ("fB", "f8",  "-f9","-fE", "-fF", "fC",  "fD",  "-f2", "f3",  "-1",  "-f1", "-f6", "-f7", "f4",  "f5"),
- ("-fA","f9",  "f8", "-fF", "fE",  "-fD", "fC",  "-f3", "-f2", "f1",  "-1",  "-f7", "f6",  "-f5", "f4"),
- ("fD", "fE",  "fF", "f8",  "-f9", "-fA", "-fB", "-f4", "f5",  "f6",  "f7",  "-1",  "-f1", "-f2", "-f3"),
- ("-fC","fF",  "-fE","f9",  "f8",  "fB",  "-fA", "-f5", "-f4", "f7",  "-f6", "f1",  "-1",  "f3",  "-f2"),
- ("-fF","-fC", "fD", "fA",  "-fB", "f8",  "f9",  "-f6", "-f7", "-f4", "f5",  "f2",  "-f3", "-1",  "f1"),
- ("fE", "-fD", "-fC","fB",  "fA",  "-f9", "f8",  "-f7", "f6",  "-f5", "-f4", "f3",  "f2",  "-f1", "-1"))
-
-phi15 = e123 +e145 +e167 +e189 +e1AB +e1CD +e1EF +e246 +e257 +e28A +e29B +e2CE +e2DF +e347 +e356 +e38B +e39A \
-       +e3CF +e3DE -e48C +e49D +e4AE +e4BF +e58D +e59C +e5AF +e5BE +e68E +e69F +e6AC +e6BD +e78F +e79E +e7AD +e7BC
 
