@@ -411,7 +411,7 @@ class Q():
     return (self *q -q *self) *0.5 
  
   def associator(self, p, q):
-    """associator(p,q)
+    """assoc[iator](p,q)
        Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
     out = (self * p) *q - self *(p * q)
     out.__entered0 = self.__entered0

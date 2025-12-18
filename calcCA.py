@@ -824,6 +824,9 @@ class CA():
     out.__entered0 = self.__entered0
     for grade in self.__g:
       if abs(grade.value) >= precision:
+        near = grade.value +(precision if grade.value > 0 else -precision)
+        if abs(grade.value -int(near)) < precision:
+          grade.value = int(near)
         out.__g.append(self.Grade(grade.value, grade.bases()))
     return out
 
@@ -1590,29 +1593,36 @@ class CA():
     """spin([basis])
        Return the Lib.Table triad list and Basis list if basis else
        VersorArgs list from 3-form self finding the largest dimension."""
-    setBasis = set([])
+    maxBasis = 0
+    sTriads = []
     triads = []
     for term in self.__g:
       bases = term.bases()[0]
       if len(bases) != 3 or term.bases()[1]:
         raise Exception("Invalid 3-form for spin: %s" %"".join(term.strs()))
       terms = []
+      rTerms = []
       for idx,pairs in enumerate(((0,1), (1,2), (0,2))):
-        base = int(bases[idx], self.__HEX_BASIS +1)
-        setBasis.add(base)
-        terms.append(base)
+        maxBasis = max(maxBasis, int(bases[idx], self.__HEX_BASIS +1))
+        terms.append(int(bases[idx], self.__HEX_BASIS +1))
+        form = 'e%s%s' %(bases[pairs[0]], bases[pairs[1]])
+        rTerms.append(form)
       if term.value < 0:
         tmp = terms[0]; terms[0] = terms[1]; terms[1] = tmp
+        tmp = rTerms[0]; rTerms[0] = rTerms[1]; rTerms[1] = tmp
       triads.append(terms)
+      sTriads.append(rTerms)
     if basis is not None:
-      Lib._checkList(basis, None, "spin", len(setBasis))
+      Lib._checkList(basis, None, "spin", maxBasis)
     else:
-      setBasis = sorted(list(setBasis))
-      basis = list((CA(**{"e%X" %x: 1}) for x in setBasis))
-      sTriads = triads[:]
+      sBasis = CA._VersorArgs(maxBasis)
+      basis = list((CA(**{x: 1}) for x in sBasis))
       triads = []
       for terms in sTriads:
-        triads.append(list(setBasis.index(x) +1 for x in terms))
+        triad = []
+        for term in terms:
+          triad.append(sBasis.index(term) +1)
+        triads.append(triad)
     return (Matrix(*triads), basis)
 
   ##############################################################################

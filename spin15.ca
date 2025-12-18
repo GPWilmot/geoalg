@@ -341,7 +341,7 @@ def triads15build(triads, cpus=1, path=None, name="tmp", values=None):
       for pos,task in enumerate(process):
         while task.is_alive():
           tmp = list(status[idx] for idx in range(cpus)) if status else None
-          if tmp == oldStatus or pos == 0:
+          if tmp != oldStatus or pos == 0:
             Lib.checkMem(pos, 1, extra=tmp)
             sys.stdout.flush()
             oldStatus = tmp

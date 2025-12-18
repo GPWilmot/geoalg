@@ -161,8 +161,8 @@ class Lib():
       if digits is not None:
         raise Exception("Can't set digits when get set")
     else:
-      if not isinstance(digits, int) or digits < 0:
-        raise Exception("Invalid printing resolution")
+      if digits is not None:
+        Lib._checkType(digits, int, "resolution", (0,0))
       if digits is None:
         digits = 18
       Lib._checkType(digits, int, "resolution")
@@ -398,7 +398,7 @@ class Lib():
     if len(flat) %2:
       raise Exception("Pairs length must be even")
     if flat and dim < max(flat):
-      raise Exception("Pairs dim must be greater then indicies")
+      raise Exception("Pairs dim must be greater then indices")
     perm = list(x +1 for x in range(dim))
     for idx in range(0, len(flat), 2):
       idx0, idx1 = flat[idx] -1, flat[idx +1] -1
@@ -411,7 +411,9 @@ class Lib():
        of basis pair names."""
     Lib._checkList(pairs, None, "morph")
     if isinstance(basisNames, (list, tuple, Matrix)):
+      Lib._checkList(basisNames, Lib._basestr, "morph")
       basisNames = "".join(basisNames)
+    Lib._checkType(basisNames, Lib._basestr, "morph")
     if len(pairs) %2:
       raise Exception("Pairs in morph needs to be of even length")
     morphed = False
@@ -502,8 +504,8 @@ class Lib():
   @staticmethod
   def time(epoch=False):
     """time([epoch])
-       Return hours since epoch or difference to previous call as a float."""
-    lastTime = 0 if Lib.__lastTime == 0 or epoch else Lib.__lastTime
+       Return seconds since epoch or difference to previous call as a float."""
+    lastTime = 0 if not epoch else Lib.__lastTime
     Lib.__lastTime = time.time()
     return Lib.__lastTime -lastTime
 
@@ -574,7 +576,8 @@ class Lib():
         yield tuple(basis[idx -1] for idx in rng if idx not in elem) 
     else:
       for elem in Lib.__perm(n, [1] *r, 1, dump):
-        yield tuple(basis[idx -1]  for idx in elem) 
+        yield tuple(basis[idx -1]  for idx in elem)
+  _comb = __comb
   
   @staticmethod
   def permute(n, r=None):
@@ -614,6 +617,7 @@ class Lib():
               yield arr
         else:
           yield [recuse]
+  _perm = __perm
 
   @staticmethod
   def additionTree(dim, split, maxs=()):
@@ -1570,41 +1574,110 @@ class Tensor(list):
        labels and +-1 of labels type so may be of basis or string type."""
     Lib._checkList(basis, None, "morph")
     if labels is None:
-      out = []
-      if self and isinstance(self[0], (list, tuple, Matrix)): # self.shape>(1,1)
-        for idx1,val1 in enumerate(self):
-          out.append([])
-          for val2 in val1:
-            out.append(Lib._morph(val2, 1, basis)[val2])
-        return Tensor(*out)
-      for idx1,val1 in enumerate(self):
-        out.append(Lib._morph(val1, 1, basis)[val1])
-      return self.copy(out)
-    Lib._checkList(labels, None, "morph", len(basis))
-    val1 = self[0]
-    if isinstance(val1, (list, tuple, Matrix)) and len(val1) > 0:
-      for val2 in val1[:]:
-        if type(val1) == type(basis[0]):
-          break
-        val1 = val2
-    if type(val1) != type(basis[0]):
-      raise Exception("Invalid swap basis type: %s !~ %s" %(type(val1),
-                       type(basis[0])))
-    if isinstance(val1, Matrix):
-      out = Tensor.Diag([""] *self.shape[0])
-      for x in range(self.shape[0]):
-        for y in range(self.shape[1]):
-          if self.get(x,y) in basis:
-            out[x][y] = labels[basis.index(self.get(x,y))]
-          elif -self.get(x,y) in basis:
-            lab = labels[basis.index(-self.get(x,y))]
-            out[x][y] = lab[1:] if lab[0]=="-" else ("-" +lab)
-          elif self.get(x,y) == 0:
-            out[x][y] = "0"
+      Lib._CheckList(basis, (list, tuple, Matrix), "morph")
+      labels = list(x[1] for x in basis if len(x)==2)
+      basis = list(x[0] for x in basis if len(x)==2)
+    else:
+      Lib._checkList(labels, None, "morph", len(basis))
+    return self.morphIn(basis, True).morphOut(labels, True)
+
+  def morphIn(self, basis, unknown=False):
+    """Internal method to return a Matrix as indices into basis elements."""
+    out = []
+    basis = list(basis)[:] +([1, 0,-1] if unknown else [1])
+    pBasis,mBasis = Lib._basisStrs(basis)
+    for val1 in self:
+      row = []
+      if isinstance(val1, (list, tuple, Matrix)):
+        for val2 in val1:
+          val2 = str(val2)
+          if val2 in pBasis:
+            row.append(pBasis.index(val2) +1)
+          elif val2 in mBasis:
+            row.append(-mBasis.index(val2) -1)
+          elif unknown:
+            row.append(basis.index(-1) +1)
           else:
-            out[x][y] = "XXX"
-      return out
-    return self.__morph(basis, labels)
+            raise Exception("Element not found in basis for morph")
+      else:
+        val1 = str(val1)
+        if val2 in pBasis:
+          out.append(pBasis.index(val1) +1)
+        elif var2 in mBasis:
+          out.append(-mBasis.index(val1) -1)
+        elif unknown:
+          out.append(basis.index(-1) +1)
+        else:
+          raise Exception("Element not found in basis for morph")
+      if row:
+        out.append(row)
+    return self.copy(out)
+
+  def morphOut(self, basis, unknown=False):
+    """Internal method to return a Matrix of indices into basis elements."""
+    try:
+      out = []
+      basis = list(basis)[:] +([1,0,-1] if unknown else [1])
+      if any(map(lambda x: isinstance(x, Lib._basestr), basis)) or unknown:
+        if unknown:
+          basis[-1] = "XXX"
+        basis,mBasis = Lib._basisStrs(basis)
+      else:
+        mBasis = list(-x for x in basis)
+      for val1 in self:
+        row = []
+        if isinstance(val1, (list, tuple, Matrix)):
+          for val2 in val1:
+            row.append(mBasis[-val2 -1]  if val2 < 0 else basis[val2 -1])
+        else:
+          out.append(mBasis[-val1 -1] if val1 < 0 else basis[val1 -1])
+        if row:
+          out.append(row)
+    except IndexError:
+      raise Exception("Element not found in output for morph")
+    return self.copy(out)
+
+  def morphPerm(self, perm):
+    """Internal routine to return self with values, rows and cols permuted."""
+    rows = []
+    for idx in perm: # Swap rows
+      if idx > 0:
+        rows.append(self[idx -1])
+      elif self.shape[1] == 1:
+        rows.append(-self[-idx -1])
+      else:
+        rows.append(list((-v for v in self[-idx -1])))
+    swap = []  # Swap columns
+    if self.shape[1] == 1:
+      if len(self) != len(perm):
+        raise Exception("Invalid permute row length")
+      swap = rows
+    else:
+      for idx in range(len(rows)):
+        swap.append([]) 
+        if len(self[idx]) != len(perm):
+          raise Exception("Invalid permute row length")
+      for idx1,row in enumerate(swap):
+        for idx2 in perm:
+          if idx2 > 0:
+            row.append(rows[idx1][idx2 -1])
+          else:
+            row.append(-rows[idx1][-idx2 -1])
+    out = []
+    #compPerm = list(Tensor(perm).permInvert()) +[len(perm) +1]
+    compPerm = perm[:] +[len(perm) +1]
+    for val1 in swap:
+      row = []
+      if isinstance(val1, (list, tuple, Matrix)):
+        for val2 in val1:
+          val = compPerm[abs(val2) -1]
+          row.append(-val if val2 < 0 else val)
+      elif val1 in basis:
+        val = compPerm[abs(val1) -1]
+        row.append(-val if val1 < 0 else val)
+      if row:
+        out.append(row)
+    return self.copy(out)
 
   def __morph(self, basis, labels):
     """Internal routine to return self with basis & ones replaced by labels
@@ -1757,9 +1830,11 @@ class Tensor(list):
     #if hasattr(self[0][0], "grades") != hasattr(basis[0], "grades"):
     #  raise Exception("Tensor is not the same type as basis for %s" %name)
 
-  def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=True,
-             initPerm=[], permCycle=False, noAntiIso=False):
-    """search(basis, cf, [cfBasis,num,diffs,cycles,initPerm,permCycle])
+  def search(self, basis, cf, cfBasis=None, num=-2, diffs=-1, cycles=False,
+             permCycle=False, initPerm=[], squares=False, noAntiIso=False, 
+             dump=False):
+    """search(basis, cf, [cfBasis,num,diffs,cycles,permCycle,initPerm,squares,
+              dump])
        Find self in signed permutation of cf for basis optionallly replacing
        cfBasis in cf with basis. All n! permutations and 2**n combinations of
        signs are searched and the histogram of difference counts is returned
@@ -1770,23 +1845,34 @@ class Tensor(list):
        cycle is also quicker (default) because it converts to Tensor.cycles
        and uses morphCycles instead of isomorph. Parameter initPerm is used
        to fix the first part of all permutations such as octonians when
-       looking for sedenions. permCycle outputs cycles instead of maps."""
+       looking for sedenions. permCycle outputs cycles instead of maps. If
+       squares match diagagonal signature first."""
     self.__checkSquare(basis, "search", "basis")
     Lib._checkList(cf, None, "search")
     cf = Tensor(*cf)
-    if cfBasis:
-      cf.__checkSquare(cfBasis, "search", "cf")
+    if cfBasis is None:
+      cfBasis = basis
+    cf.__checkSquare(cfBasis, "search", "cf")
     Lib._checkType(num, int, "search")
     Lib._checkType(diffs, int, "search")
     Lib._checkType(cycles, bool, "search")
-    Lib._checkList(initPerm, None, "search")
     Lib._checkType(permCycle, bool, "search")
-    chkPerm = list(x for x in sorted(list(abs(y) for y in initPerm)))
+    Lib._checkList(initPerm, None, "search")
+    Lib._checkType(squares, bool, "search")
+    Lib._checkType(dump, bool, "search")
     cycPerm = Tensor(list(x+1 for x in range(len(basis))))
-    for idx in range(len(initPerm)):
-      if chkPerm[idx] != idx +1:
-        raise Exception("Search initPerm needs numbers %s" %range(len(initPerm)))
+    chkPerm = list(sorted(list(abs(x) for x in initPerm)))
+    for idx in range(1, len(initPerm)):
+      if chkPerm[idx -1] == chkPerm[idx]:
+        raise Exception("Search initPerm needs unique numbers 1-%s" \
+                %range(len(basis)))
+    extraPerm = list(x for x in range(1, len(basis) +1) if x not in chkPerm)
+    if squares:
+      basisDiag = Tensor(list(int(x) for x in self.diag()))
+      cfDiag = list(int(x) for x in cf.diag())
     dim = len(basis)
+    if dim != len(cfBasis):
+      raise Exception("Search cfBasis length is not valid")    
     val1 = self[0]
     if isinstance(val1, (list, tuple, Matrix)) and len(val1) > 0:
       for val2 in val1[:]:
@@ -1796,43 +1882,45 @@ class Tensor(list):
     if type(val1) != type(basis[0]):
       raise Exception("Invalid search basis type: %s !~ %s" %(type(val1),
                        type(basis[0])))
-    if cfBasis:
-      if dim != len(cfBasis):
-        raise Exception("Search cfBasis length is not valid")
-      if not cycles:
-        cf = cf.morph(cfBasis, basis)
-    dim -= len(initPerm) 
-    perms = Lib.perm(dim, dim)
+    dim0 = dim -len(initPerm)
+    if dump:
+      perms = Lib._perm(dim0, [1] *dim0, 0, [dim0,0])
+    else:
+      perms = Lib.perm(dim0, dim0)
     difHisto = {}
-    difRange = [99999, 0]
+    difRange = [99999999, 0]
     isStr = isinstance(basis[0], Lib._basestr)
     if isStr:
       mBasis = list((x[1:] if x[:1] == "-" else ("-" +x) for x in basis))
     else:
       mBasis = list((-x for x in basis))
     if cycles:
-      cf = cf.cycles(cfBasis if cfBasis else basis)
+      cf = cf.cycles(cfBasis)
       cycleIso = self.cycles(basis)
       if len(cf) < len(self) or len(cycleIso) < len(self):
         raise Exception("Invalid basis for table.cycles()")
+    else:
+      newSelf = self.morphIn(basis)
+      cf = cf.morphIn(cfBasis)
     cnt = 0
-    antiIso = 0 if noAntiIso else dim
+    antiIso = 0 if noAntiIso else (dim)
     for p in perms:                # For all permutations
+      p0 = list(extraPerm[x -1] for x in p)
+      p0 = initPerm +p0
       for n in range(antiIso +1):      # For all negative sign combinations
         for sgns in Lib.comb(dim, n, True):
-          p0 = list(x +len(initPerm) for x in p)
+          p1 = p0[:]
           for sgn in sgns:
-            p0[sgn -1] *= -1
-          p0 = initPerm +p0
+            p1[sgn -1] *= -1
 
-          # iso = self.isomorph(basis, p0)   # Signed swap rows, columns & cells
+          # iso = self.isomorph(basis, p1)   # Signed swap rows, columns & cells
           if cycles:
-            iso = cycleIso.morphCycles(p0, basis if isinstance(cycleIso[0][0],
+            iso = cycleIso.morphCycles(p1, basis if isinstance(cycleIso[0][0],
                            Lib._basestr) else None)
           else:
-            pBasis = list((basis[x-1] if x>0 else mBasis[-x-1] for x in p0))
-            morphed = self.__morph(basis, pBasis)
-            iso = morphed.permute(p0, True)
+            if squares and list(basisDiag.permute(p1)) != cfDiag:
+              break
+            iso = newSelf.morphPerm(p1)
 
           # Now report found, perm, diffs & accumulate histogram
           if diffs < 0:
@@ -1847,26 +1935,26 @@ class Tensor(list):
           difRange[1] = len(dif) if len(dif) >= difRange[1] else difRange[1]
           difHisto[len(dif)] += 1
           if permCycle:
-            p0 = cycPerm.permute(p0, True).permCycles()
+            p1 = cycPerm.permute(p1, True).permCycles()
           if len(dif) == 0: # iso == cf
-            sys.stdout.write("FOUND at %d %s\n" %(cnt, p0))
+            sys.stdout.write("FOUND at %d %s\n" %(cnt, p1))
           elif diffs >= 0 and len(dif) <= diffs:
-            sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p0,
+            sys.stdout.write("DIFFS at %d %s has %d: %s\n" %(cnt, p1,
                               len(dif), dif))
           if cnt == num or (num == -1 and len(dif) == 0):
             if diffs < 0 and len(dif) > 0:
-              sys.stdout.write("GOT at %d %s\n" %(cnt, p0))
-            return iso
+              sys.stdout.write("GOT at %d %s\n" %(cnt, p1))
+            return (p1, iso if cycles else iso.morphOut(basis))
           cnt += 1
     i = difRange[0]
-    p0 = [0] *i
+    stats = [0] *(i if cnt else 0)
     while i < difRange[1] +1:
       j = difHisto[i] if i in difHisto else 0
-      p0.append(j)
+      stats.append(j)
       i += 1
-    if num == -1:
-      sys.stdout.write("NOT FOUND for %d: %s\n" %(cnt, p0))
-    return p0
+    if num == -1 and dump:
+      sys.stdout.write("NOT FOUND for %d: %s\n" %(cnt, stats))
+    return (cnt, stats)
   
   def cycles(self, basis, results=None, degree=0, indices=False):
     """cycles(basis, [results, degree,indices])
@@ -1924,13 +2012,14 @@ class Tensor(list):
     if abs(x1) == scalar: return x2 *(-1 if x1 < 0 else 1)
     if abs(x2) == scalar: return x1 *(-1 if x2 < 0 else 1)
     if x1 > scalar or x2 > scalar: return scalar +1
-    mul = str(self[abs(x1) -1][abs(x2) -1])
-    if mul == "0": return scalar +1
+    mul = self[abs(x1) -1][abs(x2) -1]
+    smul = str(mul)
+    if smul == "0": return scalar +1
     if abs(x1) == abs(x2):
-      neg = (mul[0] == "-")
+      neg = (smul[0] == "-")
       idx = scalar * (-1 if neg else 1)
     else:
-      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(mul)-1
+      idx = (basis.index(mul) +1) if mul in basis else -mBasis.index(str(mul))-1
     if (x1 < 0) != (x2 < 0):
       idx = -idx
     return idx
@@ -1954,7 +2043,9 @@ class Tensor(list):
     Lib._checkType(alternate, bool, "assocTriads")
     Lib._checkType(dump, bool, "assocTriads")
     pBasis,mBasis = Lib._basisStrs(basis)
-    tmp = Lib.triadPairs(self.__assocTriads, pBasis, "assocTriads", dump,
+    if isinstance(self[0][0], Lib._basestr):
+      basis = pBasis
+    tmp = Lib.triadPairs(self.__assocTriads, basis, "assocTriads", dump,
                          (alternate,mBasis))
     if not nonAssoc:  return tmp
     return Lib.triadPairs(Lib._allTriads, basis, "assocTriads", dump, tmp)
@@ -1992,8 +2083,7 @@ class Tensor(list):
     self.__checkSquare(basis, "moufangTriads", "basis")
     Lib._checkType(moufang, int, "moufangTriads", (0,5))
     Lib._checkType(dump, bool, "moufangTriads")
-    pBasis = list((str(x) for x in basis))
-    mBasis = list((x[1:] if x[:1] == "-" else "-" +x for x in pBasis))
+    pBasis,mBasis = Lib._basisStrs(basis)
     if isinstance(self[0][0], Lib._basestr):
       basis = pBasis
     return Lib.triadPairs(self.__moufangTriads, basis, "moufangTriads", dump,
@@ -2209,22 +2299,20 @@ class Tensor(list):
   def permInvert(self):
     """permInvert()
        Return inverted vector permutation."""
-    compPerm = []
-    for x in range(1, len(self) +1):
+    compPerm = list(x+1 for x in range(max(self)))
+    for idx,x in enumerate(range(1, len(self) +1)):
       if x in self:
-        compPerm.append(self.index(x) +1)
-      else:
-        compPerm.append(-self.index(-x) -1)
+        compPerm[idx] = self.index(x) +1
+      elif -x in self:
+        compPerm[idx] = -self.index(-x) -1
     return Tensor(compPerm)
 
   def permute(self, perm, invert=False):
     """permute(perm, [invert])
        Return self with rows and columns swapped and signed by perm."""
     Lib._checkList(perm, None, "permute")
-    if self.shape[0] <= 1 or self.shape[0] != len(perm):
-      raise Exception("Swap parameter length is not valid")
-    if not all(map(lambda x:abs(x) in range(1,len(perm) +1), perm)):
-      raise Exception("Swap perm index is out of range")
+    if max(self.shape) +2 < max(perm):
+      raise Exception("Permute parameter length is not valid")
     isStr = isinstance(self[0] if self.shape[1]<2 else self[0][1],
                        Lib._basestr)
     compPerm = Tensor(perm).permInvert() if invert else perm
@@ -2244,7 +2332,7 @@ class Tensor(list):
         rows.append(list((-v for v in self[-idx -1])))
     out = []  # Swap columns
     if self.shape[1] == 1:
-      if len(self) != len(compPerm):
+      if len(self) < max(compPerm):
         raise Exception("Invalid permute row length")
       out = rows
     else:
@@ -2304,9 +2392,9 @@ class Tensor(list):
           tmp = str(isoRow[idx])
           isoRow[idx] = (-mBasis.index(tmp) -1) if tmp[:1]=='-' \
                         else (pBasis.index(tmp) +1)
-      for idx in range(cycLen):
-        tmp = perm[abs(isoRow[idx]) -1]
-        isoRow[idx] = tmp *(-1 if row[idx] < 0 else 1)
+      #for idx in range(cycLen):
+      #  tmp = perm[abs(isoRow[idx]) -1]
+      #  isoRow[idx] = tmp *(-1 if row[idx] < 0 else 1)
       while True:
         for idx,neg in {0: (2,3), 1: (2,4)}.items():
           if isoRow[idx] < 0:
@@ -2751,7 +2839,7 @@ if np and "numpy" in sys.modules:
       return Tensor(list(self)).moufangTriads(basis, moufang, dump)
 
     def abcTriads(self, basis, abc=0, nonAssoc=False, dump=False):
-      """abcTriads(basis,[abc,nonAssocdump])
+      """abcTriads(basis,[abc,nonAssoc,dump])
          Return traids for abc=0-3 where 0 is triple associator and 1-3: [a,c,b],
          [a,b,c], [b,a,c]. See Lib.triadDump() for return and other params."""
       return Tensor(list(self)).abcTriads(basis, abc, nonAssoc, dump)
