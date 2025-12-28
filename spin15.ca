@@ -3,7 +3,7 @@
 ## File: spin15.ca - G.P.Wilmot
 ####################################
 from multiprocessing import Process
-import time
+import time, traceback
 try:
   from multiprocessing import shared_memory
 except:
@@ -15,13 +15,13 @@ _spin15 = """Extend Spin(7) construction to all Cl(15) sedenion representations
    slow so the multitask process to build all files is defined below. The files
    can be loaded with triads15load(path="data") after the files are loaded.
  Module contains variables:
-   f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nacs15map_0,
-   Nacs15names, Nacs15, Nacs15mirrors, P15, PP15, F15, FF15, FFF15, FFFF15,
+   f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nac15map_0,
+   Nac15names, Nac15, Nac15mirrors, P15, PP15, F15, FF15, FFF15, FFFF15,
    SO15, SB15, SOBmap
  and functions:
    tri2str, str2tri, triads15load, loadCa, saveCa,, taskTriads15build,
-   triads15build, triads15parts, nacs15subalg, nacs15genSA, nacs15map,
-   taskNacs15build, nacs15build, nacs15parts, nacs15mirrors, triadsShalf,
+   triads15build, triads15parts, nac15subalg, nac15genSA, nac15map,
+   taskNac15build, nac15build, nac15parts, nac15mirrors, triadsShalf,
    triads15all, triads15terms, triads15remain, triads15class.
  Extend Triads15 by running triads15parts(0). This was initially created with
    Triads15 = [Triads15_0] +list(triads15build(Triads15_0)) # and stored here.
@@ -29,11 +29,11 @@ _spin15 = """Extend Spin(7) construction to all Cl(15) sedenion representations
    and unique ones are stored in out%s.ca files. At the end these are accum.ed,
    sorted, packed via tri2str() and stored as spin15-triads{1,2,3?,4?,5?,6}.ca
    files of size 2M primaries. Triads15parts contains the size of each iteration
-   of triads15build() which is run by triads15parts(). Then use nacs15parts() to
-   find sedonions and the 100 subsedenion-like algebras. Nacs15 stores these
-   and Nacs15names continas the Triads15 and allSigns()[] indices for these.
+   of triads15build() which is run by triads15parts(). Then use nac15parts() to
+   find sedonions and the 100 subsedenion-like algebras. Nac15 stores these
+   and Nac15names continas the Triads15 and allSigns()[] indices for these.
    On the Adelaide Uni. Pheonix HPC iceman system with 72 nodes triads15parts()
-   takes 2.8 days and nacs15parts() takes 1.6 days. The 2M file size is actually
+   takes 2.8 days and nac15parts() takes 1.6 days. The 2M file size is actually
    a nice chunk size to generate new primaries and read especially since Windows
    can't load more in a timely fashion. Also packing is used because 100k triads
    is >20MB and python exec blows up RAM more than size of structure (ie >13E6)!
@@ -322,7 +322,7 @@ def triads15build(triads, cpus=1, path=None, name="tmp", values=None):
   try:
     size = len(triads)
     step = (size +cpus -1) //cpus
-    last = (size +step -1) //step
+    #last = (size +step -1) //step # TBD
     if cpus == 1:
       out = taskTriads15build(triads, allTriads, values, path, name)
     elif cpus > 1:
@@ -456,16 +456,16 @@ def triads15parts(code, cpus=2, redo=[], path=""):
   Triads15 = list(Triads15)
 
 
-_Nacs15 = "The unique primaries for 101 sedonion-like algs. See Nacs15Names."
-_Nacs15Names = """Dictionary in Nac15 order of non-assoc. cnt to (algebra name,
+_Nac15 = "The unique primaries for 101 sedonion-like algs. See Nac15Names."
+_Nac15Names = """Dictionary in Nac15 order of non-assoc. cnt to (algebra name,
    first example part, part's idx, allSigns position) (282:I6=Sedenions). 
-   Check with nacs15map()."""
-_Nacs15map_0 = "list(nacs15subalg(x) for x in Triads15_0.allSigns(36))#."
-Nacs15map_0 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224,
+   Check with nac15map()."""
+_Nac15map_0 = "list(nac15subalg(x) for x in Triads15_0.allSigns(36))#."
+Nac15map_0 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224,
    200, 208, 208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188,
    220, 196, 220, 196, 204, 204, 204, 204)
 
-Nacs15names = {
+Nac15names = {
  128: ('A1',3,6793710,4), 130: ('A2',2,1106227,4), 132: ('A3',3,7643461,4),
  134: ('A4',3,6980279,22),136: ('A5',2,476144,17), 138: ('A6',2,973626,3),
  140: ('A7',1,89116,16),  142: ('A8',1,70147,3),   144: ('A9',0,67,26),
@@ -501,25 +501,25 @@ Nacs15names = {
  320: ('K7',1,224,31),    322: ('K8',1,35370,14),  324: ('K9',2,193266,30),
  326: ('L1',3,3600142,7), 328: ('L2',3,8667056,7)}
 
-def nacs15subalg(tri, pos=None):
-  """nacs15subalg(tri, [pos])
+def nac15subalg(tri, pos=None):
+  """nac15subalg(tri, [pos])
      Return non-assoc. cnt for tri or str2tri(tri).allSigns()[pos] sub-alg."""
   if isinstance(tri, Lib._basestr):
     tri = CA.str2tri(tri)
   if pos is not None:
-    Lib._checkType(pos, int, "nacs15subalg", (0,0))
+    Lib._checkType(pos, int, "nac15subalg", (0,0))
     tri = list(tri.allSigns(pos))[pos]
   return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f15Basis)) \
                      .assocTriads(f15Basis,True),f15Basis)))
 
-def nacs15genSA(tri, pos=True):
-  """nacs15genSA(tri, [pos=True ie half of 3E10])
+def nac15genSA(tri, pos=True):
+  """nas15genSA(tri, [pos=True ie half of 3E10])
      Yield each allSigns subalgebra non-assoc. count: for x in gen: print(x)."""
   for stri in tri.allSigns(pos):
     yield len(list(Lib.triadDump(Tensor.Triads(*stri.spin(f15Basis)) \
                      .assocTriads(f15Basis,True),f15Basis)))
 
-Nacs15 = [ \
+Nac15 = [ \
  "12913B14A15F16E17D18C23425C26728F2AB2DE35E36F37839A3CD45D46847F49B4CE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
  "12A13B14915F16E17D18C23425D26827F29B2CE35E36F37839A3CD45C46748F4AB4DE56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
  "12A13914B15F16E17D18C23425D26827F29B2CE35C36738F3AB3DE45E46F47849A4CD56B57A58969D6AC79E7BC8AE8BD9CFADFBEF",
@@ -622,12 +622,12 @@ Nacs15 = [ \
  "12613714E15F18B19C1AD23425827E29A2BF2CD35936E38A3BD3CF45A4674894BC4DF56B57C5DE68F69D6AC78D79F7AB8CE9BEAEF",
  "12B13A14715618D19C1EF23F24C25D2682792AE34D35C3693783BE45F46E48A49B57E58B59A67F6AC6BD7AD7BC89F8CE9DEABFCDF"]
 
-def nacs15map(code=0):
-  """nacs15map([code=0=all])
-     Return invalid Nacs15names checking Nacs15 after triads15load(code)."""
+def nac15map(code=0):
+  """nac15map([code=0=all])
+     Return invalid Nac15names checking Nac15 after triads15load(code)."""
   idx = 0
   out = {}
-  for sa,nac in Nacs15names.items():
+  for sa,nac in Nac15names.items():
     tri = ""
     if code in (0, nac[1]):
       if nac[1] >= len(Triads15parts) or \
@@ -635,18 +635,18 @@ def nacs15map(code=0):
         raise Exception("Triads15parts[%d] needed for %d\n" %(nac[1], sa))
       else:
         tri = Triads15[Triads15parts[nac[1]][0] +nac[2]]
-        tmp = nacs15subalg(tri, nac[3])
-        if tri != Nacs15[idx] or tmp != sa:
+        tmp = nac15subalg(tri, nac[3])
+        if tri != Nac15[idx] or tmp != sa:
           out[sa] = (tmp, idx)
     idx += 1
   return out
 
 # Windows needs to copy this function into calcCA.py due to a scoping bug.
-def taskNacs15build(triads, nacs15keys, offs=0, siz=0,
+def taskNac15build(triads, nac15keys, offs=0, siz=0,
                     path="", name="nactmp", status=None, pos=0):
-  """taskNacs15build(triads,nacs15keys,[offs,siz,path,name,status,pos])
-     Output new Nacs15 signed sub-sedenion algs from 36 signed triads if cnt==1
-     else use cnt tasks via outnacs*.ca files."""
+  """taskNac15build(triads,nac15keys,[offs,siz,path,name,status,pos])
+     Output new Nac15 signed sub-sedenion algs from 36 signed triads if cnt==1
+     else use cnt tasks via outnac*.ca files."""
   if siz == 0:
     siz = len(triads)
   outname = "%s%d" %(name, pos)
@@ -659,12 +659,12 @@ def taskNacs15build(triads, nacs15keys, offs=0, siz=0,
       for sgn,tri in enumerate(CA.str2tri(triad).allSigns(36)):
         tmp = len(list(Lib.triadDump(Tensor.Triads(*(tri).spin(bas)) \
                                .assocTriads(bas,True), bas, 1)))
-        if tmp not in nacs15keys:
+        if tmp not in nac15keys:
           cnt += 1
-          nacs15keys.add(tmp)
+          nac15keys.add(tmp)
           out.append((tmp, offs +idx, sgn, triad))
           if not status:
-            sys.stdout.write("Not in Nacs15 %d: %d,%d\n" %(cnt, offs +idx, sgn))
+            sys.stdout.write("Not in Nac15 %d: %d,%d\n" %(cnt, offs +idx, sgn))
       if status:
         status[pos] = offs +idx
         if Lib.freeMemMB() < Lib._memLimitMB:
@@ -689,10 +689,10 @@ def taskNacs15build(triads, nacs15keys, offs=0, siz=0,
     status.shm.close()
   return out
 
-def nacs15build(triads, cpus=1, path="", name="nactmp"):
-  """nacs15build(triads,[cpus=1,path,name="nactmp"])
-     Output new Nacs15 signed sub-sedenion algs from 36 signed triads."""
-  nacs15keys = set(Nacs15names.keys())
+def nac15build(triads, cpus=1, path="", name="nactmp"):
+  """nac15build(triads,[cpus=1,path,name="nactmp"])
+     Output new Nac15 signed sub-sedenion algs from 36 signed triads."""
+  nac15keys = set(Nac15names.keys())
   out = []
   Lib.checkMem()
   status = oldStatus = None
@@ -701,7 +701,7 @@ def nacs15build(triads, cpus=1, path="", name="nactmp"):
     step = (size +cpus -1) //cpus
     last = (size +step -1) //step
     if cpus == 1:
-      out = taskNacs15build(triads, nacs15keys)
+      out = taskNac15build(triads, nac15keys)
     elif cpus > 1:
       process = []
       if shared_memory:
@@ -710,8 +710,8 @@ def nacs15build(triads, cpus=1, path="", name="nactmp"):
         sys.stderr.write("Shared memory is not available for status logging\n")
       for start in range(0, size, step):
         idx = start //step
-        process.append(Process(target=taskNacs15build,
-                 args=(triads, nacs15keys, start, step, 
+        process.append(Process(target=taskNac15build,
+                 args=(triads, nac15keys, start, step, 
                        path, name, status, idx)))
       for cnt,proc in enumerate(process):
         proc.start()
@@ -750,22 +750,22 @@ def nacs15build(triads, cpus=1, path="", name="nactmp"):
   Lib.checkMem(len(out), finish=True)
   return out
 
-def nacs15parts(code, cpus=2, redo=[], path="."):
-  """nacs15parts(code, [cpus=2,redo=[],path="."])
-     Extend Nacs15 and Nacs15names with level code (0=all) using nacs15build.
+def nac15parts(code, cpus=2, redo=[], path="."):
+  """nac15parts(code, [cpus=2,redo=[],path="."])
+     Extend Nac15 and Nac15names with level code (0=all) using nac15build.
      For code>2 can do file indices listed in redo. If redo contains -1 then at
-     the end accumulate all outnacs files and write spin15-nacs<code> file.
+     the end accumulate all outnac files and write spin15-nac<code> file.
      Code==1 does both parts 0 and 1."""
-  global Nacs15names
-  global Nacs15
+  global Nac15names
+  global Nac15
   if isinstance(redo, int):
     redo = [redo]
-  Lib._checkType(code, int, "nacs15parts")
-  Lib._checkType(cpus, int, "nacs15parts")
-  Lib._checkType(redo, (list, tuple), "nacs15parts")
-  Lib._checkType(path, Lib._basestr, "nacs15parts")
+  Lib._checkType(code, int, "nac15parts")
+  Lib._checkType(cpus, int, "nac15parts")
+  Lib._checkType(redo, (list, tuple), "nac15parts")
+  Lib._checkType(path, Lib._basestr, "nac15parts")
   if code not in range(len(Triads15parts) +1):
-    raise Exception("Invalid value for code in nacs15parts")
+    raise Exception("Invalid value for code in nac15parts")
   parts = [code] if code else range(1, len(Triads15parts))
   triname = "spin15-triads%d%s"
   tmpname = "nactmp%d%s"     # Used by tasks
@@ -782,7 +782,7 @@ def nacs15parts(code, cpus=2, redo=[], path="."):
         subpart = "" if size == 1 else chr(97 +idx)
         if part == 1:  # Part 1 has 2 sub-parts
           sys.stdout.write("Use tris0 to generate %s\n" %tmpname %(0, ""))
-          tmp = nacs15build(tris0, cpus, path, tmpname %(0, ""))
+          tmp = nac15build(tris0, cpus, path, tmpname %(0, ""))
           sizePart0 = len(tmp)
           sys.stdout.write("Part 0 size is %d\n" %sizePart0)
           sys.stdout.flush()
@@ -791,7 +791,7 @@ def nacs15parts(code, cpus=2, redo=[], path="."):
         sys.stdout.flush()
         triads = loadCa(triname %(part, subpart), "tris%d%s" %(part, subpart),
                         path, ".ca")
-        tmp += nacs15build(triads, cpus, path, tmpname %(part, subpart))
+        tmp += nac15build(triads, cpus, path, tmpname %(part, subpart))
         Lib.save(tmpname %(part, subpart), tmpname %(part, subpart),
                  tmp, path, ".ca")
     if (-1 in redo or not redo) and size > 0:
@@ -809,23 +809,23 @@ def nacs15parts(code, cpus=2, redo=[], path="."):
             newKeys.add(nac[0])
             out.append(nac)
             offs = idx *2000000
-            Nacs15names[nac[0]] = ("", newPart, offs +nac[1], nac[2])
-            Nacs15.append(nac[3])
+            Nac15names[nac[0]] = ("", newPart, offs +nac[1], nac[2])
+            Nac15.append(nac[3])
       Lib.save(outname %part, outname %part, out, path, ".ca")
   if -1 in redo or not redo:
-    Lib.save(outname %"names.ca", "nacs15names", Nacs15names, path, ".ca")
-    Lib.save(outname %"triads.ca", "nacs15", Nacs15, path, ".ca")
-  return len(Nacs15)
+    Lib.save(outname %"names.ca", "nas15names", Nas15names, path, ".ca")
+    Lib.save(outname %"triads.ca", "nac15", Nac15, path, ".ca")
+  return len(Nac15)
 
 # TBD: Triads7 reflections have the same structure for each primary
 # This is easy to just check the remainder. CA(15) doesn't have the equivalent.
-Nacs15mirrors = []
+Nac15mirrors = []
 
-def nacs15mirrors(idx):
-  """nacs15mirrors(idx)
+def nac15mirrors(idx):
+  """nac15mirrors(idx)
      Check Triads15[idx] first 36 signed combos have the same mirror indices."""
   if idx < 0 or idx >= len(Triads15):
-    raise Exception("Invalid nacs15subalg signed position")
+    raise Exception("Invalid nac15subalg signed position")
   triad = CA.str2tri(Triads15[idx])
   cmp = []
   for cnt,tri in enumerate(triad.allSigns(36)):
@@ -844,7 +844,7 @@ def nacs15mirrors(idx):
       #buf.append(idx32768)
       #buf.append(32768 -idx32768)
     cmp.append(buf)#sorted(buf)[:36])
-  #if cmp != Nacs15mirrors:
+  #if cmp != Nas15mirrors:
   #  print("NOT EQUAL", idx)
   #  return cmp
   #return []
@@ -895,8 +895,8 @@ def triads15class(phi, id=False):
   idx = Triads15.index(aPhi)
   idxSign,parity = phi.allSignsIndices()
   sgn = -1 if parity %2 else 1
-  nac = nacs15subalg(aPhi, idxSign)
-  clsName = Nacs15Name[nac]
+  nac = nac15subalg(aPhi, idxSign)
+  clsName = Nac15Name[nac]
   if id:
     return (clsName, -sgn, idx, int(idxSign))
   return "%s%s:%0.5f" %(clsName, "-" if parity %2 else "+", idx +idxSign/100000.0)

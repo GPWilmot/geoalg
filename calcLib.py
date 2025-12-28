@@ -580,11 +580,14 @@ class Lib():
   _comb = __comb
   
   @staticmethod
-  def permute(n, r=None):
-    """perm[ute](n, [r])
+  def permute(n, r=None, dump=False):
+    """perm[ute](n, [r,dump])
        Return number of permutations of n terms or generator of r in n perms."""
     Lib._checkType(n, (int, float), "perm")
+    Lib._checkType(dump, bool, "perm")
     if isinstance(r, int) and not isinstance(r, bool):
+      if dump:
+        return Lib.__perm(n, [1] *r, 0, [r,0])
       return Lib.__perm(n, [1] *r, 0, None)
     elif r is None:
       return math.factorial(n) 
@@ -617,7 +620,6 @@ class Lib():
               yield arr
         else:
           yield [recuse]
-  _perm = __perm
 
   @staticmethod
   def additionTree(dim, split, maxs=()):
@@ -1311,11 +1313,13 @@ class Tensor(list):
     return out
 
   def sym(self, mat):
-    """Return self*mat +mat*self."""
+    """sym(mat)
+       Return self*mat +mat*self."""
     return self.dot(mat) +mat.dot(self)
 
   def asym(self, mat):
-    """Return self*mat -mat*self."""
+    """asym(mat)
+       Return self*mat -mat*self."""
     return self.dot(mat) -mat.dot(self)
 
   def diag(self, vector=None):
@@ -1341,7 +1345,8 @@ class Tensor(list):
     return Tensor(*out)
 
   def multiply(self, mat):
-    """Return Hadamard product matrix."""
+    """multiply(mat)
+       Return Hadamard product matrix."""
     out = []
     if not isinstance(mat, Matrix):
       if isinstance(mat, (list, tuple)) and not isinstance(mat, Tensor):
@@ -1579,9 +1584,9 @@ class Tensor(list):
       basis = list(x[0] for x in basis if len(x)==2)
     else:
       Lib._checkList(labels, None, "morph", len(basis))
-    return self.morphIn(basis, True).morphOut(labels, True)
+    return self.__morphIn(basis, True).__morphOut(labels, True)
 
-  def morphIn(self, basis, unknown=False):
+  def __morphIn(self, basis, unknown=False):
     """Internal method to return a Matrix as indices into basis elements."""
     out = []
     basis = list(basis)[:] +([1, 0,-1] if unknown else [1])
@@ -1613,7 +1618,7 @@ class Tensor(list):
         out.append(row)
     return self.copy(out)
 
-  def morphOut(self, basis, unknown=False):
+  def __morphOut(self, basis, unknown=False):
     """Internal method to return a Matrix of indices into basis elements."""
     try:
       out = []
@@ -1637,7 +1642,7 @@ class Tensor(list):
       raise Exception("Element not found in output for morph")
     return self.copy(out)
 
-  def morphPerm(self, perm):
+  def __morphPerm(self, perm):
     """Internal routine to return self with values, rows and cols permuted."""
     rows = []
     for idx in perm: # Swap rows
@@ -1883,10 +1888,7 @@ class Tensor(list):
       raise Exception("Invalid search basis type: %s !~ %s" %(type(val1),
                        type(basis[0])))
     dim0 = dim -len(initPerm)
-    if dump:
-      perms = Lib._perm(dim0, [1] *dim0, 0, [dim0,0])
-    else:
-      perms = Lib.perm(dim0, dim0)
+    perms = Lib.perm(dim0, dim0, dump)
     difHisto = {}
     difRange = [99999999, 0]
     isStr = isinstance(basis[0], Lib._basestr)
@@ -1900,8 +1902,8 @@ class Tensor(list):
       if len(cf) < len(self) or len(cycleIso) < len(self):
         raise Exception("Invalid basis for table.cycles()")
     else:
-      newSelf = self.morphIn(basis)
-      cf = cf.morphIn(cfBasis)
+      newSelf = self.__morphIn(basis)
+      cf = cf.__morphIn(cfBasis)
     cnt = 0
     antiIso = 0 if noAntiIso else (dim)
     for p in perms:                # For all permutations
@@ -1944,7 +1946,7 @@ class Tensor(list):
           if cnt == num or (num == -1 and len(dif) == 0):
             if diffs < 0 and len(dif) > 0:
               sys.stdout.write("GOT at %d %s\n" %(cnt, p1))
-            return (p1, iso if cycles else iso.morphOut(basis))
+            return (p1, iso if cycles else iso.__morphOut(basis))
           cnt += 1
     i = difRange[0]
     stats = [0] *(i if cnt else 0)
@@ -2652,15 +2654,18 @@ if np and "numpy" in sys.modules:
       return Matrix(*Tensor(list(self)).copy(arr))
 
     def sym(self, mat):
-      """Return self*mat +mat*self."""
+      """sym(mat)
+         Return self*mat +mat*self."""
       return np.dot(self, mat) +np.dot(mat, self)
 
     def asym(self, mat):
-      """Return self*mat -mat*self."""
+      """asym(mat)
+         Return self*mat -mat*self."""
       return np.dot(self, mat) -np.dot(mat, self)
 
     def multiply(self, mat):
-      """Return Hadamard product matrix."""
+      """multiply(mat)
+         Return Hadamard product matrix."""
       return Matrix(*Tensor(list(self)).multiply(mat))
 
     def cayleyDicksonMult(self, vector, baezRule=False):
