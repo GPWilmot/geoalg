@@ -15,22 +15,20 @@
 ## GeoAlg. If not, see <https://www.gnu.org/licenses/>.
 ## -----------------------------------------------------------------------------
 ## CalcO is a commnd line calculator that converts basis numbers into
-## Octonions, Sedenions, Quaternions, Versors and Euler Angle rotations.
+## Octonions, Sedenions, Quaternions and other Cayley-Dickson algebras.
 ## CA numbers and Quaternions can also be included and processed separately
 ## which allows Dixon Algebra to be defined using the Tensor class. 
 ##
-## O multivectors are of the form p = w +p o1..F u1..F +....
+## O multivectors are of the form p = w +x o1..F u1..F +....
 ## A quaternion maps as i->o1, j->o2, k->o12. u basis has the same 
 ## multiplication table as o basis except the squares are positive unity
-## and define the split algebra.
-## Quaternions are of the form q = w + _v_ where _v_ is a i,j,k vector
-## s.t. _v_*_v_ >= 0 and w is a scalar. A pure quaternion has w==0.
-## A unit quaternion has _n_*_n_ = -1. A versor has norm = 1 which means
-## r = cos(a) + sin(a) * _n_ where _n_ in a unit. This is extended to
-## Octonians for basis number 3 and Sedenians for numbers 4 and above.
+## and define the split algebras.
+## Quaternions are of the form q = w + v where v is i, j or k s.t. v*v==-1
+## and w is a scalar. A pure quaternion has w==0. A unit quaternion has 
+## n*n = -1. A versor has norm = 1 which means r = cos(a) + sin(a) * n.
+## This is extended to octonians for q==3 and sedenians for q==4, etc.
 ## The calc(Q) command interprets i, j, k using Q class and the calc(CA)
-## command interprets CA numbers via CA class. Need to avoid name conflicts
-## in loaded files in the later case.
+## command interprets CA numbers via CA class.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
 __version__ = "0.8"
@@ -40,12 +38,12 @@ from calcLib import *
 ################################################################################
 class O():
   """Class to process octonions and unity elements consisting of 32-D numbers,
-     half being positive definite (u1..uF) and half being standard imaginary
-     octonions (o1..oF). O(q,p) specifies q the octonian dimension (o<hex>) and
-     p specifies the dimension of octonions with unity base elements (u1..uF).
+     half being standard imaginary Cayley-Dickson generators (o1..oF) and (u1..
+     uF) being unity generators. O(q,p) gives the basis where q specifies neg.
+     (o<hex>) and p positive (p<hex>) signature, p>0 gives split algrbras.
 
      The notation is the same as for CA so o1*o2=o12 but the basis is ungraded
-     so o12 is a single imaginary entity and o21 or o1o2 becomes o12. u1o2u3o4
+     so o12 is a single imaginary entity and o21 or o2*o1 becomes -o12 & u2o1
      becomes o24u13. This allows easy extension to arbitray Sedenian Algebras
      (O(q) with q>4) and split octonian and sedenions. The o and u basis hex
      numbers can be entered in any order but must be unique.
@@ -55,21 +53,21 @@ class O():
      producing matricies. O(1,1) are Lorentz numbers and O(2,1), O(1,2) and 
      O(0,3) are split octonions. The O.Basis(p,q) function creates the basis 
      with unity basis elements last. These can be created manually and u1, u2,
-     u3, u12, u23, u13, u123 provide the unity basis for all seven
-     representations of the split octonion algebras. The multiplication tables
-     for these can be displayed using Tensor.Table(O.Basis(p,q)) and mapping
-     found with the seach method. Note that package math methods only work on
-     the scalar part eg sin(a)==sin(a.scalar()).
+     u3, u12, u23, u13, u123 provide the unity basis for all 3 representations
+     of the split octonion algebras. The multiplication tables for these can be
+     displayed using Tensor.Table(O.Basis(p,q)).dump(O.Basis(p,q)). Note that
+     math pack methods only work on the scalar part eg sin(a)==sin(a.scalar()).
      """
   __HEX_BASIS   = 15                     # e and i basis size
   __HEX_CHARS   = ('A', 'B', 'C', 'D', 'E', 'F')
   __CA_CHARS    = ('e', 'i')             # CA basis chars only
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
   __allChars    = ['o', 'u']             # Include CA
-  __basisList   = ['', '']               # Store the dimension characters
+  __maxBasis    = ['0', '0']             # Store the max dimensions
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
+  __basisODim   = 0                      # Count of o basis to move u basis
   __basisCache  = []                     # Cache partial multiplication table
   __baezMulRule = False                  # Change Cayley-Dickson multiply rule
   dumpRepr      = False                  # Repr defaults to str
@@ -178,9 +176,10 @@ class O():
       self.__pBase = bases[0]
       self.__oBase = bases[1]
       self.__uBase = bases[2]
+      self.__qBase = bases[3]
     def __str__(self):
-      return "%s[%s,%s,%s]" %(self.value, self.__pBase,
-                             self.__oBase, self.__uBase)
+      return "%s[%s,%s,%s,%s]" %(self.value, self.__pBase,
+                             self.__oBase, self.__uBase, self.__qBase)
     __repr__ = __str__
     def __mergeStr(self, dupStr):
       sStr = sorted(dupStr)
@@ -203,10 +202,10 @@ class O():
 
     def new(self, value):
       inherit = self.__new__(O.Grade)
-      inherit._init(value, (0, "", ""))
+      inherit._init(value, (0, "", "", 0))
       return inherit
     def bases(self):
-      return (self.__pBase, self.__oBase, self.__uBase)
+      return (self.__pBase, self.__oBase, self.__uBase, self.__qBase)
     def lens(self):
       """Octonians are ungraded so length is 1 if o &/or u set."""
       both = self.__oBase and self.__uBase
@@ -222,7 +221,7 @@ class O():
     def copy(self, value=None):
       inherit = super(self.__class__, self).__new__(self.__class__)
       inherit._init(self.value if value is None else value,
-                    (self.__pBase, self.__oBase[:], self.__uBase[:]))
+                (self.__pBase, self.__oBase[:], self.__uBase[:], self.__qBase))
       return inherit
 
     def isEq(self, cf, precision):
@@ -247,6 +246,12 @@ class O():
         return 1
       return 0
 
+    @staticmethod
+    def moveUBasis(bases, xyz, maxODim, hexBase):
+      """If uBase is set then pBase needs to move if max oBase increases."""
+      uOffs = "".join("%X" %(int(x, hexBase) +maxODim) for x in bases[2])
+      return xyz.index("".join(sorted(bases[1] +uOffs)))
+
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs as one row due to the definition of
          the product. This is done row by row of the table so as to not rebuild
@@ -255,13 +260,19 @@ class O():
          multiplication used by the graded lists."""
       value *= self.value
       lhs = self.bases()
-      xyz = None
-      bases = [0, "", ""]     # Base for lhs p, o and u, resp
-      rBase = rhs[0] # Iterate rhs o and u
+      xyz, maxDim, maxODim, baezMul, hexBase = O._BasisArray()
+      if lhs[2] and lhs[3] != maxODim:
+        self.__pBase = self.__class__.moveUBasis(lhs, xyz, maxODim, hexBase)
+        self.__qBase = maxODim
+        lhs = self.bases()
+      if rhs[2] and rhs[3] != maxODim:
+        rhs = (self.__class__.moveUBasis(rhs, xyz, maxODim, hexBase),
+                rhs[1], rhs[2], maxODim)
+      bases = [0, "", "", maxODim]     # Base for lhs p, o and u, resp
+      rBase = rhs[0]                   # Iterate rhs o and u
       lBase = lhs[0]
       row = O._basisCache(lBase)
       if not row or len(row) <= max(lBase, rBase):
-        xyz, maxDim, baezMul = O._BasisArray()
         lp = [0] *len(xyz)
         rp = list(range(len(xyz)))
         lp[lBase] = 1
@@ -312,11 +323,15 @@ class O():
       dim = int(math.log(len(args))/math.log(2) +1)       # l=pow(2,dim)
       if dim > self.__HEX_BASIS:
         raise Exception("Too many basis elements")
-      xyz = O._BasisArray(dim)[0]   # Setup global dimension
+      xyz, maxDim, maxODim, baezMul, hexBase = O._BasisArray(dim) # Global dims
       for idx,val in enumerate(args[1:]):
         Lib._checkType(val, (int, float), "O")
         if val:
-          self.__g.append(O.Grade(val, [idx +1, xyz[idx +1], ""]))
+          base = xyz[idx +1]
+          self.__g.append(O.Grade(val, (idx +1, base, "", maxODim)))
+          maxChar = base[:-1]
+          if maxChar > O.__maxBasis[0]:
+            O.__maxBasis[0] = maxChar
     for key,value in kwargs.items():
       Lib._checkType(value, (int, float), "O")
       if not key:
@@ -325,68 +340,63 @@ class O():
         self.__add(O._init(key, value, O.__BASIS_CHARS))
 
   def _initAdd(self, grade):
-    """Used internally to add grades to this O."""
+    """Used internally to add grades to this O."""   # TBD
     self.__add(grade)
 
   @staticmethod
   def _init(key, value, baseChars):
     """Return the Grade for basis string key. Separate o & u parts."""
-    lGrade = O.Grade(1, (0, "", ""))  # Base for o and u, resp
-    grades = [lGrade, lGrade.copy()]
-    rBases = [0, "", ""]
     typ = None
     baseCh = False
-    lastChar = ''
     for char in key:
-      if (char.isdigit() or char in O.__HEX_CHARS) and char > lastChar:
-        lastChar = char
-    xyz = O._BasisArray(lastChar)[0]
-    lastChar,oneByOne  = '', False
+      offset = int(typ == baseChars[1]) # o==0, u==1
+      if (char.isdigit() or char in O.__HEX_CHARS) \
+          and char > O.__maxBasis[offset]:
+        O.__maxBasis[offset] = char
+      elif char in baseChars:
+        typ = char
+    dims = list(int(x, O.__HEX_BASIS +1) for x in O.__maxBasis)
+    xyz, maxDim, maxODim, baezMul, hexBase = O._BasisArray(*dims)
+    lGrade = O.Grade(1, (0, "", "", maxODim))  # Base for o and u, resp
+    grades = [lGrade, lGrade.copy()]
+    rBases = [0, "", "", maxODim]
+    lastChar,typ,oneByOne  = ['',''], None, False
     cntBases = 0
     for char in key:
       offset = int(typ == baseChars[1]) # o==0, u==1
-      oneByOne = (oneByOne or char <= lastChar)
+      oneByOne = (oneByOne or char <= lastChar[offset])
       if typ and char.isdigit():
-        if char in O.__basisList[1 -offset]:
-          raise Exception("Dimension already used by %s%s" \
-                           %(baseChars[1 -offset], char))
         if oneByOne:
-          rBases[0] = xyz.index("".join(sorted(rBases[offset +1])))
+          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
-          rBases = [0, "", ""]
-        lastChar = char
-        if char not in O.__basisList[offset]:
-          O.__basisList[offset] += char
+          rBases = [0, "", "", maxODim]
+        lastChar[offset] = char
         rBases[offset +1] += char
         baseCh = False
       elif typ and char in O.__HEX_CHARS:
-        if char in O.__basisList[1 -offset]:
-          raise Exception("Invalid basis: %s%s" %(typ, char))
         if oneByOne:
-          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
+          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
-          rBases = [0, "", ""]
-        lastChar = char
-        if char not in O.__basisList[offset]:
-          O.__basisList[offset] += char
+          rBases = [0, "", "", maxODim]
+        lastChar[offset] = char
         rBases[offset +1] += char
         baseCh = False
       elif char in baseChars and not baseCh:
         if cntBases == 3 or char == typ:
           raise Exception("Invalid basis duplication: %s" %char)
         if rBases[offset +1]:
-          rBases[0] = xyz.index(''.join(sorted(rBases[offset +1])))
+          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
-          rBases = [0, "", ""]
+          rBases = [0, "", "", maxODim]
         cntBases += 1
         typ = char
         baseCh = True
-        lastChar,oneByOne  = '', False
+        lastChar,oneByOne  = ['',''], False
       else:
         raise Exception("Invalid basis: %s" %key)
     if typ and baseCh:
       raise Exception("Invalid last basis: %s" %key)
-    rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+    rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
     grades[offset] = grades[offset].mergeBasis(value, rBases)
     if cntBases == 1:
       return grades[offset]
@@ -394,7 +404,7 @@ class O():
     rBases[2] = grades[1].bases()[2]
     if typ == baseChars[0]:
       grades[0].value *= -1
-    rBases[0] = xyz.index("".join(sorted(rBases[1] +rBases[2])))
+    rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
     grades[0]._init(grades[0].value *grades[1].value, rBases)
     return grades[0]
 
@@ -429,6 +439,12 @@ class O():
   def __hash__(self):
     """Allow dictionary access for basis objects."""
     return hash(str(self))
+  def _dump(self):
+    """Debug method to return scalar +str of grades."""
+    g = [str(self.w)]
+    for base in self.__g:
+      g.append(str(base))
+    return "+".join(g)
 
   def __eq__(self, cf):
     """Return True if 2 Os are equal within precision."""
@@ -550,7 +566,7 @@ class O():
           out.__add(grade.mergeBasis(grade2.value, grade2.bases()))
       if q.w:
         for grade1 in self.__g:
-          out.__add(grade1.mergeBasis(q.w, (0, "", "")))
+          out.__add(grade1.mergeBasis(q.w, (0, "", "", O.__basisODim)))
       for grade1 in self.__g:
         for grade2 in q.__g:
           out.__add(grade1.mergeBasis(grade2.value, grade2.bases()))
@@ -662,6 +678,11 @@ class O():
     if sum(grade.lens()) == 0:
       self.w += grade.value
       return
+    #if self.__currentAdd >= 0:            # TBD
+    #  order = self.__g[self.__currentAdd].order(grade)
+    #  pos = self.__currentAdd
+    #else:
+    #  order = self.__g[0].order(grade) if self.__g else 0
     order = self.__g[0].order(grade) if self.__g else 0
     pos = 0
     for idx,base in enumerate(self.__g[:]):
@@ -795,13 +816,16 @@ class O():
     return cls
 
   @staticmethod
-  def _BasisArray(dim=0, exact=False):
-    """Used by Grade and BasisArgs and matches Grade.order.
-       Returns basis digits list for current max dim = oDim + uDim,
-       current max (increasing if dim > max dim) and multiplication rule."""
-    if isinstance(dim, Lib._basestr):
-      dim = int(dim, O.__HEX_BASIS +1)
-    if dim > O.__basisDim or (exact and dim < O.__basisDim):
+  def _BasisArray(oDim=0, uDim=0, exact=False):
+    """Used by Grade and BasisArgs and matches Grade.order. Returns basis
+       digits list for current dim = max(oDim, uDim) (expects increasing
+       cache if dim > max dim), max dim and multiplication rule."""
+    maxODim = oDim if exact else max(oDim, O.__basisODim)
+    dim = maxODim +uDim
+    if dim > O.__HEX_BASIS: # xyz could use alphabet if moveUBasis did too TBD
+      raise Exception("Basis size too large: (%d,%d) %(oDim)")
+    if dim > O.__basisDim or oDim > O.__basisODim \
+        or (exact and dim < O.__basisDim):
       out = [""]
       for ii in range(1, dim +1):
         form = "%X" %ii
@@ -810,59 +834,24 @@ class O():
       if dim > O.__basisDim:
         O.__basisXyz = out
         O.__basisDim = dim
+        O.__basisODim = maxODim
     else:
       out = O.__basisXyz
-    return out, O.__basisDim, O.__baezMulRule
+    return out, O.__basisDim, O.__basisODim, O.__baezMulRule, O.__HEX_BASIS +1
 
   @staticmethod
   def _BasisArgs(oDim, uDim, och="o", uch="u"):
     """Used by BasisArgs and externally to return the basis strs."""
-    dims = O.__basisList
-    pDim = max(oDim, len(dims[0])) +max(uDim, len(dims[1])) 
-    xyz = O._BasisArray(pDim, True)[0]
-    typs = [och] *pDim                    # Setup basisList o/u types
-    for idx in dims[1]:
-      typs[int(idx, O.__HEX_BASIS +1) -1] = uch
-    if oDim > len(dims[0]) or uDim > len(dims[1]):
-      missing = []                        # Add needed oDim/uDim positions
-      for pos in range(1, pDim +1):
-        if "%X" %pos not in dims[0] +dims[1]:
-          missing.append(pos -1)
-      pos = 0
-      for idx in range(oDim -len(dims[0])):
-        typs[missing[pos]] = och
-        pos += 1
-      for idx in range(uDim -len(dims[1])):
-        typs[missing[pos]] = uch
-        pos += 1
-    xyzMap = list("%X" %pos for pos in range(1, pDim +1))
-    if oDim +uDim < pDim:                # Remove excess basis elements
-      xyz = O._BasisArray(oDim +uDim, True)[0]
-      xyzMap = []
-      typsNew = []
-      oPos = uPos = 0
-      for idx,ch in enumerate(typs):
-        if ch == och and oPos < oDim:
-          typsNew.append(och)
-          xyzMap.append("%X" %(idx +1))
-          oPos += 1
-        elif ch == uch and uPos < uDim:
-          typsNew.append(uch)
-          xyzMap.append("%X" %(idx +1))
-          uPos += 1
-      typs = typsNew
-    out = []
-    for base in xyz[1:]:
-      tmp = ""
-      typ = ""
-      for ch in base:
-        idx = int(ch, O.__HEX_BASIS +1) -1
-        if typ != typs[idx]:
-          typ = typs[idx]
-          tmp += typ +xyzMap[idx]
-        else:
-          tmp += xyzMap[idx]
-      out.append(tmp)
+    #dims = list(int(x, O.__HEX_BASIS +1) for x in O.__maxBasis)
+    #oDim = max(oDim, dims[0])
+    #uDim = max(uDim, dims[1])
+    xyz = O._BasisArray(oDim, uDim, True)[0]
+    out = list(och +dig for dig in xyz[1:2**oDim])
+    if uDim > 0:
+      tmp1 = [''] +out[:]
+      tmp2 = list(uch +dig for dig in xyz[1:2**uDim])
+      for val in tmp2:
+        out.extend(x +val for x in tmp1)
     return out
 
   @staticmethod
@@ -1057,16 +1046,16 @@ class O():
   def basis(self, local=False):
     """basis([local])
        Return the local signature or max. dimension basis of basis elements."""
-    dims = self.__basisList
+    dims = self.__maxBasis
     if local:
       dims = ['', '']
       for grade in self.__g:
         for idx,bases in enumerate(grade.strs()):
           if idx < local:
-            dims[idx] = max(dims[idx][-1:], bases[-1:])
+            dims[idx] = max(dims[idx], bases[-1:])
     out = []       # Convert max. char to hex-digit
     for val in dims:
-      out.append(int(sorted(val)[-1], self.__HEX_BASIS +1) if val else 0)
+      out.append(int(val, self.__HEX_BASIS +1) if val else 0)
     return out
 
   def len(self):
@@ -1906,19 +1895,6 @@ class O():
       kwargs[xyz[idx]] = val if idx < 3 else -val
     return O(args[0], **kwargs)
 
-  @staticmethod
-  def SetQuaternions():
-    if len(O.__basisList[0]) >= 2:
-      x1,x2 = O.__basisList[0][0], O.__basisList[0][1]
-      return ("i,j,k=O(o%s=1),O(o%s=1),O(o%s=1)" %(x1, x2, x1+x2),
-              "o%s,o%s,o%s" %(x1, x2, x1 +x2))
-    elif len(O.__basisList[1]) >= 3:
-      x1,x2,x3 = O.__basisList[1][0], O.__basisList[1][1], O.__basisList[1][2]
-      return ("i,j,k=O(u%s=1),O(u%s=1),O(u%s=1)" %(x1 +x2, x2 +x3, x3+x1),
-              "u%s,u%s,u%s" %(x1 +x2, x2 +x3, x3 +x1))
-    else:
-      return ("", "")
-
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
@@ -1929,7 +1905,7 @@ class O():
           numbers (o1..F or u1..F) and multiples. The form oijk, for example,
           means left expansion, oi*oj*ok = ((oi*oj)*ok, and is internalised as
           a graded form with a subset of ordered indices from o123456789ABCDEF."""
-    ijk = O.SetQuaternions()[0]
+    ijk = "i,j,k=O(o1=1),O(o2=1),O(o12=1)"
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 
   @classmethod
@@ -1940,7 +1916,7 @@ class O():
         if i not in cls.__allChars:
           cls.__allChars.append(i)
       cls.__useCA = True
-    return O.SetQuaternions()[1]
+    return "o1,o2,o12"
 
   @classmethod
   def _validBasis(cls, value, full=False):

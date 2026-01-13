@@ -351,8 +351,8 @@ class Lib():
       out = []
       for ii in arr1:
         for jj in arr2:
-          if jj[0] == "-":
-            if ii[0] == "-":
+          if jj[:1] == "-":
+            if ii[:1] == "-":
               out.append(ii[1:] +jj[1:])
             else:
               out.append("-" +ii +jj[1:])
@@ -741,14 +741,14 @@ class Lib():
     return filename
 
   @staticmethod
-  def __save(value):
+  def __save(value, noStr=False):
     """Internal function to iterate and expand strings."""
     if isinstance(value, (list, tuple, Matrix, set)):
       out = []
       for val in value:
-        out.append(Lib.__save(val))
+        out.append(Lib.__save(val, noStr))
     elif isinstance(value, Lib._basestr):
-      out = str(value)
+      out = value if noStr else "\"%s\"" %value
     else:
       out = value
     return out
@@ -774,7 +774,8 @@ class Lib():
         typ = "Matrix" if isinstance(value, (Tensor, Matrix)) else ""
         fp.write("%s = %s(\\\n" %(name, typ))
         for val in value:
-          fp.write("  %s,\n" %Lib.__save(val))
+          fp.write("  %s,\n" %Lib.__save(val,  isinstance(val, 
+                   (list, tuple, Matrix, set))))
         fp.write(")\n")
       elif isinstance(value, (Tensor, Matrix)):
         fp.write("%s = Matrix(%s)\n" %(name, Lib.__save(value)))
@@ -791,12 +792,12 @@ class Lib():
       txt = isinstance(val, Lib._basestr)
       if txt and ("-" in val or "+" in val):
         raise Exception("Multiple text terms not supported: %s" %val)
-      if str(val)[:1] == "-":
-        mBasis.append(str(val))
-        pBasis.append("-" +val if txt else str(-val))
+      val = str(val)
+      pBasis.append(val)
+      if val[:1] == "-":
+        mBasis.append(val[1:])
       else:
-        pBasis.append(str(val))
-        mBasis.append("-" +val if txt else str(-val))
+        mBasis.append("-" +val)
     return pBasis,mBasis
   
   @staticmethod
@@ -1584,12 +1585,13 @@ class Tensor(list):
       basis = list(x[0] for x in basis if len(x)==2)
     else:
       Lib._checkList(labels, None, "morph", len(basis))
+    x=self.__morphIn(basis, True)
     return self.__morphIn(basis, True).__morphOut(labels, True)
 
   def __morphIn(self, basis, unknown=False):
     """Internal method to return a Matrix as indices into basis elements."""
     out = []
-    basis = list(basis)[:] +([1, 0,-1] if unknown else [1])
+    basis = list(basis)[:] +[1, 0]
     pBasis,mBasis = Lib._basisStrs(basis)
     for val1 in self:
       row = []
@@ -1601,7 +1603,7 @@ class Tensor(list):
           elif val2 in mBasis:
             row.append(-mBasis.index(val2) -1)
           elif unknown:
-            row.append(basis.index(-1) +1)
+            row.append(len(basis) +1)
           else:
             raise Exception("Element not found in basis for morph")
       else:
@@ -1922,7 +1924,7 @@ class Tensor(list):
           else:
             if squares and list(basisDiag.permute(p1)) != cfDiag:
               break
-            iso = newSelf.morphPerm(p1)
+            iso = newSelf.__morphPerm(p1)
 
           # Now report found, perm, diffs & accumulate histogram
           if diffs < 0:
@@ -2301,7 +2303,7 @@ class Tensor(list):
   def permInvert(self):
     """permInvert()
        Return inverted vector permutation."""
-    compPerm = list(x+1 for x in range(max(self)))
+    compPerm = list(x+1 for x in range(max(max(self),-min(self))))
     for idx,x in enumerate(range(1, len(self) +1)):
       if x in self:
         compPerm[idx] = self.index(x) +1

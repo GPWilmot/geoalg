@@ -229,14 +229,15 @@ class Calculator:
      doc strings and class variable documents strings (starting with one _)."""
   # Firstly, all words processed by parsing
   __USEFUL_WORDS  = ("quit", "exit", "help", "show", "clear", "save",
-                     "load", "test", "version", "calc", "vars",
-                     "verbose", "precision", "resolution", "free",
-                     "date", "time")
+                     "load", "saved", "loadd", "test", "version", "calc",
+                     "vars", "verbose", "precision", "resolution",
+                     "free", "date", "time")
   __USEFUL_LIBS   = ("verbose", "precision", "resolution",  "free",
                      "date", "time")
-  __USEFUL_CMDS   = ("load", "test", "version")        # Words with evaluation
-  __USEFUL_FILE   = ("show", "clear", "save", "load")  # Ordered filename words
-  __PYTHON_WORDS  = ("print", "raise", "from", "with", # Exec not eval
+  __USEFUL_CMDS   = ("load", "loadd", "test", "version") # Words with evaluation
+  __USEFUL_FILE   = ("show", "clear", "save", "load",    # Ordered filename words
+                      "saved", "loadd")
+  __PYTHON_WORDS  = ("print", "raise", "from", "with",   # Exec not eval
                      "with", "global", "raise", "for",
                      "import", "while", "exec", "eval",
                      "del", "def")
@@ -336,10 +337,11 @@ class Calculator:
     pass
 
   @staticmethod
-  def fixFilename(filename):
+  def fixFilename(filename, data=False):
     """Add home path & extention if not already there."""
-    return Lib.fixFilename(filename, os.path.dirname(__file__),
-                     os.path.splitext(Calculator.__default)[1])
+    return Lib.fixFilename(filename, os.path.dirname(__file__) \
+          +("%s..%sdata" %(os.sep, os.sep) if data else ""),
+           os.path.splitext(Calculator.__default)[1])
 
   @staticmethod
   def quit(filename=None):
@@ -356,7 +358,7 @@ class Calculator:
       sys.stdout.write("\n".join(Calculator.__history).replace('\\', "\\\\") \
                         +'\n')
   @staticmethod
-  def load(filenames=None, noError=False):
+  def load(filenames=None, data=False, noError=False):
     """Load filenames or default file and add to history."""
     if not filenames:
       filenames = Calculator.__default
@@ -366,7 +368,12 @@ class Calculator:
       if not os.path.splitext(filename)[1]:
         filename += os.path.splitext(Calculator.__default)[1]
       Lib._storeName(filename)
-      code0 = Lib.readText(Calculator.fixFilename(filename))
+      fName = Calculator.fixFilename(filename)
+      if data or not os.path.isfile(fName):
+        fName2 = Calculator.fixFilename(filename, True)
+        if data or os.path.isfile(fName2):
+          fName = fName2
+      code0 = Lib.readText(fName)
       if not code0:
         if not noError:
           raise Exception("File %s is empty" %filename)
@@ -374,23 +381,29 @@ class Calculator:
         readline.read_history_file(Calculator.fixFilename(filename))
       code += code0 +"\n"
     if Lib._isVerbose():
-      Calculator.__lastCmd = "load(%s)" %filenames
+      Calculator.__lastCmd = "load(%s)" %(filenames +(",True" if data else ""))
     return code
 
   @staticmethod
-  def save(filename=None, varname=None):
+  def __save(filename=None, varname=None, data=False):
     """Save history or variable to filename or history to default file."""
     if not filename:
       filename = Calculator.__default
     if varname is not None:
-      Lib._save(filename, varname, Calculator.__saveVar,
-          os.path.dirname(__file__), os.path.splitext(Calculator.__default)[1])
+      filename = Calculator.fixFilename(filename, data)
+      Lib._save(filename, varname, Calculator.__saveVar)
     else:
-      with open(Calculator.fixFilename(filename), "a") as fp:
+      with open(Calculator.fixFilename(filename, data), "a") as fp:
         for line in Calculator.__history:
           if line.strip()[:4] not in Calculator.__USEFUL_WORDS:
             fp.write(line +'\n')
     sys.stdout.write("File saved\n")
+  save=__save
+
+  @staticmethod
+  def saved(filename=None, varname=None):
+    """Save history or variable to filename in data directory."""
+    Calculator.__save(filename, varname, True)
 
   @staticmethod
   def clear(filename=None):
@@ -524,6 +537,7 @@ class Calculator:
           +'          load or load(<files>) - load %s\n' %(tmp %(" from", ext))\
           +'          save or save(<file>)  - append %s\n' %(tmp %(" to", ext))\
           +'            or save(<file>,var) - save var to file\n'\
+          +'          loadd, saved, [load]  - use ../data [if not found]\n'\
           +'          version, vars         - list all versions, vars/fns\n'\
           +test \
           +'          ' +libWords +' - See help(Lib.*)\n'\
@@ -673,10 +687,10 @@ class Calculator:
         if word == "load" and param == "noError=True":
           param = ""
           doFirstLoad = True
-        if word == "save":
+        if word[:4] == "save":
           buf = param.split(',')
           if len(buf) > 1:
-            if len(buf) > 2:
+            if len(buf) > 2 +(1 if word == "saved" else 0):
               raise Exception("Too many variables to save")
             param = buf[0].strip()
             extra = ",'%s'" %buf[1].strip()
@@ -707,10 +721,10 @@ class Calculator:
           ext = os.path.splitext(Calculator.__default)[1]
           pline = "(path='%s')" %self.fixFilename("*")
       if word in self.__USEFUL_CMDS:        # Expand & parse __USEFUL_CMDS
-        if word == "load":    # Need extra large files setup
+        if word[:4] == "load":    # Need extra large files setup
           if len(param) > 3 and (param[:4] == '",".' or param[:4] == "','."):
             param = self.__processExec((True, param)) # Use join to load a list
-          loadLine = Calculator.load(param, noError=doFirstLoad)
+          loadLine = Calculator.load(param, (word=="loadd"), doFirstLoad)
         elif word == "test":
           loadLine = Calculator.test(param, firstTest)
           firstTest = False
