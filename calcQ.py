@@ -948,9 +948,6 @@ class Q():
 ################################################################################
 if __name__ == '__main__':
   from calcR import Calculator
-  import traceback
-  import sys, os
-  from math import *
   exp = Lib.exp
   log = Lib.log
   try:

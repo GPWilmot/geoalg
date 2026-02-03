@@ -29,7 +29,8 @@
 ################################################################################
 __version__ = "0.8"
 import math, sys, os
-import time, datetime
+import time, datetime, traceback
+from math import *
 try:
   np = True
   for arg in sys.argv:
@@ -907,6 +908,10 @@ class Lib():
        (b,c,d), (b,bc,d), (c,bc,d). bc is multiplied from basis or if table is a
        multiplication table then bc is looked up. Simple triples with repeated
        elements or scalars are not triads. See triadDump to display results."""
+    Lib._checkList(basis, None, "allCycles", (1,0))
+    if isinstance(basis[0], Lib._basestr) and table:
+      Lib._checkList(basis, Lib._basestr, "allCycles")
+      table = Tensor(table)._morphIn(basis)
     buf = Lib.triadPairs(Lib.__allCycles, basis, "allCycles", dump, table)
     lr = len(basis)
     single, cycles = [[]] *(lr *(lr -1)), [[]] *(lr *(lr -1)) 
@@ -938,6 +943,10 @@ class Lib():
     bb,cc,table = params
     if table:
       bc = abs(table.get(b,c))
+      if bc >= len(basis):
+        return cnt
+      if isinstance(basis[0], Lib._basestr):
+        bc -= 1
     else:
       bc = basis.index(abs(bb *cc))
     b1,c1,bc1 = sorted((b, c, bc))
@@ -951,6 +960,10 @@ class Lib():
   def associativeCycles(basis, table=None, dump=False):
     """assoc[iative]Cycles(basis,[table,dump]) See Tensor.assocTriads()
        Return a list of independent simplex 3-cycle faces. See allCycles()."""
+    Lib._checkList(basis, None, "associativeCycles", (1,0))
+    if isinstance(basis[0], Lib._basestr) and table:
+      Lib._checkList(basis, Lib._basestr, "associativeCycles")
+      table = Tensor(table)._morphIn(basis)
     return Lib.triadPairs(Lib.__assocCycles, basis, "assocCycles", dump, table)
   @staticmethod
   def __assocCycles(out, basis, lr, b, c, params):
@@ -958,6 +971,10 @@ class Lib():
     bb,cc,table = params
     if table:
       bc = abs(table.get(b,c))
+      if bc >= len(basis):
+        return cnt
+      if isinstance(basis[0], Lib._basestr):
+        bc -= 1
     else:
       bc = basis.index(abs(bb *cc))
     b1,c1,bc1 = sorted((b, c, bc))
@@ -1585,8 +1602,11 @@ class Tensor(list):
       basis = list(x[0] for x in basis if len(x)==2)
     else:
       Lib._checkList(labels, None, "morph", len(basis))
-    x=self.__morphIn(basis, True)
     return self.__morphIn(basis, True).__morphOut(labels, True)
+
+  def _morphIn(self, basis):
+    """Internal method to return a Matrix as indicies into Basis elements."""
+    return self.__morphIn(basis)
 
   def __morphIn(self, basis, unknown=False):
     """Internal method to return a Matrix as indices into basis elements."""
@@ -1608,12 +1628,12 @@ class Tensor(list):
             raise Exception("Element not found in basis for morph")
       else:
         val1 = str(val1)
-        if val2 in pBasis:
+        if val1 in pBasis:
           out.append(pBasis.index(val1) +1)
-        elif var2 in mBasis:
+        elif val1 in mBasis:
           out.append(-mBasis.index(val1) -1)
         elif unknown:
-          out.append(basis.index(-1) +1)
+          out.append(len(basis) +1)
         else:
           raise Exception("Element not found in basis for morph")
       if row:
@@ -1624,8 +1644,8 @@ class Tensor(list):
     """Internal method to return a Matrix of indices into basis elements."""
     try:
       out = []
-      basis = list(basis)[:] +([1,0,-1] if unknown else [1])
-      if any(map(lambda x: isinstance(x, Lib._basestr), basis)) or unknown:
+      basis = list(basis)[:] +[1, 0]
+      if any(map(lambda x: isinstance(x, Lib._basestr), basis)):
         if unknown:
           basis[-1] = "XXX"
         basis,mBasis = Lib._basisStrs(basis)
@@ -1635,9 +1655,19 @@ class Tensor(list):
         row = []
         if isinstance(val1, (list, tuple, Matrix)):
           for val2 in val1:
-            row.append(mBasis[-val2 -1]  if val2 < 0 else basis[val2 -1])
+            if abs(val2) -1 >= len(basis):
+              if not unknown:
+                raise Exception("Unknown morph element")
+              row.append("XXX")
+            else:
+              row.append(mBasis[-val2 -1]  if val2 < 0 else basis[val2 -1])
         else:
-          out.append(mBasis[-val1 -1] if val1 < 0 else basis[val1 -1])
+          if abs(val1) -1 >= len(basis):
+            if not unknown:
+              raise Exception("Unknown morph element")
+            row.append("XXX")
+          else:
+            out.append(mBasis[-val1 -1] if val1 < 0 else basis[val1 -1])
         if row:
           out.append(row)
     except IndexError:
@@ -2193,8 +2223,8 @@ class Tensor(list):
 
   def zeroTriads(self, basis, dump=False):
     """zeroTriads(basis, [dump])
-       Return all zero divisors (a+b)(c+d) as list of (b,c,d1,d2,...) with
-       a=bcd non-scalar and unique where b > c > d range through the table."""
+       Return all zero divisors (a+b)(c+d) triads with where b > c > d, all pure
+       and unique and a=bcd non-scalar. See Lib.triadDump() to format return."""
     self.__checkSquare(basis, "zeroTriads", "basis")
     Lib._checkType(dump, bool, "zeroTriads")
     pBasis = list((str(x) for x in basis))

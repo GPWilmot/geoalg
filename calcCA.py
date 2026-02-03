@@ -647,6 +647,8 @@ class CA():
     """Return semi-graded sym or asym product for sign=-1 or 1. Different
        definition to structure paper due to Pertti Lounesto feedback.
        Probably upsets Pfaffian proof though."""
+    if isinstance(ca, (int, float)):
+      ca = CA(ca)
     if sign == -1:
       out = CA(0)
       out.__entered0 = self.__entered0
@@ -1074,19 +1076,21 @@ class CA():
   def dot(self, ca):
     """dot(ca)
        Return odd overlap contraction. Dot product for vectors."""
-    Lib._checkType(ca, CA, "dot")
+    Lib._checkType(ca, (CA, int, float), "dot")
     return self.__bar(ca, -1)
 
   def wedge(self, ca):
     """wed[ge](ca)
        Return even overlap & scalar expansion. Exterior part if no overlap."""
-    Lib._checkType(ca, CA, "wedge")
+    Lib._checkType(ca, (CA, int, float), "wedge")
     return self.__bar(ca, 1)
   wed = wedge
 
   def cross(self, ca):
     """cross(ca)
        Return cross product of pure(1) parts and using e321 * asym/2 product."""
+    if isinstance(ca, (int, float)):
+      ca = CA(ca)
     Lib._checkType(ca, CA, "cross")
     if len(self.grades()) > 2 or len(ca.grades()) > 2:
       raise Exception("Can only apply cross to 1-forms")
@@ -1104,7 +1108,7 @@ class CA():
   def sym(self, ca):
     """sym(ca)
        Return symmetric product of two CAs. The dot product *2 for vectors."""
-    Lib._checkType(ca, CA, "sym")
+    Lib._checkType(ca, (CA, int, float), "sym")
     out = self *ca +ca *self
     out.__entered0 = self.__entered0
     return out
@@ -1112,7 +1116,7 @@ class CA():
   def asym(self, ca):
     """asym(ca)
        Return antisymmetric product of two CAs. Wedge product*2 for vectors."""
-    Lib._checkType(ca, CA, "asym")
+    Lib._checkType(ca, (CA, int, float), "asym")
     out = self *ca -ca *self
     out.__entered0 = self.__entered0
     return out
@@ -1120,6 +1124,8 @@ class CA():
   def associator(self, p, q):
     """associator(p,q)
        Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
+    Lib._checkType(p, (CA, int, float), "associator")
+    Lib._checkType(q, (CA, int, float), "associator")
     out = (self * p) *q - self *(p * q)
     out.__entered0 = self.__entered0
     return out
@@ -2034,9 +2040,6 @@ class CA():
 ################################################################################
 if __name__ == '__main__':
   from calcR import Calculator
-  import traceback
-  import sys, os
-  from math import *
   exp = Lib.exp
   log = Lib.log
   try:

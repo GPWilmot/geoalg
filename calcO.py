@@ -714,7 +714,6 @@ class O():
        Even = not appropriate as octonions are not graded
        Commutes = +ve/-ve terms commute.
        Hyperbolic = has x*x>0 terms but no imaginary terms."""
-    sgnOut = self.__class__(0)
     out = self.__class__(self.w)
     p2 = 0
     lastDim = (0, 0)
@@ -733,7 +732,7 @@ class O():
       if conj:
         if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
-          sgnOut.__g.append(grade.copy(value))
+        out.__g.append(grade.copy(value))
     scalar = (1 if self.w else 0)
     simple = False
     if conj:
@@ -744,7 +743,7 @@ class O():
           simple = True
         elif flat[1] + scalar == 1:
           simple = (flat[0] == flat[1])
-    return out +sgnOut, simple, (flat[1] > 0 and flat[0] == 0), p2
+    return out, simple, (flat[1] > 0 and flat[0] == 0), p2
 
   def __versible(self, conj):
     """Try self*conj to see if it generates a single invertible term. Return
@@ -945,7 +944,7 @@ class O():
        Return self as 3 lists = a list of o-basis indicies, values & u-basis."""
     out1,out2,out3 = [],[],[]
     for grade in self.__g:
-      pBasis,oBase,uBase = grade.bases()
+      pBasis,oBase,uBase,qBase = grade.bases()
       basis = []
       for ch in oBase:
         basis.append(int(ch, self.__HEX_BASIS +1))
@@ -1142,27 +1141,40 @@ class O():
       raise Exception("Illegal form for inverse")
     return out
 
+  def dot(self, q):
+    """dot(q)
+       Return half abs value of sym product."""
+    return abs(self.sym(q)) //2
+
+  def wedge(self, q):
+    """wed[ge](q)
+       Return half asym product."""
+    return self.asym(q) //2
+  wed = wedge
+
   def cross(self, q):
     """cross(q)
        Return half asym product of pure parts."""
+    if isinstance(q, (int, float)):
+      q = O(q)
     Lib._checkType(q, O, "cross")
     x = self.__class__()
     x.__g = self.__g    # Shallow copies
     y = self.__class__()
     y.__g = q.__g
-    out = (x *y -y *x) *0.5 
+    out = (x *y -y *x) //2
     return out
 
   def sym(self, q):
     """sym(q)
        Return symmetric product of two Os. The pure part is always zero."""
-    Lib._checkType(q, O, "sym")
+    Lib._checkType(q, (O, int, float), "sym")
     return (self *q +q *self)
 
   def asym(self, q):
     """asym(q)
        Return antisymmetric product of two Os. Cross product is pure part."""
-    Lib._checkType(q, O, "asym")
+    Lib._checkType(q, (O, int, float), "asym")
     return (self *q -q *self)
  
   def associator(self, p, q, alternate=False):
@@ -1170,8 +1182,8 @@ class O():
        Return the associator [self,p,q] = (self * p) *q - self *(p * q) or
        the first alternate where alternate is [x,y,z]!=0 for any pair equal
        and x,y,z in {self,p,q}. Any scalar gives zero."""
-    Lib._checkType(p, O, "associator")
-    Lib._checkType(q, O, "associator")
+    Lib._checkType(p, (O, int, float), "associator")
+    Lib._checkType(q, (O, int, float), "associator")
     Lib._checkType(alternate, bool, "associator")
     accum = []
     out = self.__assoc(p, q)
@@ -2013,9 +2025,6 @@ class O():
 ################################################################################
 if __name__ == '__main__':
   from calcR import Calculator
-  import traceback
-  import sys, os
-  from math import *
   exp = Lib.exp
   log = Lib.log
   try:

@@ -24,7 +24,6 @@
 ## Start with either calcS.py, python calcS.py or see ./calcR.py -h.
 ################################################################################
 __version__ = "0.2"
-import sys, math
 import keyword
 from calcLib import *
 
@@ -610,7 +609,6 @@ class S():
 ################################################################################
 if __name__ == '__main__':
 
-  from math import *
   from calcR import Calculator
 
   # P & S Unit test cases for Calc with Tests[0] being init for each case

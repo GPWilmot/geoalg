@@ -138,6 +138,8 @@ class LibTest():
       if not test:
         LibTest.__testPass = False
       tst = LibTest.__testRng[LibTest.__testCnt]
+      if LibTest.__testCnt > len(LibTest.__testRng) -1:
+        raise Exception("Invalid test number")
       LibTest.__testCnt += 1
       if store is None:
         sys.stdout.write("Test %d\n" %tst)
@@ -1278,8 +1280,6 @@ class Real(float):
 
 ################################################################################
 if __name__ == '__main__':
-  from math import *
-  import traceback
   try:
     import importlib
   except:
