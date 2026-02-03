@@ -1,8 +1,15 @@
 # File: ultronions.oct
 # Build all zero divisors and Cayley-Dickson algebra structure
+from multiprocessing import Process
+import time, traceback
+try:
+  from multiprocessing import shared_memory
+except:
+  shared_memory = None
 
 _ultronions = """Module contains class Cawagas, variables:
-   ao7, AO7, b07, co7, BO7, so7, SO7, s15, S15, CyclesPattern, ABCXeg, CyclesModes
+   AO7, b07, co7, BO7, SO7, S712, S721, S15, SS15, SB1513, SB1522, SB1531,
+   f7Basis, f15Basis, e15Basis, CyclesPattern, ABCXeg, CyclesModes
  and functions:
    nonAssocType, nonAssocModeType, cycles, cyclesType, nonAssocMode, nonAssocModeCounts,
    nonAssocMalcev, nonAssocLine, nonAssocCube, triadCycles3, triadCycles, triadCyclesModes,
@@ -16,7 +23,9 @@ O.Basis(5)  # Cawagas uses o1-o4 & CABCXeg uses o5
 # S14 = e123 +e145 +e167 +e246 -e257 -e347 +e356,  t14 = CP6[3][0]
 
 # With Cayley Dickson Rule set the same as Wikipedia (default)
+_f7Basis = "Labels f1, f2, ..., f7 to compare different algebras."
 f7Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7"))
+_AO7 = "Wiki rep.: Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)."
 AO7 = Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)
 print("Wiki representation:", AO7 == Tensor(
       ("-1", "f3", "-f2", "f5", "-f4", "-f7", "f6"),
@@ -30,12 +39,17 @@ print("Wiki representation:", AO7 == Tensor(
 # The Baez Octonion representation is found with an anti-isomorphic
 # permutation or by changing to Baez duubling rule and applying an
 # isomorphic permutation.
+_bo7 = "Permutation to convert Wiki to Baez reps."
 bo7 = Tensor(O.Basis(3)).permute([1, 2, 4, 3, 7, 5, -6], invert=True)
+_BO7 = "Baez rep.: Tensor.Table(bo7).morph(bo7,f7Basis)."
 BO7 = Tensor.Table(bo7).morph(bo7,f7Basis)
 if "doBaez" not in globals() or doBaez:
   doBaez = False
   O.CayleyDicksonRule(True)
+  _co7 = "Permutation to convert Baez to Wiki reps."
   co7 = Tensor(O.Basis(3)).permute([-1, 2, 4, 3, 7, -5, 6], invert=True)
+  _CO7 = """Baez rep.: O.CayleyDicksonRule(True);
+  Tensor.Table(O.Basis(3)).morph(O.Basis(3),f7Basis)"""
   CO7 = Tensor.Table(co7).morph(co7,f7Basis)
   O.CayleyDicksonRule(False)
   print("Baez representation:", BO7 == CO7, BO7 == Tensor(
@@ -47,31 +61,24 @@ if "doBaez" not in globals() or doBaez:
       ("f5", "-f7", "f4", "-f3", "-f1", "-1", "f2"),
       ("f3", "f6", "-f1", "f5", "-f4", "-f2", "-1")))
 
-# Split Octonions from Wiki = Tensor(SO7).dump(so7)
-so7 = ("i",  "j",   "k",   "l",   "li", "lj",  "lk")
-SO7 = Tensor(
-     ("-1", "k",  "-j",  "-li", "l",  "-lk", "lj"),
-     ("-k", "-1",  "i",   "-lj", "lk", "l",   "-li"),
-     ("j",  "-i",  "-1",  "-lk", "-lj","li",  "l"),
-     ("li", "lj",  "lk",  "1",   "i",  "j",   "k"),
-     ("-l", "-lk", "lj",  "-i",  "1",  "k",   "-j"),
-     ("lk", "-l",  "-li", "-j",  "-k", "1",   "i"),
-     ("-lj", "li", "-l",  "-k",  "j",  "-i",  "1"))
-# Tensor.Table(O.Basis(2,1)).search(O.Basis(2,1),Tensor(SO7),so7,num=-1)
-# First match=[-1, 2, 3, 4, -5, 6, 7] -> Tensor.Table(so21).morph(so21,so7)==SO7 if
-so21 = Tensor(O.Basis(2,1)).permute([1, 2, 3, -4, 5, 6, 7], invert=True)
-# Tensor.Table(O.Basis(1,2)).search(O.Basis(1,2),Tensor(SO7),so7,cycles=False,num=-1)
-# First match=[1, -4, -5, 6, 7, 2, 3] -> Tensor.Table(so12).morph(so12,so7)==SO7 if
-so12 = Tensor(O.Basis(1,2)).permute([-1, 4, 5, 6, 7, 2, 3], invert=True)
-# Tensor.Table(O.Basis(0,3)).search(O.Basis(0,3),Tensor(SO7),so7,cycles=False,num=-1)
-# First match=[-4, 5, 1, 6, 2, -3, 7] -> Tensor.Table(so03).morph(so03,so7)==SO7 if
-so03 = Tensor(O.Basis(0,3)).permute([-4, 5, 1, 6, 2, -3, 7], invert=True)
+_SO7 = "Split Octonions from Wiki: Tensor.Table(O.Basis(0,3))"
+SO7 = Tensor.Table(O.Basis(0,3)).morph(O.Basis(0,3), f7Basis)
+_ss7 = """Split-octonion with ob = Tensor(O.Basis(%s))
+   Tensor.Table(ob).search(ob,SO7,f7Basis,num=-1,noAntiIso=True) -> <match>
+   ob.permute(<match>,True); Tensor.Table(%s).morph(%s,f7Basis)==SO7"""
+_S712 = _ss7 %("1,2", "S712", "S712");   _S721 = _ss7 %("2,1", "S721", "S721")
+S712 = Tensor(O.Basis(1,2)).permute([3, 2, 1, 4, 7, 6, 5])
+S721 = Tensor(O.Basis(2,1)).permute([5, 6, 3, 4, 1, 2, 7])
 
-# Sedenions from Wikipedia (= Cawagas)
-# Tensor.Table(O.Basis(4)).morph(O.Basis(4), s15)==S15
-s15=("e1","e2","e3","e4","e5","e6","e7","e8","e9","e10","e11","e12","e13","e14","e15")
-_S15 = "Sedenions from Wikipedia (= Cawagas)"
-S15 = Tensor(
+
+# SEDENIONS
+_e15Basis = "Sedenion basis for S15 (Wiki)"
+e15Basis = ("e1","e2","e3","e4","e5","e6","e7","e8","e9",
+            "e10","e11","e12","e13","e14","e15")
+_S15 = """Sedenions from Wikipedia (= Cawagas), 
+    Tensor.Table(O.Basis(4)).morph(O.Basis(4), e15Basis)==S15"""
+S15 = Tensor.Table(O.Basis(4)).morph(O.Basis(4), e15Basis)
+print("Sedonion Wiki rep.: ", S15 == ( \
   ("-1",  "e3",  "-e2", "e5",  "-e4", "-e7", "e6",  "e9", "-e8", "-e11","e10", "-e13","e12", "e15","-e14"),
   ("-e3", "-1",  "e1",  "e6",  "e7",  "-e4", "-e5", "e10","e11", "-e8", "-e9", "-e14","-e15","e12","e13"),
   ("e2",  "-e1", "-1",  "e7",  "-e6", "e5",  "-e4", "e11","-e10","e9",  "-e8", "-e15","e14","-e13","e12"),
@@ -86,52 +93,89 @@ S15 = Tensor(
   ("e13", "e14", "e15", "e8",  "-e9", "-e10","-e11","-e4","e5",  "e6",  "e7",  "-1", "-e1", "-e2", "-e3"),
   ("-e12","e15", "-e14","e9",  "e8",  "e11", "-e10","-e5","-e4", "e7",  "-e6", "e1", "-1",  "e3",  "-e2"),
   ("-e15","-e12","e13", "e10", "-e11","e8",  "e9",  "-e6","-e7", "-e4", "e5",  "e2", "-e3", "-1",  "e1"),
-  ("e14", "-e13","-e12","e11", "e10", "-e9", "e8",  "-e7","e6",  "-e5", "-e4", "e3", "e2",  "-e1", "-1"))
+  ("e14", "-e13","-e12","e11", "e10", "-e9", "e8",  "-e7","e6",  "-e5", "-e4", "e3", "e2",  "-e1", "-1")))
+
+# Split sedenions: SS15.dump(f15Basis)
+_f15Basis = "Sedenion labels fr comparison."
+f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9","fA", "fB", "fC", "fD", "fE", "fF"))
+_SS15 = "Split sedenions: Tensor.Table(O.Basis(0,4)).morph(O.Basis(0,4), f15Basis)."
+SS15 = Tensor.Table(O.Basis(0,4)).morph(O.Basis(0,4), f15Basis)
+_ss15 = """Split-sedenion with ob = Tensor(O.Basis(%s))
+   Tensor.Table(ob).search(ob,SS15,f15Basis,num=-1,noAntiIso=True,initPerm=?)
+   -> <match> where ? = match for 7-D equivalent in 1st quarter of Table.
+   ob.permute(<match>,True); Tensor.Table(%s).morph(%s,f15Basis)==SS15"""
+_SB1513 = _ss15 %("1,3", "S1513", "S1513")
+_SB1522 = _ss15 %("2,2", "S1522", "S1522")
+_SB1531 = "TBD"
+SB1513 = Tensor(O.Basis(1,3)).permute([3,2,1,4,7,6,5,8,11,10,9,12,15,14,13])
+SB1522 = Tensor(O.Basis(2,2)).permute([5,6,3,4,1,2,7,8,13,14,11,12,9,10,15])
+#SB1531 = Tensor(O.Basis(3,1)).permute([])
+#  (1,3) (o1u2, u2, o1, u3, o1u23, u23, o1u3, u4, o1u24, u34, o1u4, u34, o1u234, u234, o1u34) Found at 44125
+#  (2,2) (o2u5, o12u5, o1, u5, o2, o12, o1u5, u6, o2u56, o12u56, o1u6, u56, o2u6, o12u6, o1u56) Found at 576
+
+if Lib.isCalc("CA"):
+  def unspin(matrix, basis):
+    """unspin(matrix, basis):
+       Generate calibration from table and it's assoc. triads."""
+    triads = list(Lib.triadDump(matrix.abcTriads(basis), basis))
+    cal = 0
+    for (x,y,z) in triads:
+      x0 = basis.index(x); y0 = basis.index(y)
+      tri = matrix[x0][y0]
+      xyz = CA.Eval(("e" +str(x)[1:] +str(y)[1:] +str(z)[1:],1))
+      if tri == z:
+        cal += xyz
+      elif str(tri) ==  "-" +str(z):
+        cal += -xyz
+      else:
+        raise Exception("Invalid triad in unspin: %s" %(x,y,z))
+    return cal
 
 class Cawagas():
   """for x in Cawagas().deriveZDs(): print((x[0]+x[1])*(x[2]+x[3]))"""
   # Cawagas Sedenion zero divisors
-  #       0     1     2      3     4      5      6
-  #       1     2     3     12    13     14     15
-  ZD1 = (o1,   o2,  -o12,  o234, o1234, o34,   o134)
-  ZD2 = (o1,   o23,  o123, o134, o34,  -o124,  o24)
-  ZD3 = (o1,   o13,  o3,   o24, -o124,  o1234, o234)
-  ZD4 = (o2,   o23,  o3,   o1234,o134,  o14,  -o124)
-  ZD5 = (o2,   o123, o13, -o124, o14,   o34,   o234)
-  ZD6 = (-o12, o23,  o13,  o34, o1234,  o24,   o14)
-  ZD7 = (-o12, o3,   o123, o14, o24,    o134,  o234)
+  if str(O.Basis(4)[-1]) == "o1234":
+    #       0     1     2      3     4      5      6
+    #       1     2     3     12    13     14     15
+    ZD1 = (o1,   o2,  -o12,  o234, o1234, o34,   o134)
+    ZD2 = (o1,   o23,  o123, o134, o34,  -o124,  o24)
+    ZD3 = (o1,   o13,  o3,   o24, -o124,  o1234, o234)
+    ZD4 = (o2,   o23,  o3,   o1234,o134,  o14,  -o124)
+    ZD5 = (o2,   o123, o13, -o124, o14,   o34,   o234)
+    ZD6 = (-o12, o23,  o13,  o34, o1234,  o24,   o14)
+    ZD7 = (-o12, o3,   o123, o14, o24,    o134,  o234)
 
-  def _deriveZDs(self, *x):
-    """Used by deriveZDs."""
-    out = x[5]
-    for y in x[1:3]:
-      a,b,c,d = x[4] *(-1 if x[0][1]=="-" else 1),\
-                x[3], x[1], x[2] *(-1 if x[0][0]=="-" else 1)
-      out.append((a,b,c,d))
-      return
-    for y in x[3:5]:
-      a,b,c,d = x[2] *(-1 if x[0][0]=="-" else 1),\
-                x[1], x[3], x[4] *(-1 if x[0][0]=="-" else 1)
-      out.append((a,b,c,d))
+    def _deriveZDs(self, *x):
+      """Used by deriveZDs."""
+      out = x[5]
+      for y in x[1:3]:
+        a,b,c,d = x[4] *(-1 if x[0][1]=="-" else 1),\
+                  x[3], x[1], x[2] *(-1 if x[0][0]=="-" else 1)
+        out.append((a,b,c,d))
+        return
+      for y in x[3:5]:
+        a,b,c,d = x[2] *(-1 if x[0][0]=="-" else 1),\
+                  x[1], x[3], x[4] *(-1 if x[0][0]=="-" else 1)
+        out.append((a,b,c,d))
 
-  def deriveZDs(self):
-    """deriveZDs()
-       Return sedenion zero divisors list (a,b,c,d) equivalent to Cawagas."""
-    out = []
-    for x in (self.ZD1, self.ZD2, self.ZD3,self.ZD4,self.ZD5,self.ZD6,self.ZD7):
-      self._deriveZDs("+-", x[0], x[4], x[1], x[5], out,0)
-      self._deriveZDs("++", x[0], x[5], x[1], x[4], out,1)
-      self._deriveZDs("--", x[0], x[3], x[1], x[6], out,2)
-      self._deriveZDs("-+", x[0], x[6], x[1], x[3], out,3)
-      self._deriveZDs("-+", x[1], x[5], x[2], x[6], out,4)
-      self._deriveZDs("+-", x[1], x[4], x[2], x[3], out,5)
-      self._deriveZDs("--", x[1], x[6], x[2], x[5], out,6)
-      self._deriveZDs("++", x[1], x[3], x[2], x[4], out,7)
-      self._deriveZDs("+-", x[2], x[6], x[0], x[4], out,8)
-      self._deriveZDs("--", x[2], x[3], x[0], x[5], out,9)
-      self._deriveZDs("-+", x[2], x[5], x[0], x[3], out,10)
-      self._deriveZDs("++", x[2], x[4], x[0], x[6], out,11)
-    return out
+    def deriveZDs(self):
+      """deriveZDs()
+        Return sedenion zero divisors list (a,b,c,d) equivalent to Cawagas."""
+      out = []
+      for x in (self.ZD1, self.ZD2, self.ZD3,self.ZD4,self.ZD5,self.ZD6,self.ZD7):
+        self._deriveZDs("+-", x[0], x[4], x[1], x[5], out,0)
+        self._deriveZDs("++", x[0], x[5], x[1], x[4], out,1)
+        self._deriveZDs("--", x[0], x[3], x[1], x[6], out,2)
+        self._deriveZDs("-+", x[0], x[6], x[1], x[3], out,3)
+        self._deriveZDs("-+", x[1], x[5], x[2], x[6], out,4)
+        self._deriveZDs("+-", x[1], x[4], x[2], x[3], out,5)
+        self._deriveZDs("--", x[1], x[6], x[2], x[5], out,6)
+        self._deriveZDs("++", x[1], x[3], x[2], x[4], out,7)
+        self._deriveZDs("+-", x[2], x[6], x[0], x[4], out,8)
+        self._deriveZDs("--", x[2], x[3], x[0], x[5], out,9)
+        self._deriveZDs("-+", x[2], x[5], x[0], x[3], out,10)
+        self._deriveZDs("++", x[2], x[4], x[0], x[6], out,11)
+      return out
 
 def nonAssocType(bc, d=O(0)):
   """nonAssocType(bc, [d])
@@ -501,7 +545,7 @@ def triadCyclesSA(triCyc, full=False, silo=None):
             else:
               tmp[idx +silo] = 1
           else:
-            sub = len(list(Lib.triadDump(O.AssocTriads(all7,True),all7)))
+            sub = len(list(Lib.triadDump(O.AssocTriads(all7, True), all7)))
             tmp = {"": sub, idx +silo: 1}
             out[triad] = tmp
   if full:
