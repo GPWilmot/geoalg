@@ -539,7 +539,7 @@ class Calculator:
           +'          load or load(<files>) - load %s\n' %(tmp %(" from", ext))\
           +'          save or save(<file>)  - append %s\n' %(tmp %(" to", ext))\
           +'            or save(<file>,var) - save var to file\n'\
-          +'          loadd, saved, [load]  - use ../data [if not found]\n'\
+          +'          loadd, saved, [load]  - use ../data [used if not found]\n'\
           +'          version, vars         - list all versions, vars/fns\n'\
           +test \
           +'          ' +libWords +' - See help(Lib.*)\n'\
@@ -1095,10 +1095,7 @@ class Calculator:
             if buf[0]:   # isAns
               anyAns = True
               if isinstance(tmpAns, float):
-                resol, resolForm, resolFloat = Lib._getResolutions()
-                ans = resolForm %tmpAns
-                if ans.find(".") < 0 and tmpAns != int(tmpAns):
-                  ans = resolFloat %tmpAns
+                ans = Lib.getResolNum(tmpAns)
                 sys.stdout.write("ans = %s\n" %ans)
               elif tmpAns is not None:
                 ans = tmpAns

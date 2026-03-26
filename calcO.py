@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 ################################################################################
 ## File: calcO.py needs calcR.py and file is part of GeoAlg.
-## Copyright (c) 2021, 2023 G.P.Wilmot
+## Copyright (c) 2021, 2023, 2025, 2026 G.P.Wilmot
 ##
 ## GeoAlg is free software: you can redistribute it and/or modify it under the
 ## terms of the GNU General Public License as published by the Free Software 
@@ -31,12 +31,12 @@
 ## command interprets CA numbers via CA class.
 ## Start with either calcO.py, python calcO.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.8"
+__version__ = "0.9"
 import math
 from calcLib import *
 
 ################################################################################
-class O():
+class O(object):
   """Class to process octonions and unity elements consisting of 32-D numbers,
      half being standard imaginary Cayley-Dickson generators (o1..oF) and (u1..
      uF) being unity generators. O(q,p) gives the basis where q specifies neg.
@@ -64,13 +64,13 @@ class O():
   __BASIS_CHARS = ('o', 'u')             # O basis chars only
   __allChars    = ['o', 'u']             # Include CA
   __maxBasis    = ['0', '0']             # Store the max dimensions
+  _maxDims      = ['0', '0']             # For inheritad dimensions
   __useCA       = False                  # CA class is loaded
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
   __basisODim   = 0                      # Count of o basis to move u basis
   __basisCache  = []                     # Cache partial multiplication table
   __baezMulRule = False                  # Change Cayley-Dickson multiply rule
-  dumpRepr      = False                  # Repr defaults to str
 
   class Product(list):
     """Cayley-Dickson expansion as recursive binary tree to arbitrary level.
@@ -173,14 +173,20 @@ class O():
       self._init(value, bases)
     def _init(self, value, bases):
       self.value = value
-      self.__pBase = bases[0]
-      self.__oBase = bases[1]
-      self.__uBase = bases[2]
-      self.__qBase = bases[3]
+      if bases:
+        self.__pBase = bases[0]
+        self.__oBase = bases[1]
+        self.__uBase = bases[2]
+        self.__qBase = bases[3]
     def __str__(self):
       return "%s[%s,%s,%s,%s]" %(self.value, self.__pBase,
                              self.__oBase, self.__uBase, self.__qBase)
-    __repr__ = __str__
+    def __repr__(self):
+      """Overwrite object output using __str__ for print if !verbose."""
+      if Lib._isVerbose():
+        return "%s%s" %(self.value, [self.__pBase, self.__oBase, self.__uBase,
+              self.__qBase])
+      return str(self)
     def __mergeStr(self, dupStr):
       sStr = sorted(dupStr)
       out = ""
@@ -200,9 +206,10 @@ class O():
           idx += 1
       return out, (sgn %2 == 1)
 
-    def new(self, value):
-      inherit = self.__new__(O.Grade)
-      inherit._init(value, (0, "", "", 0))
+    def new(self, value, bases=(0, "", "", 0)):
+      """Part is ignored for the base class."""
+      inherit = self.__new__(self.__class__)
+      inherit._init(value, bases)
       return inherit
     def bases(self):
       return (self.__pBase, self.__oBase, self.__uBase, self.__qBase)
@@ -220,8 +227,7 @@ class O():
 
     def copy(self, value=None):
       inherit = super(self.__class__, self).__new__(self.__class__)
-      inherit._init(self.value if value is None else value,
-                (self.__pBase, self.__oBase[:], self.__uBase[:], self.__qBase))
+      inherit._init(self.value if value is None else value, self.bases())
       return inherit
 
     def isEq(self, cf, precision):
@@ -246,11 +252,13 @@ class O():
         return 1
       return 0
 
-    @staticmethod
-    def moveUBasis(bases, xyz, maxODim, hexBase):
+    def moveUBasis(self, bases, xyz, maxODim, hexBase):
       """If uBase is set then pBase needs to move if max oBase increases."""
       uOffs = "".join("%X" %(int(x, hexBase) +maxODim) for x in bases[2])
       return xyz.index("".join(sorted(bases[1] +uOffs)))
+    def setMaxODim(self, maxODim):
+      """Fix the current maxODim from inside O."""
+      self.__qBase = maxODim
 
     def mergeBasis(self, value, rhs):
       """Multiply graded basis self by rhs as one row due to the definition of
@@ -262,11 +270,11 @@ class O():
       lhs = self.bases()
       xyz, maxDim, maxODim, baezMul, hexBase = O._BasisArray()
       if lhs[2] and lhs[3] != maxODim:
-        self.__pBase = self.__class__.moveUBasis(lhs, xyz, maxODim, hexBase)
+        self.__pBase = self.moveUBasis(lhs, xyz, maxODim, hexBase)
         self.__qBase = maxODim
         lhs = self.bases()
       if rhs[2] and rhs[3] != maxODim:
-        rhs = (self.__class__.moveUBasis(rhs, xyz, maxODim, hexBase),
+        rhs = (self.moveUBasis(rhs, xyz, maxODim, hexBase),
                 rhs[1], rhs[2], maxODim)
       bases = [0, "", "", maxODim]     # Base for lhs p, o and u, resp
       rBase = rhs[0]                   # Iterate rhs o and u
@@ -316,7 +324,7 @@ class O():
        bases are not allowed and hex digits must be increasing. See Basis and
        BasisArgs for a list of basis numbers and names."""
     self.w = args[0] if args else 0             # Scalar
-    self.__g = []                               # Array of ordered Grades
+    self._g = []                               # Array of ordered Grades
     self.__currentAdd = -1                      # Previous add index
     Lib._checkType(self.w, (int, float), "O")
     if len(args) > 1:
@@ -328,7 +336,7 @@ class O():
         Lib._checkType(val, (int, float), "O")
         if val:
           base = xyz[idx +1]
-          self.__g.append(O.Grade(val, (idx +1, base, "", maxODim)))
+          self._g.append(O.Grade(val, (idx +1, base, "", maxODim)))
           maxChar = base[:-1]
           if maxChar > O.__maxBasis[0]:
             O.__maxBasis[0] = maxChar
@@ -337,14 +345,15 @@ class O():
       if not key:
         self.w += value
       elif value:
-        self.__add(O._init(key, value, O.__BASIS_CHARS))
+        lGrade = O.Grade(1, (0, "", "", 0))
+        self.__add(O._init(key, value, O.__BASIS_CHARS, lGrade))
 
   def _initAdd(self, grade):
-    """Used internally to add grades to this O."""   # TBD
+    """Used externally to add grades to inherited O."""
     self.__add(grade)
 
   @staticmethod
-  def _init(key, value, baseChars):
+  def _init(key, value, baseChars, lGrade):
     """Return the Grade for basis string key. Separate o & u parts."""
     typ = None
     baseCh = False
@@ -357,7 +366,7 @@ class O():
         typ = char
     dims = list(int(x, O.__HEX_BASIS +1) for x in O.__maxBasis)
     xyz, maxDim, maxODim, baezMul, hexBase = O._BasisArray(*dims)
-    lGrade = O.Grade(1, (0, "", "", maxODim))  # Base for o and u, resp
+    lGrade.setMaxODim(maxODim)
     grades = [lGrade, lGrade.copy()]
     rBases = [0, "", "", maxODim]
     lastChar,typ,oneByOne  = ['',''], None, False
@@ -367,7 +376,7 @@ class O():
       oneByOne = (oneByOne or char <= lastChar[offset])
       if typ and char.isdigit():
         if oneByOne:
-          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
+          rBases[0] = lGrade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", "", maxODim]
         lastChar[offset] = char
@@ -375,7 +384,7 @@ class O():
         baseCh = False
       elif typ and char in O.__HEX_CHARS:
         if oneByOne:
-          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
+          rBases[0] = lGrade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", "", maxODim]
         lastChar[offset] = char
@@ -385,7 +394,7 @@ class O():
         if cntBases == 3 or char == typ:
           raise Exception("Invalid basis duplication: %s" %char)
         if rBases[offset +1]:
-          rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
+          rBases[0] = lGrade.moveUBasis(rBases, xyz, maxODim, hexBase)
           grades[offset] = grades[offset].mergeBasis(1, rBases)
           rBases = [0, "", "", maxODim]
         cntBases += 1
@@ -396,7 +405,7 @@ class O():
         raise Exception("Invalid basis: %s" %key)
     if typ and baseCh:
       raise Exception("Invalid last basis: %s" %key)
-    rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
+    rBases[0] = lGrade.moveUBasis(rBases, xyz, maxODim, hexBase)
     grades[offset] = grades[offset].mergeBasis(value, rBases)
     if cntBases == 1:
       return grades[offset]
@@ -404,7 +413,7 @@ class O():
     rBases[2] = grades[1].bases()[2]
     if typ == baseChars[0]:
       grades[0].value *= -1
-    rBases[0] = O.Grade.moveUBasis(rBases, xyz, maxODim, hexBase)
+    rBases[0] = lGrade.moveUBasis(rBases, xyz, maxODim, hexBase)
     grades[0]._init(grades[0].value *grades[1].value, rBases)
     return grades[0]
 
@@ -416,7 +425,7 @@ class O():
     """Overload string output. Printing taking resolution into account."""
     out = ""
     sign = ""
-    for grade in [None] +self.__g:
+    for grade in [None] +self._g:
       if grade:
         val = grade.value
         gOut = "".join(grade.strs())
@@ -430,27 +439,22 @@ class O():
       if out:
         sign = " +"
     return out if out else "0"
-  def __repr__(self):
-    """Overwrite object output using __str__ for print if !verbose."""
-    if Lib._isVerbose() and O.dumpRepr:
-      return '<%s.%s object at %s>' % (self.__class__.__module__,
-             self.__class__.__name__, hex(id(self)))
-    return str(self)
+  __repr__ = __str__
   def __hash__(self):
     """Allow dictionary access for basis objects."""
     return hash(str(self))
   def _dump(self):
     """Debug method to return scalar +str of grades."""
     g = [str(self.w)]
-    for base in self.__g:
-      g.append(str(base))
+    for base in self._g:
+      g.append(repr(base))
     return "+".join(g)
 
   def __eq__(self, cf):
     """Return True if 2 Os are equal within precision."""
     precision = Lib._getPrecision()
     if isinstance(cf, (int, float)):
-      return not self.__g  and abs(self.w -cf) <= precision
+      return not self._g  and abs(self.w -cf) <= precision
     elif not isinstance(cf, O):
       return False
     if abs(self.w -cf.w) > precision:
@@ -458,8 +462,8 @@ class O():
     idx = 0
     cfIdx = 0
     while True:
-      base = self.__g[idx] if idx < len(self.__g) else None
-      cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
+      base = self._g[idx] if idx < len(self._g) else None
+      cfBase = cf._g[cfIdx] if cfIdx < len(cf._g) else None
       if not (base and cfBase):
         if not base:
           if not cfBase:
@@ -509,7 +513,7 @@ class O():
     """Add 2 Os or a scalar from w."""
     if isinstance(q, O):
       out = self.dup(self.w +q.w)
-      for grade in q.__g:
+      for grade in q._g:
         out.__add(grade)
     elif isinstance(q, (Tensor, Matrix)):
       out = q.__add__(self)
@@ -542,7 +546,7 @@ class O():
   def __neg__(self):
     """Unitary - operator for O."""
     out = self.dup(-self.w)
-    for grade in out.__g:
+    for grade in out._g:
       grade.value = -grade.value
     return out
   def __pos__(self):
@@ -551,7 +555,7 @@ class O():
   def __abs__(self):
     """Unitary abs operator for O."""
     out = self.dup(abs(self.w))
-    for grade in out.__g:
+    for grade in out._g:
       grade.value = abs(grade.value)
     return out
   abs = __abs__
@@ -561,14 +565,14 @@ class O():
     if isinstance(q, O):
       out = self.__class__(self.w *q.w)
       if self.w:
-        for grade2 in q.__g:
+        for grade2 in q._g:
           grade = grade2.new(self.w)
           out.__add(grade.mergeBasis(grade2.value, grade2.bases()))
       if q.w:
-        for grade1 in self.__g:
-          out.__add(grade1.mergeBasis(q.w, (0, "", "", O.__basisODim)))
-      for grade1 in self.__g:
-        for grade2 in q.__g:
+        for grade1 in self._g:
+          out.__add(grade1.copy(q.w *grade1.value))
+      for grade1 in self._g:
+        for grade2 in q._g:
           out.__add(grade1.mergeBasis(grade2.value, grade2.bases()))
     elif isinstance(q, (Tensor, Matrix)):
       out = q.__rmul__(self)
@@ -576,8 +580,8 @@ class O():
       Lib._checkType(q, (int, float), "mul")
       out = self.__class__(self.w *q)
       if q:
-        for grade in self.__g:
-          out.__g.append(grade.copy(grade.value *q))
+        for grade in self._g:
+          out._g.append(grade.copy(grade.value *q))
     return out
   __rmul__ = __mul__
 
@@ -591,7 +595,7 @@ class O():
       out = self.__mul__(q.inverse())
       if isFloor:
         out.w = int(out.w)
-        for grade in out.__g:
+        for grade in out._g:
           grade.value = int(grade.value)
       return out
     Lib._checkType(q, (int, float), "div")
@@ -599,16 +603,16 @@ class O():
       raise Exception("Illegal divide by zero")
     if isFloor:
       out = self.__class__(int(self.w /q))
-      for grade in self.__g:
-        out.__g.append(grade.copy(int(grade.value /q)))
+      for grade in self._g:
+        out._g.append(grade.copy(int(grade.value /q)))
     elif sys.version_info.major == 2:  # Turn Python v2 into v3
       out = O(float(self.w) /q)
-      for grade in self.__g:
-        out.__g.append(grade.copy(float(grade.value) /q))
+      for grade in self._g:
+        out._g.append(grade.copy(float(grade.value) /q))
     else:
       out = self.__class__(self.w /q)
-      for grade in self.__g:
-        out.__g.append(grade.copy(grade.value /q))
+      for grade in self._g:
+        out._g.append(grade.copy(grade.value /q))
     return out 
   __truediv__ = __div__
   def __floordiv__(self, q): return self.__div__(q, True)
@@ -621,11 +625,11 @@ class O():
     """Return inside/outside graded comparisons for operator."""
     if isinstance(cf, (int, float)):
       res = True
-      if not self.__g:
+      if not self._g:
         if not oper(self.w, cf):
           res = False
       if res:
-        for g in self.__g:
+        for g in self._g:
           if not oper(g.value, 0.0):
             res = False
             break
@@ -636,20 +640,28 @@ class O():
     idx = 0
     order = 0
     res = True
+    resBase = 0
     while True:
-      base = self.__g[idx] if idx < len(self.__g) else None
-      cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
+      base = self._g[idx] if idx < len(self._g) else None
+      cfBase = cf._g[cfIdx] if cfIdx < len(cf._g) else None
       if not (base and cfBase):
         if not base:
           if not cfBase:
-            if (self.w or cf.w) and not oper(self.w, cf.w):
+            if (resBase == 1 and not oper(self.w, 0.0)) or \
+               (resBase == 2 and not oper(0.0, cf.w)):
+               pass
+            elif (self.w or cf.w) and not oper(self.w, cf.w):
               res = False
             return res
-          if not oper(0.0, cfBase.value):
+          if oper(0.0, cfBase.value):
+            resBase = 1
+          else:
             res = False
           cfIdx += 1
         else:
-          if not oper(base.value, 0.0):
+          if oper(base.value, 0.0):
+            resBase = 2
+          else:
             res = False
           idx += 1
       else:
@@ -679,29 +691,29 @@ class O():
       self.w += grade.value
       return
     #if self.__currentAdd >= 0:            # TBD
-    #  order = self.__g[self.__currentAdd].order(grade)
+    #  order = self._g[self.__currentAdd].order(grade)
     #  pos = self.__currentAdd
     #else:
-    #  order = self.__g[0].order(grade) if self.__g else 0
-    order = self.__g[0].order(grade) if self.__g else 0
+    #  order = self._g[0].order(grade) if self._g else 0
+    order = self._g[0].order(grade) if self._g else 0
     pos = 0
-    for idx,base in enumerate(self.__g[:]):
+    for idx,base in enumerate(self._g[:]):
       order = base.order(grade)
       if order == 0:
-        self.__g[pos].value += grade.value
-        if not self.__g[idx].value:
-          del(self.__g[idx])
+        self._g[pos].value += grade.value
+        if not self._g[idx].value:
+          del(self._g[idx])
         return
       elif order > 0:
         break
       pos = idx +1
     if grade.value:
-      self.__g.insert(pos, grade)
+      self._g.insert(pos, grade)
 
   def __copy(self):
     """Used by copy() to turn the basis into a kwargs dictionary."""
     v = {}
-    for base in self.__g:
+    for base in self._g:
       v[base.str()] = base.value
     return v
 
@@ -719,7 +731,7 @@ class O():
     lastDim = (0, 0)
     cnt = 0        # Count of total basis terms
     flat = [0, 0]  # Count of Imaginaries, Hyperbolics with different basis dims
-    for grade in self.__g:
+    for grade in self._g:
       dim = grade.lens()
       cnt += 1
       if dim != lastDim:
@@ -732,7 +744,7 @@ class O():
       if conj:
         if sgnVal.value < 0: # Conjugate if len < 0
           value *= -1
-        out.__g.append(grade.copy(value))
+        out._g.append(grade.copy(value))
     scalar = (1 if self.w else 0)
     simple = False
     if conj:
@@ -756,20 +768,22 @@ class O():
         return conj *tmp.inverse(False)
     return 0
 
-  def _vectorSizes(self, local=False):
-    """Return the Octonian vector sizes. Can't handle negative signatures."""
+  def _vectorSizes(self, local=False, parts=False):
+    """Return the Octonian vector sizes counting each octonion as a single
+       dimension. Parts isolates CA & O parts if posible. Can't handle negative
+       signatures."""
     dims = self.basis(local)
-    if dims[0] == 1:
-      dims[0] = 2
+    if sum(dims) < 2:
+      dims[0] = 2 - sum(dims)
     xyz = self.__class__._BasisArgs(*dims)
     return len(xyz), xyz
 
   def _basisType(self):
     """Return index position +1 of paired sum over all grades or 0 for mixed."""
-    if not self.__g:
+    if not self._g:
       return 1   # For scalar only
-    cnts = [0] *(len(self.__g[0].lens()) //2)
-    for grade in self.__g:
+    cnts = [0] *(len(self._g[0].lens()) //2)
+    for grade in self._g:
       lens = grade.lens()
       for idx in range(len(lens) //2):
         cnts[idx] += sum(lens[idx*2: idx*2 +2])
@@ -778,41 +792,6 @@ class O():
     if sum(cnts) == 1:
       return cnts.index(1) +1
     return 0
-
-  @staticmethod
-  def _BasisConvert(q, part=0, cls=None):
-    """Return basis[part] as a dictionary if class is None else return first
-       part using empty class as the output with basis[part] set."""
-    if not isinstance(q, O):
-      raise Exception("Conversion needs octonion class input")
-    if not q.__g:
-      return {} if cls is None else q.w  # For scalar only
-    if cls is None:
-      if part < 0 or part >= len(q.__g[0].lens()) //2:
-        raise Exception("Invalid part size in conversion")
-      out = {}
-      idx = (part -1) *3 +2
-      for grade in q.__g:
-        if part == 0:
-          bases = grade.strs()[0] +grade.strs()[1]
-          if bases:
-            out[bases] = grade.value
-        else:
-          bases = grade.bases()[idx:idx+3]
-          if bases[0]:
-            out[(O.__BASIS_CHARS[0] +bases[1]) if bases[1] else "" \
-              +(O.__BASIS_CHARS[1] +bases[2]) if bases[2] else ""] = grade.value
-      return out
-    if q.__class__ != O:
-      raise Exception("Conversion needs octonion input")
-    if not isinstance(cls, O):
-      raise Exception("Conversion needs octonion class")
-    if part < 1 or part >= len(cls.Grade(0, [None,[]]).new(0).lens()) //2:
-      raise Exception("Invalid part size in conversion")
-    cls.w = q.w
-    for grade in q.__g:
-      cls.__g.append(cls.Grade(0, [None, []]).new(grade.value, part, grade.bases()))
-    return cls
 
   @staticmethod
   def _BasisArray(oDim=0, uDim=0, exact=False):
@@ -839,26 +818,6 @@ class O():
     return out, O.__basisDim, O.__basisODim, O.__baezMulRule, O.__HEX_BASIS +1
 
   @staticmethod
-  def _BasisArgs(oDim, uDim, och="o", uch="u"):
-    """Used by BasisArgs and externally to return the basis strs."""
-    #dims = list(int(x, O.__HEX_BASIS +1) for x in O.__maxBasis)
-    #oDim = max(oDim, dims[0])
-    #uDim = max(uDim, dims[1])
-    xyz = O._BasisArray(oDim, uDim, True)[0]
-    out = list(och +dig for dig in xyz[1:2**oDim])
-    if uDim > 0:
-      tmp1 = [''] +out[:]
-      tmp2 = list(uch +dig for dig in xyz[1:2**uDim])
-      for val in tmp2:
-        out.extend(x +val for x in tmp1)
-    return out
-
-  @staticmethod
-  def _VersorArgs(oDim, uDim, och="o", uch="u"):
-    """Used by VersorArgs and externally to return the versor strs."""
-    return O._BasisArgs(oDim, uDim, och, uch)
-
-  @staticmethod
   def _basisCache(idx, row=None):
     """Used by Grade to store the multiplication table row by row."""
     if row:
@@ -882,7 +841,7 @@ class O():
   def isScalar(self):
     """isScalar()
        Return true is there are no graded parts."""
-    return not self.__g
+    return not self._g
 
   def isVersor(self, hyperbolic=False):
     """isVersor([hyperbolic])
@@ -917,8 +876,8 @@ class O():
     else:
       Lib._checkType(scalar, (int, float), "dup")
       out = self.__class__(scalar)
-    for grade in self.__g:
-      out.__g.append(grade.copy())
+    for grade in self._g:
+      out._g.append(grade.copy())
     return out
 
   def copy(self, *args, **kwargs):
@@ -935,7 +894,7 @@ class O():
     """copyTerms()
        Return terms as a list of pairs of (term, factor). Cf O(**dict(...))."""
     v = [("", self.w)] if self.w else []
-    for grade in self.__g:
+    for grade in self._g:
       v.append((grade.str(), grade.value))
     return v
 
@@ -943,7 +902,7 @@ class O():
     """basisTerms()
        Return self as 3 lists = a list of o-basis indicies, values & u-basis."""
     out1,out2,out3 = [],[],[]
-    for grade in self.__g:
+    for grade in self._g:
       pBasis,oBase,uBase,qBase = grade.bases()
       basis = []
       for ch in oBase:
@@ -977,9 +936,9 @@ class O():
     else:
       Lib._checkType(precision, float, "trim")
     out = self.__class__(0 if abs(self.w) < precision else self.w)
-    for grade in self.__g:
+    for grade in self._g:
       if abs(grade.value) >= precision:
-        out.__g.append(grade.copy())
+        out._g.append(grade.copy())
     return out
 
   def pure(self):
@@ -992,7 +951,7 @@ class O():
        Return the coefficients as a 1-D Matrix optionally reshaped."""
     dim,xyz = self._vectorSizes(local)
     vec = [0] *dim
-    for grade in self.__g:
+    for grade in self._g:
       pos = xyz.index(grade.str())
       if pos < dim:
         vec[pos] = grade.value
@@ -1005,7 +964,7 @@ class O():
        Return a list of basis terms count at each grade with scalar first."""
     Lib._checkType(maxSize, int, "grades")
     g = [1 if self.w else 0]
-    for base in self.__g:
+    for base in self._g:
       l = sum(base.lens())
       if maxSize and l > maxSize:
         break
@@ -1022,7 +981,7 @@ class O():
     g = [1 if self.w else 0]
     b = '0'
     l = 1
-    for grade in self.__g:
+    for grade in self._g:
       bases = grade.strs()
       l = 0
       for base in bases:
@@ -1045,13 +1004,14 @@ class O():
   def basis(self, local=False):
     """basis([local])
        Return the local signature or max. dimension basis of basis elements."""
-    dims = self.__maxBasis
+    maxDims = O.__maxBasis
     if local:
-      dims = ['', '']
-      for grade in self.__g:
+      dims = ['0'] *len(self._maxDims)
+      for grade in self._g:
         for idx,bases in enumerate(grade.strs()):
-          if idx < local:
-            dims[idx] = max(dims[idx], bases[-1:])
+          dims[idx] = max(dims[idx], bases[-1:])
+    else:
+      dims = self._maxDims[:]
     out = []       # Convert max. char to hex-digit
     for val in dims:
       out.append(int(val, self.__HEX_BASIS +1) if val else 0)
@@ -1061,7 +1021,7 @@ class O():
     """len()
        Return the scalar square sum of the product with it's conjugate."""
     n2 = self.w*self.w
-    for grade in self.__g:
+    for grade in self._g:
       sgnVal = grade.copy(1)
       sgnVal = sgnVal.mergeBasis(1, grade.bases())
       n2 += grade.value *grade.value *sgnVal.value
@@ -1073,7 +1033,7 @@ class O():
     """pureLen()
        Return the signed len of the pure part only."""
     n2 = 0
-    for grade in self.__g:
+    for grade in self._g:
       sgnVal = grade.copy(1)
       sgnVal = sgnVal.mergeBasis(1, grade.bases())
       n2 += grade.value *grade.value *sgnVal.value
@@ -1086,12 +1046,12 @@ class O():
        Return copy of self with pure parts negated (imaginary only if split)."""
     out = self.dup()
     if split:
-      for grade in out.__g:
+      for grade in out._g:
         sgnVal = grade.copy(1)
         sgnVal = sgnVal.mergeBasis(1, grade.bases())
         grade.value *= sgnVal.value
     else:
-      for grade in out.__g:
+      for grade in out._g:
         grade.value = -grade.value
     return out
   conj = conjugate
@@ -1100,7 +1060,7 @@ class O():
     """norm()
        Return the scalar sqrt of the product with it's conjugate."""
     p2 = self.w *self.w
-    for grade in self.__g:
+    for grade in self._g:
       p2 += grade.value *grade.value
     return math.sqrt(p2)
 
@@ -1131,11 +1091,11 @@ class O():
       else:
         out = self.__versible(out)
     else:
-      if out.w < 0 and not out.__g:
+      if out.w < 0 and not out._g:
         out = 0
       else: # Rescale
         out.w /= l2
-        for grade in out.__g:
+        for grade in out._g:
           grade.value /= l2
     if out == 0 and not noError:
       raise Exception("Illegal form for inverse")
@@ -1144,26 +1104,21 @@ class O():
   def dot(self, q):
     """dot(q)
        Return half abs value of sym product."""
+    Lib._checkType(q, (O, int, float), "dot")
     return abs(self.sym(q)) //2
 
   def wedge(self, q):
     """wed[ge](q)
        Return half asym product."""
+    Lib._checkType(q, (O, int, float), "wedge")
     return self.asym(q) //2
   wed = wedge
 
   def cross(self, q):
     """cross(q)
        Return half asym product of pure parts."""
-    if isinstance(q, (int, float)):
-      q = O(q)
-    Lib._checkType(q, O, "cross")
-    x = self.__class__()
-    x.__g = self.__g    # Shallow copies
-    y = self.__class__()
-    y.__g = q.__g
-    out = (x *y -y *x) //2
-    return out
+    Lib._checkType(q, (O, int, float), "cross")
+    return self.asym(q)
 
   def sym(self, q):
     """sym(q)
@@ -1389,7 +1344,7 @@ class O():
       l2 = 1.0
     newSelf = rot *self *conj /l2
     self.w = newSelf.w
-    self.__g = newSelf.__g
+    self._g = newSelf._g
 
   def frame(self, hyperbolic=False):
     """frame([hyperbolic])
@@ -1421,7 +1376,7 @@ class O():
     p1 = math.sqrt(p2)
     if n1 > precision:
       p0 = 1.0 /p1
-      for base in out.__g:
+      for base in out._g:
         base.value *= p0
     return out
 
@@ -1446,7 +1401,7 @@ class O():
       sw,cw = Lib._sincos(self.w /2.0)
     sw /= math.sqrt(p2)
     out = self.dup(cw)
-    for base in out.__g:
+    for base in out._g:
       base.value *= sw
     return out
 
@@ -1455,11 +1410,11 @@ class O():
        Return vector & scalar part with the vector as length one."""
     out = self.dup()
     n2 = 0
-    for base in out.__g:
+    for base in out._g:
       n2 += base.value *base.value
     if n2 > Lib._getPrecision():
       n1 = math.sqrt(n2)
-      for base in out.__g:
+      for base in out._g:
         base.value /= n1
     return out
 
@@ -1479,7 +1434,7 @@ class O():
     if n <= Lib._getPrecision():
       return self.__class__(1.0)
     out = self.dup(self.w /n)
-    for base in out.__g:
+    for base in out._g:
       base.value /= n
     return out
 
@@ -1502,7 +1457,7 @@ class O():
       s,c = Lib._sincos(a *exp)
       s *= w /math.sqrt(p2)
       out = self.__class__(w *c)
-      for grade in self.__g:
+      for grade in self._g:
         oStr,uStr = grade.strs()
         out += self.__class__(**{oStr +uStr: grade.value *s})
       return out
@@ -1521,7 +1476,7 @@ class O():
       exp = pow(math.e, self.w)
       s *= exp /n1
       out = self.__class__(exp *c)
-      for grade in self.__g:
+      for grade in self._g:
         out += self.__class__(**{grade.str(): grade.value *s})
       return out
     raise Exception("Invalid non-hyperbolic, non-versor for exp")
@@ -1536,12 +1491,12 @@ class O():
     if not isHyperbolic:
       s = math.acos(self.w /l1) /math.sqrt(p2)
       out = self.__class__(math.log(l1))
-      for grade in self.__g:
+      for grade in self._g:
         out += self.__class__(**{grade.str(): grade.value *s})
       return out
     raise Exception("Invalid non-hyperbolic, non-versor for log")
 
-  def euler(self, hyperbolic=False):
+  def euler(self, hyperbolic=False, parts=False):
     """euler([hyperbolic])
        Quaternion versors can be converted to Euler Angles & back uniquely for
        normal basis order. Error occurs for positive signature. Euler parameters
@@ -1559,10 +1514,10 @@ class O():
       raise Exception("Illegal hyperbolic versor for versor")
     if p2 <= precision:
       return Euler()
-    dim,xyz = self._vectorSizes()
+    dim,xyz = self._vectorSizes(parts=parts)
     angles = [0] *dim
     args = [0] *dim
-    for grade in conj.__g:
+    for grade in conj._g:
       args[xyz.index(grade.str())] = grade.value
     w, x, y, z = conj.w, args[0], args[1], args[2]
     disc = w *y - x *z
@@ -1577,14 +1532,14 @@ class O():
       angles[2] = math.atan2(2.0 * (z* w + x * y), 1.0 - 2.0 * (y * y + z * z))
     return Euler(*angles)
 
-  def versorMatrix(self, hyperbolic=False):
+  def versorMatrix(self, hyperbolic=False, parts=False):
     """versorMatrix([hyperbolic])
        This is same as frameMatrix but for a versor ie half the angle.
        Converts self to euler than to matrix assuming normal basis order.
        Only defined for o1, o2, o12 quaternion part. Set hyperbolic to try
        hyperbolic angles."""
     out = self.euler(hyperbolic)
-    dim,xyz = self._vectorSizes()
+    dim,xyz = self._vectorSizes(parts=parts)
     return Euler(*out).matrix().reshape(dim)
 
   def frameMatrix(self, hyperbolic=False):
@@ -1602,7 +1557,7 @@ class O():
     """morph(pairs)
        Morphism with a list of pairs of names with o1,o2 meaning map o1->o2."""
     out = self.__class__(self.w)
-    for grade in self.__g:
+    for grade in self._g:
       out += self.__class__(**Lib._morph(grade.str(), grade.value, pairs))
     return out
 
@@ -1620,6 +1575,23 @@ class O():
       O.__basisCache  = []
       O.__baezMulRule = baez
     return "baez" if O.__baezMulRule else "wiki"
+
+  @staticmethod
+  def _BasisArgs(oDim, uDim, och="o", uch="u"): # O.__BASIS_CHARS
+    """Used by BasisArgs and externally to return the basis strs."""
+    xyz = O._BasisArray(oDim, uDim, True)[0]
+    out = list(och +dig for dig in xyz[1:2**oDim])
+    if uDim > 0:
+      tmp1 = [''] +out[:]
+      tmp2 = list(uch +dig for dig in xyz[1:2**uDim])
+      for val in tmp2:
+        out.extend(x +val for x in tmp1)
+    return out
+
+  @staticmethod
+  def _VersorArgs(oDim, uDim, och="o", uch="u"): # O.__BASIS_CHARS
+    """Used by VersorArgs and externally to return the versor strs."""
+    return O._BasisArgs(oDim, uDim, och, uch)
 
   @staticmethod
   def Basis(oDim, uDim=0):
@@ -1652,19 +1624,19 @@ class O():
     return O._VersorArgs(oDim, uDim)
 
   @staticmethod
-  def Versor(*args, **kwargs):
-    """Versor([scalar, o1 multiplier, ...][basis=multiplier, ...])
-       Every O is a 7-D versor if scaled. Return versor() of inputs."""
+  def Versor(*args, **kwargs): #order=[], implicit=False, _cls=O):
+    """Versor([angles, ...][o1=multiplier, ...][order,implicit])
+       Return O.Euler() of inputs."""
     return O.Euler(*args, **kwargs)
 
   @staticmethod
-  def Euler(*args, **kwargs): #order=[], implicit=False):
+  def Euler(*args, **kwargs): #order=[], implicit=False, _cls=O):
     """Euler([angles, ...][o1=multiplier, ...][order,implicit])
        Euler angles in higher dimensions have (D 2)T=D(D-1)/2 parameters.
        SO(4) has 6 and can be represented by two octonions. Here they are
        changed to a versor using explicit rotation & this is returned.
        So in 3-D q' = (cx+sx e23) *(cy+sy e13) *(cz+sz e12).
-       kwargs may contains "order" and "implicit".  The args arguments
+       kwargs may contain "order" and "implicit".  The args arguments
        are entered as radian angles and rotations applied in the given order
        as shown using BasisArgs(). This order can be changed using the order
        array which must be as long as the list of angles. The default is 
@@ -1674,23 +1646,24 @@ class O():
        development TBD."""
     order = kwargs["order"] if "order" in kwargs else [] # for importlib
     implicit = kwargs["implicit"] if "implicit" in kwargs else False
+    _cls = kwargs["_cls"] if "_cls" in kwargs else O
     Lib._checkType(order, (list, tuple), "Euler")
     Lib._checkType(implicit, bool, "Euler")
     if len(args) == 1 and isinstance(args[0], Euler):
       args = list(args[0])
-    out = O(1.0)
+    out = _cls(1.0)
     implicitRot = O(1.0)
     store = []
     dim = int((math.sqrt(8*len(args) +1) +1) /2 +0.9) # l=comb(dim,2)
-    xyz = O._VersorArgs(dim,0)
+    xyz = _cls._VersorArgs(dim,0)
     args = list(args)
     for bi,val in kwargs.items():
-      if bi not in ("order", "implicit"):
+      if bi not in ("order", "implicit", "_cls"):
         while bi not in xyz:
           dim += 1
           if dim > O.__HEX_BASIS:
             raise Exception("Invalid Euler parameter: %s" %bi)
-          xyz = O.BasisArgs(dim)
+          xyz = _cls._VersorArgs(dim, 0)
         if bi in xyz:
           idx = xyz.index(bi) 
         args.extend([0] *(idx -len(args) +1))
@@ -1707,7 +1680,7 @@ class O():
       ang = args[key -1]
       Lib._checkType(ang, (int, float), "Euler")
       s,c = Lib._sincos(ang *0.5)
-      rot = O(c, **{xyz[key -1]: s})
+      rot = _cls(c, **{xyz[key -1]: s})
       if implicit:
         tmpRot = rot.copy()
         rot.rotation(implicitRot)
@@ -1721,7 +1694,7 @@ class O():
   def AssocTriads(basis, nonAssoc=False, alternate=False, dump=False,
                   cntOnly=False):
     """AssocTriads(basis,[nonAssoc,alternate,dump,cntOnly])
-       Return unique O.assoc(...) traids or not. See Lib.triadDump."""
+       Return unique O.assoc(...) triads or not. See Lib.triadDump."""
     Lib._checkType(nonAssoc, bool, "AssocTriads")
     Lib._checkType(alternate, bool, "AssocTriads")
     tmp = Lib.triadPairs(O.__AssocTriads, basis, "AssocTriads", dump, alternate, cntOnly)
@@ -1839,6 +1812,11 @@ class O():
   def Eval(terms):
     """Eval(terms)
        Return opposite of copyTerms/basisTerms()(or[0])(or[0][0] for basis)."""
+    scalar,out = O._Eval(terms, O.__BASIS_CHARS, Lib.isCalc("CA"))
+    return O(scalar, **out)
+  @staticmethod
+  def _Eval(terms, basisChars, isCA):
+    """Internal method for Eval(terms)."""
     Lib._checkList(terms, None, "Eval", (1,0))
     if not isinstance(terms[0], (list, tuple)):
       terms = [terms]
@@ -1854,8 +1832,8 @@ class O():
             scalar += item[1]
           elif isinstance(item[0], Lib._basestr):
             base = item[0]
-            if base and base[0] not in O.__BASIS_CHARS:
-              base = "o" +base
+            if base and base[0] not in basisChars:
+              base = basisChars[0] +base
             if base in out:
               out[base] += item[1]
             else:
@@ -1868,7 +1846,8 @@ class O():
         if len(terms[1]) == 0:
           terms[1] = [1] *max(len(terms[0]), len(terms[2]))
         buf = [[None]] *max(map(len,terms))
-        for term,base in enumerate(("o","","u")):
+        form = (basisChars[0], "", basisChars[1])
+        for term,base in enumerate(form):
           for idx,item in enumerate(terms[term]):
             if buf[idx][0] is None:
               buf[idx] = ["", 0]
@@ -1886,13 +1865,18 @@ class O():
             out[basis] += item
           else:
             out[basis] = item
-    return O(scalar, **out)
+    return scalar, out
 
   @staticmethod
   def Q(*args):
     """Q([scalar, x, y, z])
        Map quaternion basis (w,i,j,k) to (w, o1, o2, o12) with up to 4
        arguments. If calc(Q) included then w may instead be a Q object."""
+    arg,kwargs = O._Q(args)
+    return O(arg, **kwargs)
+  @staticmethod
+  def _Q(*args):
+    """Internal function for Q()."""
     if Lib.isCalc("Q"):     # If module calcQ included can use Q class
       if len(args) == 1 and isinstance(args[0], Q):
         q = args[0]
@@ -1905,7 +1889,7 @@ class O():
     kwargs = {}
     for idx,val in enumerate(args[1:]):
       kwargs[xyz[idx]] = val if idx < 3 else -val
-    return O(args[0], **kwargs)
+    return args[0], kwargs
 
   ###################################################
   ## Calc class help and basis processing methods  ##

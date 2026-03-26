@@ -27,7 +27,7 @@
 ##   * Matrix - interface to numpy if it exists otherwise Tensor is used
 ##   * Euler  - extended Euler angles (calcQ uses 3 angles, calcCA uses more)
 ################################################################################
-__version__ = "0.8"
+__version__ = "0.9"
 import math, sys, os
 import time, datetime, traceback
 from math import *
@@ -61,10 +61,10 @@ class Lib():
   D2R            = math.pi /180.0
   _E             = "Euler's number from math"
   E              = math.e
-  __precision   = 1E-15         # Precision used for equality
-  __resolution  = 9             # Digits for float display
-  __resol_form  = r"%0.9G"      # Format string for float display
-  __resol_float = r"%0.9f"      # Format string for float display
+  __precision   = 1E-18         # Precision used for equality
+  __resolution  = 5             # Digits for float display
+  __resol_form  = r"%%0.%dG"    # Format string for float display
+  __resol_float = r"%0.5f"      # Format string for float display
   __verbose     = False         # Traceback logging
   __info        = False         # User info logging
   __plotFigure  = 0             # Matplotlib unique figures count
@@ -155,38 +155,28 @@ class Lib():
     return ("on" if verbosity else "off")
 
   @staticmethod
-  def resolution(digits=None, get=False):
-    """resolution([digits,get])
-       Set or reset to 18 &/or return format digits. Min. is 4 & default 9."""
-    if get:
-      if digits is not None:
-        raise Exception("Can't set digits when get set")
-    else:
-      if digits is not None:
-        Lib._checkType(digits, int, "resolution", (0,0))
-      if digits is None:
-        digits = 18
+  def resolution(digits=None):
+    """resolution([digits])
+       Set (with 0=default 5) &/or return format digits."""
+    if digits is not None:
+      Lib._checkType(digits, int, "resolution", (0,0))
+      if digits == 0:
+        digits = 5
       Lib._checkType(digits, int, "resolution")
-      if digits < 4:
-        digits = 4
       Lib.__resolution = digits
-      Lib.__resol_form = "%%0.%dG" %digits
       Lib.__resol_float = "%%0.%df" %digits
     return Lib.__resolution
 
   @staticmethod
-  def precision(precise=None, get=False):
-    """precision([precise,get])
-       Set or reset to default e-15 &/or return equality precision."""
-    if get:
-      if precise is not None:
-        raise Exception("Can't set precision when get set")
-    else:
-      if precise is None:
-        precise = 1E-15
+  def precision(precise=None):
+    """precision([precise])
+       Set (with 0=default e-18) &/or return equality precision."""
+    if precise is not None:
+      if precise == 0:
+        precise = 1E-18
       Lib._checkType(precise, float, "precision")
-      if precise <= 0.0 or precise > 0.9:
-        raise Exception("Precision must be positive and smaller that 0.9")
+      if precise <= 0.0 or precise >= 1.0:
+        raise Exception("Precision must be positive and smaller that 1")
       Lib.__precision = precise
     return Lib.__precision
 
@@ -205,12 +195,12 @@ class Lib():
   def getResolNum(val):
     """getResolNum(val)
        Return int or the float rounded to resolution or in exponent format."""
-    num = str(val)
+    num = str(abs(val))
     pos = num.find('.')
     if pos < 0 or len(num) -pos -1 < Lib.__resolution:
-      return num
-    else:
-      return Lib.__resol_float %val
+      return ("-" +num) if val < 0 else num
+    resolForm = Lib.__resol_form %(Lib.__resolution +pos)
+    return resolForm %val
 
   @staticmethod
   def _checkType(arg, typ, method, size=[]):
@@ -267,23 +257,16 @@ class Lib():
   @staticmethod
   def _resolutionDump(sign, val, basis):
     """Internal method to return a formated number and basis or blank."""
-    out = ""
-    num = "%s" %val
+    aval = abs(val)
+    num = str(aval)
     pos = num.find('.')
-    if num[0] == '-' and sign:
-      sign = " "
-    if pos < 0 or len(num) -pos -1 < Lib.__resolution:
-      if abs(val) == 1 and basis:
-        num = "" if val > 0 else "-"
-      if val != 0:
-        out = "%s%s%s" %(sign, num, basis)
-    elif val != 0.0:
-      flt = Lib.__resol_form %val
-      if flt.find(".") < 0:
-        flt = Lib.__resol_float %val
-      resolForm = r"%%s%s%%s" %Lib.__resol_form
-      out = sign +flt +basis
-    return out
+    if val == 0 and not sign:
+      return ""
+    if val < 0:
+      sign = " -" if sign else "-"
+    if aval == 1 and basis:
+      return sign +basis
+    return sign +Lib.getResolNum(aval) +basis
   @staticmethod
   def _storeName(name):
     """Internal method to store a named file."""
@@ -793,12 +776,11 @@ class Lib():
       txt = isinstance(val, Lib._basestr)
       if txt and ("-" in val or "+" in val):
         raise Exception("Multiple text terms not supported: %s" %val)
-      val = str(val)
-      pBasis.append(val)
-      if val[:1] == "-":
-        mBasis.append(val[1:])
+      pBasis.append(str(val))
+      if txt:
+        mBasis.append(val[1:] if val[:1] == "-" else "-" +val)
       else:
-        mBasis.append("-" +val)
+        mBasis.append(str(-val))
     return pBasis,mBasis
   
   @staticmethod
@@ -1647,7 +1629,7 @@ class Tensor(list):
       basis = list(basis)[:] +[1, 0]
       if any(map(lambda x: isinstance(x, Lib._basestr), basis)):
         if unknown:
-          basis[-1] = "XXX"
+          basis.append("XXX")
         basis,mBasis = Lib._basisStrs(basis)
       else:
         mBasis = list(-x for x in basis)

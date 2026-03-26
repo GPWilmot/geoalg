@@ -18,7 +18,7 @@ _ultronions = """Module contains class Cawagas, variables:
 O.Basis(5)  # Cawagas uses o1-o4 & CABCXeg uses o5
 
 # CA: Tensor.Triads(*(S4/12/14).spin(f7Basis))~Tensor.Table(triadSA(t4/12/14))
-# S4 = e123 -e145 +e167 -e246 -e257 -e347 +e356,   t4 = CP4[0][0]
+# S4 = e123 -e145 +e167 -e246 -e257 -e347 +e3:W56,   t4 = CP4[0][0]
 # S12 = -e123 +e145 +e167 -e246 -e257 +e347 -e356, t12 = CP5[1][0]
 # S14 = e123 +e145 +e167 +e246 -e257 -e347 +e356,  t14 = CP6[3][0]
 
@@ -130,6 +130,154 @@ if Lib.isCalc("CA"):
       else:
         raise Exception("Invalid triad in unspin: %s" %(x,y,z))
     return cal
+
+def shortList(dim, sig=(3,1)):
+  """shortList(dim, sig=(3,1))
+     Lib.perm(15,dim) lens are {4: 32760, 5: 360360, 6: 3603600, 7: 32432400}
+     and under shortList get {4: 840, 5: 2520, 6: 5040, 7: 5040}.
+     And time taken for SSearch(1,0,1,<list>) is {5: 8922s, 6:13s, 7:.6s}
+     so ideal time is {5: 6245, 6: 18, 7: 0.84} hours with a single cpu."""
+  Lib._checkType(dim, int, "shortList")
+  Lib._checkList(sig, int, "shortList", 2)
+  bas = Tensor.Table(O.Basis(*sig)).diag()
+  cf = list(Tensor.Table(O.Basis(0,4)).diag())[:dim]
+  out = []
+  for p0 in list(Lib.perm(15, dim)):
+    perm = list(bas.permute(p0))[:dim]
+    if perm == cf:
+      out.append(p0)
+  return out
+
+def longList(dump=False):
+  d04=list(Tensor.Table(O.Basis(0,4)).diag())
+  d31=Tensor.Table(O.Basis(3,1)).diag()
+  out = []
+  dim = 15 -7
+  if dump:
+    Lib.procTime(True)
+    step = max(100, len(short731) //10)
+  for a,p in enumerate(short731):
+    if dump and Lib._checkMem(a, step, len(out)):
+      break
+    extra = list(x for x in range(1, 16) if x not in p)
+    for p0 in Lib.perm(dim, dim):
+      p1 = list(extra[x -1] for x in p0)
+      if list(d31.permute(p +p1)) == d04:
+        out.append(p +p1)
+  if dump:
+    Lib.checkMem(a, extra=len(out), finish=True)
+  return out
+
+# Windows needs to copy this function into calcO.py due to a scoping bug.
+def taskSSsearch(offs=0, stop=None, perms=None, sig=(3,1), noAntiIso=False,
+                 path="", status=None, pos=0):
+  """SSsearch([offs,stop,perms,sig=(3,1),noAntiIso,path,status,pos])
+     Search for SplitSedenion isomorphs sig to (0,4) with initial perms."""
+  if perms is None:
+    perms = shortList(7, *sig)
+  if stop is None:
+    stop = len(perms)
+  vname = "SSout%s" %pos
+  s1 = O.Basis(*sig)
+  s2 = O.Basis(0,4)
+  out = ["\"%s: \"" %vname,[]]
+  bas = Tensor.Table(s1)
+  try:
+    for idx in range(offs, stop):
+      if status:
+        status[pos] = idx
+      res = Tensor.Table(s1).search(s1, Tensor.Table(s2), s2, num=-1, 
+                    noAntiIso=noAntiIso, squares=True, initPerm=perms[idx])
+      if isinstance(res[0], list):
+        out.extend(["\"FOUND at %d\"" %idx,res[0],[]])
+      else:
+        out[-1].append(res[0])
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+    out.append("\"Error %s: %s\"" %(type(e).__name__, e))
+    if status:
+      status[pos] = -2
+  if status:
+    status.shm.close()
+  Lib.save(Lib.fixFilename(vname, path, ".oct"), vname, out)
+
+def SSsearch(cpus=1, offs=0, size=0, perms=None, sig=(3,1), noAntiIso=False,
+             path=""):
+  """SSsearch([cpus,offs,size,perms,noAntiIs,sig=(3,1)o,path])
+     Search for SplitSedenion isomorphs sig to (0,4) using cpu tasks. For
+     sig=(1,3)/(2,2) use perms=[[3, 2, 1, 4, 7, 6, 5],[3, 5, 6, 4, 7, 1, 2]]."""
+  Lib._checkType(cpus, int, "SSsearch", (1,0))
+  Lib._checkList(sig, int, "SSsearch", 2)
+  Lib._checkType(noAntiIso, bool, "SSsearch")
+  Lib._checkType(path, Lib._basestr, "SSsearch")
+  if perms is None:
+    perms = shortList(7, sig)
+  Lib._checkList(perms, (list, tuple, Matrix), "SSsearch")
+  Lib._checkType(offs, int, "SSsearch", (0, len(perms)))
+  Lib._checkType(size, int, "taskSSsearch", (0, len(perms) +1))
+  Lib.checkMem(len(perms), 1)
+  status = oldStatus = None
+  oname = "SSout"
+  out = []
+  size = (len(perms) -offs) if size==0 else size
+  if offs +size > len(perms):
+    raise Exception("Invalid offs+size for SSsearch")
+  step = (size +cpus -1) //cpus
+  try:
+    if cpus == 1:
+      taskSSsearch(offs, size +offs, perms, sig, noAntiIso, path)
+    elif cpus > 1:
+      process = []
+      if shared_memory:
+        status = shared_memory.ShareableList([0] *cpus)
+      else:
+        sys.stderr.write("Shared memory is not available for status logging\n")
+      for start in range(0, size, step):
+        idx = start //step
+        process.append(Process(target=taskSSsearch, args=(start +offs,
+                   start +offs +step, perms, sig, noAntiIso, path, status, idx)))
+      for proc in process:
+        proc.start()
+      time.sleep(10)
+      for pos,task in enumerate(process):
+        while task.is_alive():
+          tmp = list(status[idx] for idx in range(cpus)) if status else None
+          if tmp != oldStatus or pos == 0:
+            Lib.checkMem(pos, 1, extra=tmp)
+            sys.stdout.flush()
+            oldStatus = tmp
+          task.join(1800)
+        else:
+          task.join()
+      time.sleep(10)
+  except BaseException as e:
+    if Lib._isVerbose():
+      traceback.print_exc()
+    else:
+      sys.stdout.write('%s: %s\n' %(type(e).__name__, e))
+    out.append("\"Error %s: %s\"" %(type(e).__name__, e))
+  if status:
+    status.shm.close()
+    status.shm.unlink()
+  sys.stdout.write("Read files %s[0..%d].oct\n" %(oname, size //step -1))
+  sys.stdout.flush()
+  for offs in range(0, size, step):
+    vname = "%s%d" %(oname, offs //step)
+    fp = Lib.fixFilename(vname, path, ".oct")
+    if os.path.isfile(fp):
+      buf = Lib.readText(fp)
+      buf += "\nout.append(%s)\n" %vname
+      exec(buf, locals())
+  Lib.save(Lib.fixFilename(oname, path, ".oct"), oname, out)
+  for offs in range(0, size, step):
+    vname = "%s%s" %(oname, offs //step)
+    fp = Lib.fixFilename(vname, path, ".oct")
+    if os.path.isfile(fp):
+      os.remove(fp)  
+  Lib.checkMem(len(out), finish=True)
 
 class Cawagas():
   """for x in Cawagas().deriveZDs(): print((x[0]+x[1])*(x[2]+x[3]))"""
@@ -333,12 +481,12 @@ _CyclesOut = (((0,2,1,3),(0,2,1,3),(0,2,1,3)), ((0,2),(0,2),(0,1)),
              ((1,3),(1,3),(2,3)),             ((),(),()),
              ((0,),))
 
-def triadCycles3(dim, dump=False):
+def triadCycles3(dim, dump=False): # TBD XXX ringMake
   """triadCycles3(dim, [dump])
      Return Lib.allTriads() as the first cycles (b,c) and 3 lists of ds for
      each pair. These have the same length but the first includes non-cycles."""
-  Lib._checkType(dim, int, "triadCycles", (1,3))
-  Lib._checkType(dump, bool, "triadCycles")
+  Lib._checkType(dim, int, "triadCycles3", (1,3))
+  Lib._checkType(dump, bool, "triadCycles3")
   return _triadCycles3(O.Basis(dim), dump)
 
 def _triadCycles3(bas, dump=False):
@@ -348,25 +496,33 @@ def _triadCycles3(bas, dump=False):
     tri = b.cycles(c)
     if tri[0] not in pairs:
       pairs[tri[0]] = [[], [], []]
-    pairs[tri[0]][tri.index((b,c))].extend(dList)
+    bc = tuple(sorted((b,c)))
+    pairs[tri[0]][tri.index(bc)].extend(dList)
   return pairs
 
-def triadCycles(dim, unpaired=False, dump=False):
-  """triadCycles(dim, [unpaired,dump])
+def triadCycles(basDim, unpaired=False, dump=False):
+  """triadCycles(basDim, [unpaired,dump])
      Return non-associative cycles organised by 3 Triad Cycles, ie a list of
             AAA, BBA, ACC, XBB, BXC, CAB, CCX, XXX, A.
-     These are patterns listed via the first cycles pair from triadCycles() with
-     non-cycle singles added to the last column which have d<bc. Associative
-     triads with d=bc are discarded. Use triadsZD() to generate zero-divisors.
-     If paired is set, return PairList lists of (b,c)(ds...) pairs. Use
-     Lib.expandPairList() to return pairs to cycles or use dict() to turn each
-     index into a dictionary. triadCyclesModes() returns the decimateModes
-     PairList and the aggreage of patterns for each cycle."""
-  Lib._checkType(dim, int, "cyclesPattern", (1,0))
-  Lib._checkType(unpaired, bool, "cyclesPattern")
-  Lib._checkType(dump, bool, "cyclesPattern")
+     These are patterns listed via the first cycles pair from _triadCycles3()
+     for O.Basis(basDim) or basDim as a NA ring with non-cycle singles added to
+     the last column which have d<bc. Associative triads with d=bc are
+     discarded. Use triadsZD() to generate zero-divisors. If paired is set,
+     return PairList lists of (b,c)(ds...) pairs. Use Lib.expandPairList() to
+     return pairs to cycles or use dict() to turn each index into a dictionary.
+     triadCyclesModes() returns the decimateModes PairList and the aggreage of
+     patterns for each cycle."""
+  if isinstance(basDim, int):
+    Lib._checkType(basDim, int, "triadCycles", (1,0))
+    dim = basDim
+    basDim = O.Basis(basDim)
+  else:
+    dim = int(log(len(basDim) +1)/log(2))
+  Lib._checkType(basDim, (list, tuple), "triadCycles")
+  Lib._checkType(unpaired, bool, "triadCycles")
+  Lib._checkType(dump, bool, "triadCycles")
   cycPatTypes = dict(list((CyclesPattern[x],x) for x in CyclesPattern))
-  pairs = _triadCycles3(O.Basis(dim), dump)
+  pairs = _triadCycles3(basDim, dump)
   cnt = 0
   fstep = Lib.comb(int(pow(2, dim)), 2) /100
   step = max(100, int(fstep) if fstep < sys.maxsize else sys.maxsize)
@@ -716,47 +872,3 @@ pure1= (c2*A1+A2*c1-(B2*d1-d2*B1)-(C2*ee1-ee2*C1-(-f2*D1+D2*f1)))*o1 \
       +(A2*ee1+ee2*A1-(f2*B1-B2*f1)+-c2*C1+C2*c1-(-D2*d1+d2*D1))*o13 \
       +(B1*ee1-ee2*B2+f1*A1+A2*f2+-d1*C1+C2*d2+D1*c1-c2*D2)*o23 \
       +(ee2*B1+B2*ee1+-A2*f1+f2*A1+-C2*d1-d2*C1+c2*D1+D2*c1)*o123 # = 0
-
-A2T7 = \
-  {(o14, o25):    (o345,  o1345,  o2345,  o12345),
-   (o14, o35):    (o245,  o1245,  o2345,  o12345),
-   (o14, o235):   (o245,  o1245,  o345,  o1345),
-   (o24, o15):    (o345,  o1345,  o2345,  o12345),
-   (o24, o35):    (o145,  o1245,  o1345,  o12345),
-   (o24, o235):   (o145,  o1245,  o1345,  o12345),
-   (o124, o15):   (o345,  o1345,  o2345,  o12345),
-   (o124, o35):   (o145,  o245,  o1345,  o2345),
-   (o124, o235):  (o145,  o245,  o345,  o12345),
-   (o34, o15):    (o245,  o1245,  o2345,  o12345),
-   (o34, o125):   (o145,  o245,  o1345,  o2345),
-   (o34, o235):   (o145,  o1245,  o1345,  o12345),
-   (o134, o15):   (o245,  o1245,  o2345,  o12345),
-   (o134, o125):  (o145,  o245,  o345,  o12345),
-   (o134, o235):  (o145,  o245,  o345,  o12345),
-   (o234, o15):   (o245,  o1245,  o345,  o1345),
-   (o234, o125):  (o145,  o245,  o345,  o12345),
-   (o234, o135):  (o145,  o245,  o345,  o12345),
-   (o1234, o15):  (o245,  o1245,  o345,  o1345),
-   (o1234, o125): (o145,  o245,  o1345,  o2345),
-   (o1234, o135): (o145,  o1245,  o345,  o2345),
-   (o14, o125):   (o345,  o1345,  o2345,  o12345),
-   (o14, o135):   (o245,  o1245,  o2345,  o12345),
-   (o14, o1235):  (o245,  o1245,  o345,  o1345),
-   (o24, o125):   (o345,  o1345,  o2345,  o12345),
-   (o24, o135):   (o145,  o1245,  o345,  o2345),
-   (o24, o1235):  (o145,  o1245,  o345,  o2345),
-   (o124, o25):   (o345,  o1345,  o2345,  o12345),
-   (o124, o135):  (o145,  o245,  o345,  o12345),
-   (o124, o1235): (o145,  o245,  o1345,  o2345),
-   (o34, o25):    (o145,  o1245,  o1345,  o12345),
-   (o34, o135):   (o245,  o1245,  o2345,  o12345),
-   (o34, o1235):  (o145,  o245,  o1345,  o2345),
-   (o134, o25):   (o145,  o1245,  o345,  o2345),
-   (o134, o35):   (o245,  o1245,  o2345,  o12345),
-   (o134, o1235): (o145,  o1245,  o345,  o2345),
-   (o234, o25):   (o145,  o1245,  o1345,  o12345),
-   (o234, o35):   (o145,  o1245,  o1345,  o12345),
-   (o234, o1235): (o245,  o1245,  o345,  o1345),
-   (o1234, o25):  (o145,  o1245,  o345,  o2345),
-   (o1234, o35):  (o145,  o245,  o1345,  o2345),
-   (o1234, o235): (o245,  o1245,  o345,  o1345)}

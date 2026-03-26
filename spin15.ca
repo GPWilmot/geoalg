@@ -2,6 +2,7 @@
 ## Extend G2 construction to Spin(15)
 ## File: spin15.ca - G.P.Wilmot
 ####################################
+
 from multiprocessing import Process
 import time, traceback
 try:

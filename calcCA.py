@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 ################################################################################
 ## File: calcCA.py needs calcR.py and is part of GeoAlg.
-## Copyright (c) 2021, 2023 G.P.Wilmot
+## Copyright (c) 2021, 2023, 2026 G.P.Wilmot
 ##
 ## GeoAlg is free software: you can redistribute it and/or modify it under the
 ## terms of the GNU General Public License as published by the Free Software 
@@ -31,7 +31,7 @@
 ## CA & optional Quaternion tests are included at the end of this file.
 ## Start with either calcCA.py, python calcCA.py or see ./calcR.py -h.
 ################################################################################
-__version__ = "0.5"
+__version__ = "0.6"
 import math
 from calcLib import *
 
@@ -61,12 +61,6 @@ class CA():
       self.value = value
       self.__eBase = bases[0]
       self.__iBase = bases[1]
-    def new(self, value):
-      inherit = self.__new__(CA.Grade)
-      inherit.value = 0
-      inherit.__eBase = ""
-      inherit.__iBase = ""
-      return inherit
     def bases(self):
       return (self.__eBase, self.__iBase)
     def lens(self):
@@ -102,8 +96,7 @@ class CA():
     __repr__ = __str__
     def copy(self, value=None):
       return CA.Grade(self.value if value is None else value,
-                     (self.__eBase[:], self.__iBase[:]))
-
+                     (self.__eBase, self.__iBase))
     def commutes(self, rhs):
       """Return boolean of self commutes with rhs."""
       cnt = 0
@@ -303,7 +296,7 @@ class CA():
     g = [str(self.w)]
     for base in self.__g:
       g.append(str(base))
-    return "+".join(g)
+    return "+".join(g)    
 
   def __eq__(self, cf):
     """Return True if 2 CAs are equal within precision."""
@@ -497,20 +490,28 @@ class CA():
     cfIdx = 0
     idx = 0
     res = True
-    while True:
+    resBase = 0
+    while res:
       base = self.__g[idx] if idx < len(self.__g) else None
       cfBase = cf.__g[cfIdx] if cfIdx < len(cf.__g) else None
       if not (base and cfBase):
         if not base:
           if not cfBase:
-            if (self.w or cf.w) and not oper(self.w, cf.w):
+            if (resBase == 1 and not oper(self.w, 0.0)) or \
+               (resBase == 2 and not oper(0.0, cf.w)):
+               pass
+            elif (self.w or cf.w) and not oper(self.w, cf.w):
               res = False
             return res
-          if not oper(0.0, cfBase.value):
+          if oper(0.0, cfBase.value):
+            resBase = 1
+          else:
             res = False
           cfIdx += 1
         else:
-          if not oper(base.value, 0.0):
+          if oper(base.value, 0.0):
+            resBase = 2
+          else:
             res = False
           idx += 1
       else:
@@ -523,7 +524,7 @@ class CA():
         else:
           if (base.value < 0) != (cfBase.value < 0):
             if not (oper(base.value, 0.0) and oper(0.0, cfBase.value)):
-              return False
+              res = False
           if order < 0:
             if not oper(0.0, cfBase.value):
               res = False
@@ -541,9 +542,12 @@ class CA():
       self.w += grade.value
       return
     if self.__currentAdd >= 0: 
+      #order = self.__g[self.__currentAdd].order(grade)  # TBD
       pos = self.__currentAdd
     else:
+      #order = self.__g[0].order(grade) if self.__g else 0
       pos = 0
+    #order = self.__g[0].order(grade) if self.__g else 0
     pos = 0
     for idx,base in enumerate(self.__g[pos:]):
       order = base.order(grade)
@@ -670,60 +674,6 @@ class CA():
       dims[0] = 3
     dims[1] = 0  # No negative signatures
     return dims
-
-  @staticmethod
-  def _BasisArg(dim, part):
-    """Used by BasisArgs and other calcs and matches Grade.order. Yield
-       digits list for the combinations of size part out of dim."""
-    out = []
-    if part > 0 and dim > 0:
-      basis = list(map(lambda x: "%X" %x, range(1, dim +1)))
-      for form in Lib.comb(dim, part, basis):
-        yield "".join(list(form))
-
-  @staticmethod
-  def _BasisArgs(eDim, iDim, grade):
-    """Used by other calcs and matches Grade.order. Yield (e,i) basis elements
-       as a list of names in addition order."""
-    minGrade = grade if grade else 1
-    maxGrade = grade +1 if grade else eDim +iDim +1
-    for n in range(minGrade, maxGrade): # Lib.additionTree
-      for i in range(n +1):
-        if eDim >= n-i and iDim >= i:
-          oute = tuple(("e" +x for x in CA._BasisArg(eDim, n-i)))
-          outi = tuple(("i" +x for x in CA._BasisArg(iDim, i)))
-          for out in Lib._mergeBasis(oute, outi):
-            yield out
-
-  @staticmethod
-  def _VersorArgs(eDim, iDim=0, rotate=False):
-    """Used internally and externally - see VersorArgs."""
-    xyz = ["32", "13", "21", "14"] if rotate else ["12", "13", "23", "14"]
-    out = []
-    cnt = 0
-    for j in range(2, eDim +1):
-      for i in range(1, j):
-        if cnt < 4:
-          out.append("e" +(xyz[cnt] if eDim > 2 else "12"))
-          cnt += 1
-        elif rotate and i > 3 and j > 3:
-          out.append("e%X%X" %(j,i))
-        else:
-          out.append("e%X%X" %(i,j))
-    cnt = 0
-    for j in range(2, iDim +1):
-      for i in range(1, j):
-        if cnt < 4:
-          out.append("i" +(xyz[cnt] if iDim > 2 else "12"))
-          cnt += 1
-        elif rotate and i > 3 and j > 3:
-          out.append("i%X%X" %(j,i))
-        else:
-          out.append("i%X%X" %(i,j))
-    for i in range(1, eDim +1):
-      for j in range(1, iDim +1):
-        out.append("e%Xi%X" %(i,j))
-    return out
 
   ##############################################################################
   ## Class utility methods
@@ -1247,7 +1197,7 @@ class CA():
       w = (self.w +1.0) %2.0 -1.0
       out = self.dup(math.acos(w) *2)
     p1 = math.sqrt(p2)
-    if n1 > precision:
+    if p1 > precision:
       p0 = 1.0 /p1
       for base in out.__g:
         base.value *= p0
@@ -1599,41 +1549,127 @@ class CA():
     """spin([basis])
        Return the Lib.Table triad list and Basis list if basis else
        VersorArgs list from 3-form self finding the largest dimension."""
-    maxBasis = 0
-    sTriads = []
+    maxBasis = ["0", "0"]
     triads = []
     for term in self.__g:
-      bases = term.bases()[0]
-      if len(bases) != 3 or term.bases()[1]:
+      bases = term.bases()
+      sizes = list(map(len, bases))
+      if sum(sizes) != 3 or (bases[1] and basis is None):
         raise Exception("Invalid 3-form for spin: %s" %"".join(term.strs()))
+      for idx in (0,1):
+        if sizes[idx] and bases[idx][-1] > maxBasis[idx]:
+          maxBasis[idx] = bases[idx][-1]
       terms = []
-      rTerms = []
-      for idx,pairs in enumerate(((0,1), (1,2), (0,2))):
-        maxBasis = max(maxBasis, int(bases[idx], self.__HEX_BASIS +1))
-        terms.append(int(bases[idx], self.__HEX_BASIS +1))
-        form = 'e%s%s' %(bases[pairs[0]], bases[pairs[1]])
-        rTerms.append(form)
-      if term.value < 0:
-        tmp = terms[0]; terms[0] = terms[1]; terms[1] = tmp
-        tmp = rTerms[0]; rTerms[0] = rTerms[1]; rTerms[1] = tmp
+      for idx in range(3):
+        form = ("e" +bases[0][idx]) if idx < sizes[0] else \
+               ("i" +bases[1][idx -sizes[0]])
+        terms.append(form)
+      terms.append(term.value)
       triads.append(terms)
-      sTriads.append(rTerms)
-    if basis is not None:
-      Lib._checkList(basis, None, "spin", maxBasis)
-    else:
-      sBasis = CA._VersorArgs(maxBasis)
-      basis = list((CA(**{x: 1}) for x in sBasis))
-      triads = []
-      for terms in sTriads:
+    maxBasis = list(int(maxBasis[x], self.__HEX_BASIS +1) for x in (0,1))
+    out = []
+    if basis is None:
+      basis = CA._VersorArgs(*maxBasis)
+      strBasis = list(str(x) for x in basis)
+      for terms in triads:
         triad = []
-        for term in terms:
-          triad.append(sBasis.index(term) +1)
-        triads.append(triad)
-    return (Matrix(*triads), basis)
+        for pairs in ((0,1), (1,2), (0,2)):
+          form = terms[pairs[0]]
+          tmp = terms[pairs[1]]
+          if form[0] == tmp[0]:
+            triad.append(strBasis.index(form +tmp[1:]) +1)
+          else:
+            triad.append(strBasis.index(form +tmp) +1)
+        if terms[3] < 0:
+          triad = [triad[0], triad[2], triad[1]]
+        out.append(tuple(triad))
+    else:
+      Lib._checkList(basis, None, "spin", sum(maxBasis))
+      strBasis = list(str(x) for x in basis)
+      for terms in triads:
+        triad = []
+        for idx in range(3):
+          triad.append(strBasis.index(terms[idx]) +1)
+        if terms[3] < 0:
+          triad = [triad[0], triad[2], triad[1]]
+        out.append(tuple(triad))
+    return (Matrix(*out), basis)
+
+  def nonAssocCode(self):
+    """nonAssocCode()
+       Return the number of ordered non-associative triads from self.spin().
+       This expects an associative calibration and returns the P code."""
+    chk = self.dims()
+    if len(chk) != 4 or chk[:3] != [0,0,0]:
+      raise exception("Expected 3-form calibration in nonAssocCode")
+    chk = self.basisTerms()
+    basis = [0,0,1]
+    basis[0] = max([0] +list(Lib.chain(*chk[0])))
+    basis[1] = max([0] +list(Lib.chain(*chk[2])))
+    bas = CA.Basis(*basis)
+    return len(list(Lib.triadDump(Matrix.Triads(*self.spin(bas)) \
+                                .assocTriads(bas, True), bas)))
+    nonAssociativeCode=nonAssocCode
 
   ##############################################################################
   ## Other creators and source inverters
   ##############################################################################
+
+  @staticmethod
+  def _MaxBasis():
+    """External access to __maxBasis."""
+    return CA.__maxBasis
+
+  @staticmethod
+  def _BasisArg(dim, part):
+    """Used by BasisArgs and other calcs and matches Grade.order. Yield
+       digits list for the combinations of size part out of dim."""
+    out = []
+    if part > 0 and dim > 0:
+      basis = list(map(lambda x: "%X" %x, range(1, dim +1)))
+      for form in Lib.comb(dim, part, basis):
+        yield "".join(list(form))
+
+  @staticmethod
+  def _BasisArgs(eDim, iDim, grade):
+    """Used by other calcs and matches Grade.order. Yield (e,i) basis elements
+       as a list of names in addition order."""
+    minGrade = grade if grade else 1
+    maxGrade = grade +1 if grade else eDim +iDim +1
+    for n in range(minGrade, maxGrade): # Lib.additionTree
+      for i in range(n +1):
+        if eDim >= n-i and iDim >= i:
+          oute = tuple(("e" +x for x in CA._BasisArg(eDim, n-i)))
+          outi = tuple(("i" +x for x in CA._BasisArg(iDim, i)))
+          for out in Lib._mergeBasis(oute, outi):
+            yield out
+
+  @staticmethod
+  def _VersorArgs(eDim, iDim=0, rotate=False):
+    """Used internally and externally - see VersorArgs."""
+    xyz = ["32", "13", "21", "14"] if rotate else ["12", "13", "23", "14"]
+    out = []
+    cnt = 0
+    for j in range(2, eDim +1):
+      for i in range(1, j):
+        if cnt < 4:
+          out.append("e" +(xyz[cnt] if eDim > 2 else "12"))
+          cnt += 1
+        else:
+          out.append("e%X%X" %(i,j))
+    cnt = 0
+    for j in range(2, iDim +1):
+      for i in range(1, j):
+        if cnt < 4:
+          out.append("i" +(xyz[cnt] if iDim > 2 else "12"))
+          cnt += 1
+        else:
+          out.append("i%X%X" %(i,j))
+    for i in range(1, eDim +1):
+      for j in range(1, iDim +1):
+        out.append("e%Xi%X" %(i,j))
+    return out
+
   @staticmethod
   def Basis(eDim, iDim=0, grade=0):
     """Basis(eDim, [iDim, grade])
@@ -1708,11 +1744,15 @@ class CA():
     for key,value in kwargs.items():
       if key in xyz:
         idx = xyz.index(key)
+        out[idx] = value
       else:
-        idx = xyz.index("e" +key[2] +key[1])
+        if len(key)==3 and "e" +key[2] +key[1] in xyz:
+          idx = xyz.index("e" +key[2] +key[1])
+          out[idx] = -value
+        else:
+          raise Exception("Invalid Versor basis: %s" %key)  
       if idx < len(args):
         raise Exception("Invalid Versor basis duplication: %s" %xyz[idx])
-      out[idx] = value
     for idx,value in enumerate(args):
       out[idx] = value
     return CA.Euler(*out)
@@ -1786,7 +1826,6 @@ class CA():
         tmpRot = rot.copy()
         rot.rotation(implicitRot)
         implicitRot *= tmpRot
-        #implicitRot = tmpRot *implicitRot
       else:
         store.append(key)
       out = rot * out
@@ -1921,7 +1960,7 @@ class CA():
        Return a string of 105 hex-digits from a triad15. See tri2str()."""
     return "".join(list(x[0][1:] for x in tri.copyTerms()))
   @staticmethod
-  def str2tri(str, ):
+  def str2tri(str):
     """str2tri(str)
        Return triad15 from a string of 105 hex-digits. See str2tri()."""
     ca = CA()

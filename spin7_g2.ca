@@ -488,12 +488,10 @@ def triads7autos(idx):
            idx, x1, x0, fnd, p0, p1, p2))
     x0 = x1
 
-print("XXX",f7Basis)
-
-PX = list((x, Matrix.Triads(*triads7all(*x[1]).spin(f7Basis))) for x in \
+PX = list((x, Matrix.Triads(*triads7all(*x[1]).spin(CA.Basis(7,0,1)))) for x in \
        ((4,(0,5)), (8,(7,0)), (10,(7,6)), (12,(0,0)), (14,(0,6)), (16,(12,0))))
 for x in PX: print("P%-2d" %x[0][0] +" has {:2d}A, {:2d}B, {:2d}C, 4X".format(\
-    *list(len(list(Lib.triadDump(x[1].abcTriads(f7Basis,y,True),f7Basis)))-4  \
+    *list(len(list(Lib.triadDump(x[1].abcTriads(CA.Basis(7,0,1),y,True),CA.Basis(7,0,1))))-4  \
      for y in (1,2,3))), " (%s)" %triads7all(*x[0][1]))
 
 #--------------------------------------------------------------------------
