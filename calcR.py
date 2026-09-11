@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 ###############################################################################
 ## File: calcR.py needs calcLib.py and is part of GeoAlg.
 ## Copyright (c) 2021, 2023 G.P.Wilmot
@@ -257,10 +257,10 @@ class Calculator:
 
   def __init__(self, clsType, tests=[], indent=None):
     """Singleton calculator for basis numbers."""
-    modList, clsList, ijk, fDef, cHelp, eHelp  = clsType._getCalcDetails()
+    Calculator.__firstCls = clsType           # Initial __inCls
+    modList, clsList, ijk, fDef, cHelp, eHelp  = clsType._getCalcDetails(self)
     LibTest._initRunTests(tests, indent)
     Calculator.__inCls = clsType              # Current calculator
-    Calculator.__firstCls = clsType           # Initial __inCls
     Calculator.__oldCls[clsType.__name__] = clsType
     Calculator.__classList.extend(clsList)
     Calculator.__moduleList.append(modList[0])
@@ -297,8 +297,7 @@ class Calculator:
     ans = Calculator.__firstCls._processExec(True, code)
     return ans, list(Calculator.__USEFUL_WORDS)
 
-  @staticmethod
-  def getGlobalWord(key):
+  def getGlobalWord(self, key):
     """Return value if key is in globals from primary module."""
     try:
       code = "globals()['%s']" %key
@@ -478,6 +477,7 @@ class Calculator:
           newCls = Calculator.__firstCls._processExec(True, code)
           if newCls is None:
             raise Exception("No importlib: run %s.py from the command line"%mod)
+        # Need to pass self for loaded calcs to use ProcessScript()a TBD
         modList, clsList, ijk, fDef, cHelp, eHelp = newCls._getCalcDetails()
         Calculator.__firstCls._processExec(False, ijk)
         msg = newCls._setCalcBasis()
@@ -749,6 +749,13 @@ class Calculator:
       else:
         code = "Calculator." +word +(pline if pline else "()")
     return isAns,code
+
+  def processScript(self, isAns, line):
+    self.__lexer.reset(line)
+    bufs = self.__parseTokens(False, isAns) # No eval words in scripts
+    if len(bufs) != 1:
+      raise Exception("Script processing error: %s" %line)
+    return self.__processExec(bufs[0][:2])
 
   def __processExec(self, buf):
     """Call processExec within calc? adding catch block for exec."""
@@ -1155,6 +1162,7 @@ class Real(float):
      modified. It has no methods, use math methods instead eg sin(pi) but change
      float to Real eg Real(pi) or pi*1. Change to complex numbers using calc(Q).
      """
+  __calculator  = None                   # Call back to parse scripts
   def __float__(self):
     return super(Real, self).__float__()
   def __int__(self):
@@ -1227,14 +1235,22 @@ class Real(float):
        Return no basis elements since there are none."""
     return ()
 
+  @staticmethod
+  def ProcessScript(isAns, line):
+    """ProcessScript(isAns, line)
+       Parse and exec globals or return eval if isAns."""
+    return Real.__calculator.processScript(isAns, line)
+
   #########################################################
   ## Calculator class help and basis processing methods  ##
   #########################################################
   @staticmethod
-  def _getCalcDetails():
+  def _getCalcDetails(calc=None):
     """Return the calculator help, module heirachy and classes for Real."""
     calcHelp = """Calculator - Simple calculator to build more complex processors.
           Use calc(Q) for complex and quaternion calculations."""
+    if calc:
+      Real.__calculator = calc
     return (("R"), ("Real", "math"), "", "default.calc", calcHelp, 
             "Use scalar method instead of Real numbers.")
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 ################################################################################
 ## File: calcCA.py needs calcR.py and is part of GeoAlg.
 ## Copyright (c) 2021, 2023, 2026 G.P.Wilmot
@@ -52,6 +52,7 @@ class CA():
   __HEX_CHARS   = ('A', 'B', 'C', 'D', 'E', 'F')
   __BASIS_CHARS = ('e', 'i')             # CA basis chars only
   __maxBasis    = ['0', '0']             # Store the max dimensions
+  __calculator  = None                   # Call back to parse scripts
   dumpRepr      = False                  # Repr defaults to str
 
   class Grade:
@@ -1072,7 +1073,7 @@ class CA():
     return out
  
   def associator(self, p, q):
-    """associator(p,q)
+    """assoc[iator](p,q)
        Return the associator [self,p,q] = (self * p) *q - self *(p * q),"""
     Lib._checkType(p, (CA, int, float), "associator")
     Lib._checkType(q, (CA, int, float), "associator")
@@ -1584,7 +1585,7 @@ class CA():
           triad = [triad[0], triad[2], triad[1]]
         out.append(tuple(triad))
     else:
-      Lib._checkList(basis, None, "spin", sum(maxBasis))
+      Lib._checkList(basis, None, "spin", (1,0))
       strBasis = list(str(x) for x in basis)
       for terms in triads:
         triad = []
@@ -1595,13 +1596,13 @@ class CA():
         out.append(tuple(triad))
     return (Matrix(*out), basis)
 
-  def nonAssocCode(self):
-    """nonAssocCode()
+  def rngCode(self):
+    """rngCode()
        Return the number of ordered non-associative triads from self.spin().
        This expects an associative calibration and returns the P code."""
     chk = self.dims()
     if len(chk) != 4 or chk[:3] != [0,0,0]:
-      raise exception("Expected 3-form calibration in nonAssocCode")
+      raise Exception("Expected 3-form calibration in rngCode")
     chk = self.basisTerms()
     basis = [0,0,1]
     basis[0] = max([0] +list(Lib.chain(*chk[0])))
@@ -1609,7 +1610,6 @@ class CA():
     bas = CA.Basis(*basis)
     return len(list(Lib.triadDump(Matrix.Triads(*self.spin(bas)) \
                                 .assocTriads(bas, True), bas)))
-    nonAssociativeCode=nonAssocCode
 
   ##############################################################################
   ## Other creators and source inverters
@@ -1984,14 +1984,22 @@ class CA():
     for idx,val in enumerate(xyz):
       kw[val] = 0 if len(args) < 4 else args[idx +1]
     return CA(0 if len(args) < 1 else args[0], **kw)
+
+  @staticmethod
+  def ProcessScript(isAns, line):
+    """ProcessScript(isAns, line)
+       Parse and exec globals or return eval if isAns."""
+    return CA.__calculator.processScript(isAns, line)
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
   @staticmethod
-  def _getCalcDetails():
+  def _getCalcDetails(calc=None):
     """Return the calculator help, module heirachy and classes for CA."""
     calcHelp = """Clifford Algebra Calculator - Process 30-dimensional basis
           numbers (e0..F or i0..F) of signature (+,-) and multiples."""
+    if calc:
+      CA.__calculator = calc
     ijk = "i,j,k=CA(e32=1),CA(e13=1),CA(e21=1)"
     return (("CA", "Q", "R"), ("CA", "math"), ijk, "default.ca", calcHelp, "")
 

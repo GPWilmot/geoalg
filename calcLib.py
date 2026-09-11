@@ -117,6 +117,30 @@ class Lib():
       raise typ(str(var).replace("\\\\\\\\", "\\"))
 
   @staticmethod
+  def textSplit(filename, size=110):
+    """textSplit(filename, [size=110])
+       Read filename text, split lines at space < size & write .out file."""
+    txt = Lib.readText(filename)
+    pos = size
+    last = 0
+    out = []
+    while pos < len(txt):
+      for idx,ch in enumerate(txt[last:pos]):
+        if ch == '\n':
+          out.append(" " +txt[last :last +idx])
+          last += idx +1
+          pos = last +size
+      while pos > last +1 and txt[pos] != ' ':
+        pos -= 1
+      out.append(" " +txt[last :pos])
+      last = pos
+      pos = last +size
+    out.append(" " +txt[last:])
+    with open(filename +".out", 'w') as fp:
+      for line in out:
+        fp.write(line +"\n")
+
+  @staticmethod
   def nextFigure():
     """nextFigure()
        Return next Matplotlib unique figure count."""
@@ -235,6 +259,9 @@ class Lib():
   @staticmethod
   def _checkSize(size, val, method, src):
     """Raise exception if val != int size or in (x,y), y=0=infinity."""
+    if isinstance(val, Lib._basestr):
+      val = len(val)
+      src = "string length"
     if isinstance(size, int):
       if size != val:
         raise Exception("Invalid %s !=%d for %s" %(src, size, method))
@@ -418,7 +445,7 @@ class Lib():
   @staticmethod
   def isLoaded(names=None):
     """isLoaded([names])
-       Return true if comma separated file names are loaded."""
+       Return true if comma separated file names are  else list."""
     if names is None:
       return Lib.__storeName
     Lib._checkType(names, Lib._basestr, "isLoaded")
@@ -437,6 +464,8 @@ class Lib():
       process = os.popen('systeminfo 2>nul |find "Available Phys"')
       result = process.read()
       process.close()
+      if len(result.split()) < 3:
+        return Lib._memLimitMB
       return int(result.split()[3].replace(",",""))
     return os.sysconf('SC_AVPHYS_PAGES')//256
   free=freeMemMB
@@ -725,19 +754,6 @@ class Lib():
     return filename
 
   @staticmethod
-  def __save(value, noStr=False):
-    """Internal function to iterate and expand strings."""
-    if isinstance(value, (list, tuple, Matrix, set)):
-      out = []
-      for val in value:
-        out.append(Lib.__save(val, noStr))
-    elif isinstance(value, Lib._basestr):
-      out = value if noStr else "\"%s\"" %value
-    else:
-      out = value
-    return out
-
-  @staticmethod
   def _save(filename, name, value, path="", ext="", mode="w"):
     """save(filename, name, value,[path,ext,mode="w"])
        Print value into a file which needs an extension.
@@ -752,20 +768,33 @@ class Lib():
         for key,var in value.items():
           if isinstance(key, Lib._basestr):
             key = '"%s"' %key
-          fp.write(" %s: %s,\n" %(key, Lib.__save(var)))
+          fp.write("  %s: %s,\n" %(key, Lib.__save(var)))
         fp.write("}\n")
-      elif isinstance(value, (list, tuple, Matrix, set)):
-        typ = "Matrix" if isinstance(value, (Tensor, Matrix)) else ""
-        fp.write("%s = %s(\\\n" %(name, typ))
-        for val in value:
-          fp.write("  %s,\n" %Lib.__save(val,  isinstance(val, 
-                   (list, tuple, Matrix, set))))
-        fp.write(")\n")
-      elif isinstance(value, (Tensor, Matrix)):
-        fp.write("%s = Matrix(%s)\n" %(name, Lib.__save(value)))
+      elif isinstance(value, (list, tuple, set, Tensor, Matrix)):
+        typ = "Matrix(" if isinstance(value, (Tensor, Matrix)) else ""
+        fp.write("%s = %s[\\\n" %(name, typ))
+        try:
+          for val in value:
+            fp.write("  %s,\n" %Lib.__save(val, 
+                   isinstance(val, (list, tuple, set, Tensor, Matrix))))
+        except BaseException as e:
+          sys.stderr.write('%s: %s\n' %(type(e).__name__, e))
+        fp.write("]%s\n" %(")" if typ else ""))
       else:
         fp.write("%s = %s\n" %(name, Lib.__save(value)))
   save=_save
+  @staticmethod
+  def __save(value, noStr=False):
+    """Internal function to iterate and expand strings."""
+    if isinstance(value, (list, tuple, Matrix, set)):
+      out = []
+      for val in value:
+        out.append(Lib.__save(val, noStr))
+    elif isinstance(value, Lib._basestr):
+      out = value if noStr else "\"%s\"" %value
+    else:
+      out = value
+    return out
 
   @staticmethod
   def _basisStrs(basis):
@@ -774,8 +803,6 @@ class Lib():
     mBasis = []
     for val in basis:
       txt = isinstance(val, Lib._basestr)
-      if txt and ("-" in val or "+" in val):
-        raise Exception("Multiple text terms not supported: %s" %val)
       pBasis.append(str(val))
       if txt:
         mBasis.append(val[1:] if val[:1] == "-" else "-" +val)
@@ -891,9 +918,7 @@ class Lib():
        multiplication table then bc is looked up. Simple triples with repeated
        elements or scalars are not triads. See triadDump to display results."""
     Lib._checkList(basis, None, "allCycles", (1,0))
-    if isinstance(basis[0], Lib._basestr) and table:
-      Lib._checkList(basis, Lib._basestr, "allCycles")
-      table = Tensor(table)._morphIn(basis)
+    table = Tensor(table)._morphIn(basis) if table else None
     buf = Lib.triadPairs(Lib.__allCycles, basis, "allCycles", dump, table)
     lr = len(basis)
     single, cycles = [[]] *(lr *(lr -1)), [[]] *(lr *(lr -1)) 
@@ -924,11 +949,9 @@ class Lib():
   def __allCycles(out, basis, lr, b, c, params):
     bb,cc,table = params
     if table:
-      bc = abs(table.get(b,c))
+      bc = abs(table.get(b,c)) -1
       if bc >= len(basis):
-        return cnt
-      if isinstance(basis[0], Lib._basestr):
-        bc -= 1
+        raise Exception("Index %s is not in basis of allCycles" %bc)
     else:
       try:
         bc = basis.index(abs(bb *cc))
@@ -942,32 +965,83 @@ class Lib():
     return 0
 
   @staticmethod
-  def associativeCycles(basis, table=None, dump=False):
-    """assoc[iative]Cycles(basis,[table,dump]) See Tensor.assocTriads()
-       Return a list of independent simplex 3-cycle faces. See allCycles()."""
+  def assocCycles(basis, table=None, subBasis=[], nonAssoc=False,
+                       dump=False):
+    """assoc[iative]Cycles(basis,[table,nonAssoc,subBasis,dump]) 
+       Return a list of independent simplex 3-cycle faces. If nonAssoc is set
+       return Type B and X triads. Only record elements in subBasis if set.
+       See allCycles(), Tensor.assocTriads and triadDump to display results."""
     Lib._checkList(basis, None, "associativeCycles", (1,0))
-    if isinstance(basis[0], Lib._basestr) and table:
-      Lib._checkList(basis, Lib._basestr, "associativeCycles")
-      table = Tensor(table)._morphIn(basis)
-    return Lib.triadPairs(Lib.__assocCycles, basis, "assocCycles", dump, table)
+    subBasis = subBasis if subBasis else basis
+    Lib._checkList(subBasis, None, "associativeCycles", (1,0))
+    subBasis = list(x[0] for x in enumerate(basis) if x[1] in subBasis)
+    subBasis = subBasis +[len(basis), len(basis) +1]
+    table = Tensor(table)._morphIn(basis) if table else None
+    return Lib.triadPairs(Lib.__nonAssocCycles if nonAssoc else \
+            Lib.__assocCycles, basis, "assocCycles", dump, (table, subBasis))
   @staticmethod
   def __assocCycles(out, basis, lr, b, c, params):
-    cnt = 0
-    bb,cc,table = params
-    if table:
-      bc = abs(table.get(b,c))
-      if bc >= len(basis):
-        return cnt
-      if isinstance(basis[0], Lib._basestr):
-        bc -= 1
-    else:
-      bc = basis.index(abs(bb *cc))
-    b1,c1,bc1 = sorted((b, c, bc))
-    if out[b1 *lr +c1] != [bc1]:
-      out[b1 *lr +c1] = [bc1]
-      cnt = 1
-    return cnt
-  assocCycles = associativeCycles
+    bb,cc,param = params
+    table,subBasis = param
+    if b in subBasis and c in subBasis:
+      if table:
+        bc = abs(table.get(b, c)) -1
+        if bc > len(basis) or bc not in subBasis:
+          raise Exception("Index %s is not in basis of assocCycles" %bc)
+      else:
+        try:
+          bc = basis.index(abs(bb *cc))
+          subBasis.index(bc)
+        except:
+          raise Exception("Element %s is not in basis of assocCycles" %bb *cc)
+      b1,c1,bc1 = sorted((b, c, bc))
+      if out[b1 *lr +c1] != [bc1]:
+        out[b1 *lr +c1] = [bc1]
+    return 0
+  @staticmethod
+  def __nonAssocCycles(out, basis, lr, b, c, params):
+    bb,cc,param = params
+    table,subBasis = param
+    bufOut = []
+    tabs = [0] *4
+    aabs = [0] *2
+    if b in subBasis and c in subBasis:
+      if table:
+        tabs[0] = table.get(b, c)
+        aabs[0] = abs(tabs[0]) -1
+        if aabs[0] > lr +1 or aabs[0] not in subBasis:
+          raise Exception("Index %s is not in basis of assocCycles" %aabs[0])
+        for d in range(c +1, lr):
+          if d in subBasis:
+            tabs[1] = table.get(c, d)
+            aabs[1] = abs(tabs[1]) -1
+            if aabs[1] > lr +1 or aabs[1] not in subBasis:
+              raise Exception("Index %s is not in basis of assocCycles" %aabs[1])
+            if aabs[0] < lr and aabs[1] < lr:
+              tabs[2] = table.get(aabs[0], d)
+              tabs[3] = table.get(b, aabs[1])
+              sgn = sum(int(s < 0) for s in tabs) %2 == 1
+              if abs(tabs[2]) != abs(tabs[3]) or sgn:
+                bufOut.append(d)
+      else:
+        try:
+          bc = bb *cc
+          subBasis.index(basis.index(abs(bc)))
+        except:
+          raise Exception("Element %s is not in basis of assocCycles" %bb *cc)
+        for d in range(c +1, lr):
+          if d in subBasis:
+            dd = basis[d]
+            try:
+              cd = cc *dd
+              subBasis.index(basis.index(abs(cd)))
+              if bc *dd != bb *cd:
+                bufOut.append(d)
+            except:
+              raise Exception("Element %s is not in basis of assocCycles" %cc*dd)
+      out[b *lr +c] = bufOut
+    return 0
+  associativeCycles = assocCycles
 
   @staticmethod
   def expandPairList(pairList):
@@ -1014,6 +1088,122 @@ class Lib():
               yield aa, bb, basis[c]
     if dump:
       Lib.checkMem(a, finish=True)
+
+  @staticmethod
+  def rngListPull(rngs, siz, savename):
+    """rngListPull(rngs, siz, basename)
+       Return list of rngPull() for each rng in rngs list."""
+    Lib._checkList(rngs, (list, tuple, Matrix, Tensor), "rngsPullTasking", (1, 0))
+    for rng in rngs:
+      Lib._checkList(rng, None, "rngsPullTasking", (3, 0))
+    tmp = Lib._rngMake(rngs[0])
+    Lib._checkType(siz, int, "rngsPullTasking", (2, len(tmp) //2))
+    out = []
+    for rng in rngs:
+      out.append(Lib.rngPull(rng, siz))
+    filename = Lib.fixFilename(savename, os.path.dirname(__file__) \
+                  +"%s..%sdata" %(os.sep, os.sep))
+    Lib._save(filename, os.path.splitext(savename)[0], out)
+    return tuple(out)
+
+  @staticmethod
+  def rngPull(rng, siz=None, slice=[], dump=False, save=None):
+    """rngPull(rng,[siz=len(rng)//2,slice,dump, save])
+       Return the list of subNArings of length siz for rng, which can be a 
+       non-associative (NA) ring. If set slice=(start, [stop]) allows subrange
+       of the first index only to be run ."""
+    Lib._checkList(rng, None, "rngPull", (3, 0))
+    rng = Lib._rngMake(rng)
+    pSiz = int(math.log(len(rng)) /math.log(2)) if siz is None else siz
+    fSiz =  int(pow(2, pSiz)) -1
+    Lib._checkType(pSiz, int, "rngPull", (2, len(rng)))
+    Lib._checkList(slice, int, "rngPull", (0, 2))
+    Lib._checkType(dump, bool, "rngPull")
+    if save:
+      Lib._checkType(save, Lib._basestr, "rngPull")
+      filename = Lib.fixFilename(save, os.path.dirname(__file__) \
+                 +"%s..%sdata" %(os.sep, os.sep))
+    try:
+      out = set()
+      start = [(slice[0] -1) if slice else -1] *pSiz
+      stop = len(rng) if len(slice) < 2 else slice[1]
+      params = [rng, start, [0] *pSiz, len(rng), pSiz, fSiz, stop, dump, out]
+      if dump:
+        Lib.checkMem(len(rng), 1)  
+      Lib.__rngPull(params, 0)
+      if dump:
+        Lib.checkMem(start[0], 1, extra=len(out), finish=True)
+      if save:
+        Lib._save(filename, os.path.splitext(save)[0], sorted(out))
+    except BaseException as e:
+      if Lib._isVerbose():
+        traceback.print_exc()
+      else:
+        sys.stderr.write('%s: %s\n' %(type(e).__name__, e))
+      out = ['%s %s: %s' %(slice, type(e).__name__, e)] +list(out)
+      if save:
+        Lib._save(filename, os.path.splitext(save)[0], sorted(out))
+    return tuple(sorted(out))
+  @staticmethod
+  def __rngPull(params, pos):
+    """Internal recursive function for rngPull."""
+    rng, poss, bass, rSiz, pSiz, fSiz, stop, dump, out = params
+    while poss[pos] < rSiz -pSiz +pos:
+      if pos == pSiz -1:
+        while poss[pos] < rSiz -1:
+          poss[pos] += 1
+          bass[pos] = rng[poss[pos]]
+          full = Lib._rngMake(bass)
+          if len(full) == fSiz:
+            out.add(Lib._rngNorm(sorted(full)))
+      else:
+        poss[pos] += 1
+        bass[pos] = rng[poss[pos]]
+        poss[pos +1] = poss[pos]
+        Lib.__rngPull(params, pos +1)
+        if pos == 0:
+          if poss[0] == stop:
+            break
+          if dump:
+            Lib.checkMem(poss[0], 1, extra=len(out))      
+
+  @staticmethod
+  def rngNorm(rng):
+    """rngNorm(rng)
+      Return power of 2 Fortran positions in rng. Opposite of rngMake()."""
+    Lib._checkList(rng, None, "rngNorm")
+    return Lib._rngNorm(Lib._rngMake(rng))
+  @staticmethod
+  def _rngNorm(rng):
+    out = []
+    pos = 0
+    while 2 **pos < len(rng):
+      out.append(rng[2 **pos -1])
+      pos += 1
+    return tuple(out)
+
+  @staticmethod
+  def rngMake(arr):
+    """rngMake(arr)
+      Return unique non unit products of arr elements. Opposite of rngNorm."""
+    Lib._checkList(arr, None, "rngMake", (1,0))
+    return Lib._rngMake(arr)
+  @staticmethod
+  def _rngMake(arr):
+    out = set([arr[0].__class__(1)])
+    for n in range(1,len(arr) +1):
+      out.update(list(abs(Tensor(lst).prod()) for lst in Lib.comb(len(arr), n,arr)))
+    out = sorted(list(out))
+    del(out[0])
+    return tuple(out)
+
+  @staticmethod
+  def rngCode(rng):
+    """rngCode(rng):
+      Return the number of non-associative triads for rng (the P_x code)."""
+    Lib._checkList(rng, None, "rngCode", (1,0))
+    rng = Lib._rngMake(rng)
+    return len(list(Lib.triadDump(Lib.assocCycles(rng, nonAssoc=True), rng)))
 Common = Lib
 
 ################################################################################
@@ -1587,13 +1777,9 @@ class Tensor(list):
       basis = list(x[0] for x in basis if len(x)==2)
     else:
       Lib._checkList(labels, None, "morph", len(basis))
-    return self.__morphIn(basis, True).__morphOut(labels, True)
+    return self._morphIn(basis, True)._morphOut(labels, True)
 
-  def _morphIn(self, basis):
-    """Internal method to return a Matrix as indicies into Basis elements."""
-    return self.__morphIn(basis)
-
-  def __morphIn(self, basis, unknown=False):
+  def _morphIn(self, basis, unknown=False):
     """Internal method to return a Matrix as indices into basis elements."""
     out = []
     basis = list(basis)[:] +[1, 0]
@@ -1625,7 +1811,7 @@ class Tensor(list):
         out.append(row)
     return self.copy(out)
 
-  def __morphOut(self, basis, unknown=False):
+  def _morphOut(self, basis, unknown=False):
     """Internal method to return a Matrix of indices into basis elements."""
     try:
       out = []
@@ -1659,7 +1845,7 @@ class Tensor(list):
       raise Exception("Element not found in output for morph")
     return self.copy(out)
 
-  def __morphPerm(self, perm):
+  def _morphPerm(self, perm):
     """Internal routine to return self with values, rows and cols permuted."""
     rows = []
     for idx in perm: # Swap rows
@@ -1699,74 +1885,6 @@ class Tensor(list):
         row.append(-val if val1 < 0 else val)
       if row:
         out.append(row)
-    return self.copy(out)
-
-  def __morph(self, basis, labels):
-    """Internal routine to return self with basis & ones replaced by labels
-       and +-1 of labels type."""
-    isStrBasis = isinstance(basis[0], Lib._basestr)
-    if isStrBasis:
-      pBasis = (str(x) for x in basis)
-      mBasis = list((x[1:] if x[0]=="-" else "-"+x for x in pBasis))
-    else:
-      mBasis = list((-x for x in basis))
-    isStrLabel = isinstance(labels[0], Lib._basestr)
-    if isStrLabel:
-      pLabels = (str(x) for x in labels)
-      mLabels = list((x[1:] if x[0]=="-" else "-"+x for x in pLabels))
-    else:
-      mLabels = list((-x for x in labels))
-    out = []
-    for val1 in self:
-      row = []
-      if isinstance(val1, (list, tuple, Matrix)):
-        for val2 in val1:
-          if val2 in basis:
-            val2 = labels[basis.index(val2)]
-          elif val2 in mBasis:
-            val2 = mLabels[mBasis.index(val2)]
-          else:
-            try:
-              if isStrBasis:
-                val2 = float(val2)
-                if val2 == int(val2):
-                  val2 = int(val2)
-              elif isinstance(val2, (int, float)):
-                pass
-              elif val2.isScalar():
-                val2 = val2.scalar()
-                if val2 == int(val2):
-                  val2 = int(val2)
-              else:
-                raise ValueError
-              if isStrLabel:
-                val2 = str(val2)
-            except (ValueError, AttributeError):
-              val2 = str(val2) # Swap element not found in basis
-          row.append(val2)
-      elif val1 in basis:
-        row = labels[basis.index(val1)]
-      elif val1 in mBasis:
-        row = mLabels[mBasis.index(val1)]
-      else:
-        try:
-          if isStrBasis:
-            val1 = float(val1)
-            if val1 == int(val1):
-              val1 = int(val1)
-          elif isinstance(val1, (int, float)):
-            pass
-          elif val2.isScalar():
-            val1 = val1.scalar()
-            if val1 == int(val1):
-              val1 = int(val1)
-          else:
-            raise ValueError
-          if isStrLabel:
-            val2 = str(val1)
-        except (ValueError, AttributeError):
-          raise Exception("Swap element not found in basis: %s" %val1)
-      out.append(row)
     return self.copy(out)
 
   def differences(self, mat, ignore=None):
@@ -1919,8 +2037,8 @@ class Tensor(list):
       if len(cf) < len(self) or len(cycleIso) < len(self):
         raise Exception("Invalid basis for table.cycles()")
     else:
-      newSelf = self.__morphIn(basis)
-      cf = cf.__morphIn(cfBasis)
+      newSelf = self._morphIn(basis)
+      cf = cf._morphIn(cfBasis)
     cnt = 0
     antiIso = 0 if noAntiIso else (dim)
     for p in perms:                # For all permutations
@@ -1939,7 +2057,7 @@ class Tensor(list):
           else:
             if squares and list(basisDiag.permute(p1)) != cfDiag:
               break
-            iso = newSelf.__morphPerm(p1)
+            iso = newSelf._morphPerm(p1)
 
           # Now report found, perm, diffs & accumulate histogram
           if diffs < 0:
@@ -1963,7 +2081,7 @@ class Tensor(list):
           if cnt == num or (num == -1 and len(dif) == 0):
             if diffs < 0 and len(dif) > 0:
               sys.stdout.write("GOT at %d %s\n" %(cnt, p1))
-            return (p1, iso if cycles else iso.__morphOut(basis))
+            return (p1, iso if cycles else iso._morphOut(basis))
           cnt += 1
     i = difRange[0]
     stats = [0] *(i if cnt else 0)

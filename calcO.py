@@ -66,6 +66,7 @@ class O(object):
   __maxBasis    = ['0', '0']             # Store the max dimensions
   _maxDims      = ['0', '0']             # For inheritad dimensions
   __useCA       = False                  # CA class is loaded
+  __calculator  = None                   # Call back to parse scripts
   __basisXyz    = ("",)                  # Cache maximum basis order
   __basisDim    = 0                      # Cache maximum basis size
   __basisODim   = 0                      # Count of o basis to move u basis
@@ -1693,7 +1694,7 @@ class O(object):
   @staticmethod
   def AssocTriads(basis, nonAssoc=False, alternate=False, dump=False,
                   cntOnly=False):
-    """AssocTriads(basis,[nonAssoc,alternate,dump,cntOnly])
+    """Assoc[iative]Triads(basis,[nonAssoc,alternate,dump,cntOnly])
        Return unique O.assoc(...) triads or not. See Lib.triadDump."""
     Lib._checkType(nonAssoc, bool, "AssocTriads")
     Lib._checkType(alternate, bool, "AssocTriads")
@@ -1713,6 +1714,7 @@ class O(object):
     if out:
       out[a *lr +b] = buf
     return cnt
+  AssociativeTriads=AssocTriads
  
   @staticmethod
   def MoufangTriads(basis, number=0, nonMoufang=False,dump=False,cntOnly=False):
@@ -1891,16 +1893,24 @@ class O(object):
       kwargs[xyz[idx]] = val if idx < 3 else -val
     return args[0], kwargs
 
+  @staticmethod
+  def ProcessScript(isAns, line):
+    """ProcessScript(isAns, line)
+       Parse and exec globals or return eval if isAns."""
+    return O.__calculator.processScript(isAns, line)
+
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
   @staticmethod
-  def _getCalcDetails():
+  def _getCalcDetails(calc=None):
     """Return the calculator help, module heirachy and classes for O."""
     cHelp = """Octonion/Sedenion/Ultra Calculator - Process 30-dimensional basis
           numbers (o1..F or u1..F) and multiples. The form oijk, for example,
           means left expansion, oi*oj*ok = ((oi*oj)*ok, and is internalised as
           a graded form with a subset of ordered indices from o123456789ABCDEF."""
+    if calc:
+      O.__calculator = calc
     ijk = "i,j,k=O(o1=1),O(o2=1),O(o12=1)"
     return (("O", "CA", "Q", "R"), ("O", "math"), ijk, "default.oct", cHelp,"")
 

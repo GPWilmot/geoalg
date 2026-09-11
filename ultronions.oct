@@ -11,13 +11,14 @@ _ultronions = """Module contains class Cawagas, variables:
    AO7, b07, co7, BO7, SO7, S712, S721, S15, SS15, SB1513, SB1522, SB1531,
    f7Basis, f15Basis, e15Basis, CyclesPattern, ABCXeg, CyclesModes
  and functions:
-   nonAssocType, nonAssocModeType, cycles, cyclesType, nonAssocMode, nonAssocModeCounts,
-   nonAssocMalcev, nonAssocLine, nonAssocCube, triadCycles3, triadCycles, triadCyclesModes,
-   decimateModes, triadCyclesSA, triadSA, triadsZD, triadFind."""
+   nonAssocType, nonAssocModeType, cycles, cyclesType, calMake,
+   nonAssocMode, nonAssocModeCounts, nonAssocMalcev, nonAssocLine,
+   nonAssocCube, triadCycles3, triadCycles, triadCyclesModes, decimateModes,
+   triadCyclesSA, triadsZD, triadFind."""
 
-O.Basis(5)  # Cawagas uses o1-o4 & CABCXeg uses o5
+#O.Basis(5) new scheme doesn't need this # Cawagas uses o1-o4 & CABCXeg uses o5
 
-# CA: Tensor.Triads(*(S4/12/14).spin(f7Basis))~Tensor.Table(triadSA(t4/12/14))
+# CA: Tensor.Triads(*(S4/12/14).spin(f7Basis))~Tensor.Table(Lib.rngMake(t4/12/14))
 # S4 = e123 -e145 +e167 -e246 -e257 -e347 +e3:W56,   t4 = CP4[0][0]
 # S12 = -e123 +e145 +e167 -e246 -e257 +e347 -e356, t12 = CP5[1][0]
 # S14 = e123 +e145 +e167 +e246 -e257 -e347 +e356,  t14 = CP6[3][0]
@@ -354,6 +355,8 @@ def nonAssocModeType(bc, d=O(0)):
   return b.nonAssocModeType(c, d)
 
 def cycles(bc, d=O(0)):
+  """cycles(bc, [d])
+     Return b.cycles(c) with option d appended."""
   Lib._checkList(bc, O, "cycles", (2,4))
   Lib._checkType(d, O, "cycles")
   if len(bc) == 4:
@@ -366,6 +369,8 @@ def cycles(bc, d=O(0)):
   return out
 
 def cyclesType(bc, d=O(0)):
+  """cyclesType(bc, [d])
+     Return b.cyclesType(c,d) for d in bc or not."""
   Lib._checkList(bc, O, "cyclesType", (2,4))
   Lib._checkType(d, O, "cyclesType")
   if len(bc) == 4:
@@ -373,6 +378,17 @@ def cyclesType(bc, d=O(0)):
   else:
     b,c,d = bc if len(bc) == 3 else (bc[0],bc[1],d)
   return b.cyclesType(c,d)
+
+def calMake(bas):
+  """calMake(bas)
+     Return (signs,triads) for associative parts of O.Basis(bas). Run:
+     a=CalTest.CalTest(n); x=calMake(10); a.crypt.setCode(*x);
+     a.crypt.getPcode() # for n=3..10."""
+  basis = O.Basis(bas)
+  assArr = list(Lib.triadDump(Lib.assocCycles(basis), basis))
+  return (list(int(x[0]*x[1]*x[2]) for x in assArr), 
+    list([basis.index(x[0]) +1, basis.index(x[1]) +1, basis.index(x[2]) +1] \
+           for x in assArr))
 
 def nonAssocMode(bc, d=O(0), mode=0):
   """nonAssocMode(bc, [d=O(0), mode=0])
@@ -554,6 +570,52 @@ def triadCycles(basDim, unpaired=False, dump=False):
     Lib.checkMem(cnt, finish=True)
   return out
 
+def zd(x): 
+  aa = x[0]*x[1]*x[2]
+  if (-aa+x[0]) *(x[1]+x[2]) == 0:
+    return 0.0
+  return (aa+x[0])*(x[1]+x[2])
+
+ccc = [(u1, u2, u3), (u1, u3, u123), (u2, u3, u123)]
+bas=O.Basis(0,4)
+cp = triadCycles(bas)
+kp=set()
+for z in cp: kp.update(x[0] for x in z)
+kc=dict((x,[]) for x in sorted(kp))
+a180=list(Lib.triadDump(O.ZeroDivisors(bas), bas))
+for x in a180: kc[cycles(x[:2])[0]].append(x[2])
+#for x in kc: print(x,len(kc[x]), len(set(kc[x])), set(kc[x]), list(zdm(list(x)+[y]) for y in set(kc[x])))
+
+def nam(bcd,mode=0):
+  b,c,d = bcd
+  a = b *c *d
+  if mode == 0:
+    return (b,c,d)
+  elif mode == 1:
+    return (b,c,a)
+  else:
+    db = abs(d *b)
+    aa = b *c *db
+    if mode == 2:
+      return (b,c,db)
+    elif mode == 3:
+      return (b,c,aa)
+    else:
+      raise Exception("Invalid value for mode in nonAssocMode")
+def zdm(x):
+  zs = list(zd(nam(x,y)) for y in range(4))
+  zm = []
+  for y in range(4):
+    m = nam(x,y)
+    zm.append(0 if zd(m) else m[2])
+  return zm
+def zcm(x):
+  print(x,len(kc[x]), len(set(kc[x])), set(kc[x]), list(zdm(list(x)+[y]) for y in set(kc[x])))
+  print(list(y for y in a180 if cycles(y[:2])[0]==x))
+  print(list(zdm(y) for y in a180 if cycles(y[:2])[0]==x))
+  print(list(zd(y) for y in a180 if cycles(y[:2])[0]==x))
+
+
 def triadCyclesModes(dim, dump=False, limit=0):
   """triadCyclesModes(dim, [dump,limit])
      Returns (patterns, order) where patterns are the same as triadCycles()
@@ -670,7 +732,7 @@ def triadCyclesSA(triCyc, full=False, silo=None):
      return the each sub-alg. pattern/item along with the first triad.
      Item counts for silos times 3 + count for non-cycles[8] == 28 if
      silo not set otherwise just use only one silo used. Use
-     "".join(sorted(nonAssocType(x) for x in Lib.comb(7,3,triadSA(triad))))
+     "".join(sorted(nonAssocType(x) for x in Lib.comb(7,3,Lib.rngMake(triad))))
      to see the identification for the triad for any sub-algebra(SA)."""
   Lib._checkList(triCyc, (list, tuple), "traidCyclesSA", 9)
   Lib._checkType(full, bool, "triadCyclesSA")
@@ -692,7 +754,7 @@ def triadCyclesSA(triCyc, full=False, silo=None):
         if dx in all7:
           tmp[idx +silo] += 1
         else:
-          all7 = _triadSA(list(pair) +[dx])
+          all7 = Lib._rngMake(list(pair) +[dx])
           triad = (all7[0], all7[1], all7[3])
           if triad in out:
             tmp = out[triad]
@@ -715,26 +777,11 @@ def triadCyclesSA(triCyc, full=False, silo=None):
       out0[z] = [x,1]
   return out0
 
-def triadSA(triad, normed=False):
-  """triadSA(triad, [normed])
-     Return sorted algebra generated by triad (SA or Oct) or normed triad."""
-  Lib._checkList(triad, O, "triadSA", 3)
-  Lib._checkType(normed, bool, "triadSA")
-  out = _triadSA(triad)
-  if normed:
-    return (out[0], out[1], out[3])
-  return out
-
 SS = [[1, 7, 63, 413, 2583, 16905, 118251, 873901],
      [1,  1,  42, 504,  4158, 30996, 229194, 1729728],
      [1,  1,   1, 168,  3024, 34776, 332640, 2912616]]
 OO = [1, 8 , 50 , 310 , 2046, 14478 , 107950 , 831470]
 TT = [0, 15, 155, 1395, 11811, 97155, 788035, 6347715]
-
-def _triadSA(triad):
-  """Internal version of triadSA."""
-  b,c,d = triad
-  return sorted([b, c, d, abs(b *c), abs(b *d), abs(c *d), abs(b *c *d)])
 
 def triadsZD(cycPat, dump=False):
   """triadsZD(cycPat, [dump])
@@ -743,7 +790,7 @@ def triadsZD(cycPat, dump=False):
      triadCyclesModes() is ignored and patterns are assumed decimated.
      Lib.cycles() is recovered and if decimated nonAssocMode() is used
      to recover all modes. For any triad find the sub-algebra ZDs with
-     m=triadSA(triad); list(Lib.triadDump(O.ZeroDivisors(m),m))."""
+     m=Lib.rngMake(triad); list(Lib.triadDump(O.ZeroDivisors(m),m))."""
   Lib._checkList(cycPat, (list, tuple, dict), "triadsZD", (2,0))
   decimated = (len(cycPat) == 2)
   triCyc = cycPat[0] if decimated else cycPat

@@ -504,33 +504,39 @@ class S():
        Return the module version string."""
     return __version__
 
+  @staticmethod
+  def ProcessScript(isAns, line):
+    """ProcessScript(isAns, line)
+       Parse and exec globals or return eval if isAns."""
+    return S.__calculator.processScript(isAns, line)
+
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
-  __keyWordList = []
-  __globWordList = []
-  __calculator = None
 
   @staticmethod
-  def _getCalcDetails():
+  def _getCalcDetails(calc=None):
     """Return the calculator help, module heirachy and classes for S."""
     help = \
       """Symbolic Algebra Calculator - Process symbols as strings currently."""
+    if calc:
+      S.__calculator = calc
+      S._setWordLists()
     return (("S"), ("S", "P", "math"), "", "default.sym", help, "")
 
   @staticmethod
-  def _setWordLists(Calc):
-    """Return list of globals and builtins from primary module as well as
+  def _setWordLists():
+    """Save list of globals and builtins from primary module as well as
        python keywords."""
-    S.__calculator = Calc
-    S.__globWordList, S.__keyWordList = Calc.getWordLists()
+    S.__globWordList, S.__keyWordList = S.__calculator.getWordLists()
     S.__keyWordList.append('S')
+    S.__keyWordList.extend(Lib._getCalcList())
     S.__keyWordList.extend(keyword.kwlist)  # Add all python keywords
 
   @classmethod
   def _setCalcBasis(cls):
     """Load this other calculator. None currently."""
-    S._setWordLists(Lib._getCalcList())
+    S._setWordLists()
     return ""
 
   @classmethod
@@ -624,6 +630,5 @@ if __name__ == '__main__':
     ]
 
   calc = Calculator(S, Tests)
-  S._setWordLists(Calculator)
   calc.processInput(sys.argv)
 ###############################################################################
