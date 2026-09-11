@@ -930,7 +930,10 @@ class Lib():
       if isinstance(basis[0], Lib._basestr):
         bc -= 1
     else:
-      bc = basis.index(abs(bb *cc))
+      try:
+        bc = basis.index(abs(bb *cc))
+      except:
+        raise Exception("Element %s is not in basis of allCycles" %abs(bb *cc))
     b1,c1,bc1 = sorted((b, c, bc))
     bufOut = out[b1 *lr +c1]
     if not bufOut: bufOut = []

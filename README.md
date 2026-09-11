@@ -81,22 +81,33 @@ rule to be automated and exposes the underlying structure with quaternions such
 as o1, o2, o12 easily recognised.
 
 The octonions are included in this list of geometric algebras because of the CA
-construction of O and G2 in 7 dimensions. The calculations in spin7_g2.ca show
+construction of O and G_2 in 7 dimensions. The calculations in spin7_g2.ca show
 how Clifford algegra simplifies the usual derivation. It goes further to show a
-commuting subset of Spin(7) can be used to define the Exceptional Lie algebra G2
+commuting subset of Spin(7) can be used to define the exceptional Lie algebra G_2
 which are the automorphisms of the octonions. This is easy to see using Clifford
 algebra. The file "Book-The Algebra of Geometry.pdf" shows a new way to derive
 and understand Clifford algebra from simplices such as the triangle and
 tetrahedron. My claim is that I can get you to think in 5 dimensions in five
-minutes but 7 dimensions takes a bit longer. The book is a work in progress and
-includes only Chapters 1 and 2 with an outline of the others. Pfaffians needed
-to be added to chapter 1 because of their close connection to simplices. The
-Spin(7) and Spin(15) chapters will document the connections to G2, octonions and
-sedenions now published as the preprint arXiv:2505.06011 [math.RA], shown in an
-earlier version in the file "Article-Construction of G2 using Clifford
-Algebra.pdf". This would be followed by chapters on ultracomplex numbers
-published as the preprint arXiv:2505.11747 and given by an early version in the
-file "Article-Structure of the Sedenion Series.pdf".
+minutes but 15 dimensions takes a bit longer. The book is a work in progress that 
+will summarise the following papers:
+* "Construction of G_2 using Clifford Algebra.pdf" - published in Advances in
+ Applied Clifford Algebras,  
+ https://link.springer.com/article/10.1007/s00006-025-01423-5?utm_source=rct_congratemailt&utm_medium=email&utm_campaign=oa_20260214&utm_content=10.1007%2Fs00006-025-01423-5 (preprint arXiv:2505.06011 [math.RA]) and working file spin7_g2.ca.
+* Structure of the Cayley Dickson algebras [Sedenion Series] (preprint
+ https://arxiv.org/abs/2505.11747 v3) and working file ultronions.oct.
+* The algebra of geometry - work in progress presented as a poster at AACA conference
+ (2024) that expands pfaffian/simplex derivation of Clifford's geometric algebra
+ presented in draft form in the book.
+* Automorphisms of Sedenions (preprint https://doi.org/10.48550/arXiv.2512.07210) -
+ Sharp subalgebras of Spin(2^n-1), n>0, extend the Fano plane to Fano hyper-volumes
+ and map to Cayley Dickson algebras. The deviration of exceptional Lie algebra G_2
+ defines the autmorphisms of sedenions, which does not match the usual maths.
+ The working file is spin15_g2.ca.
+* "Clifford algebra calibrations.pdf" - Slide presentation a walk from maths, through
+ geometry, leading to geometric algebra and physics. The visualisation of Sharp rings
+ as various levels of Fano-volume geometry, starting with the 1-D triangle projection
+ (o-o-o) helps understand the power of geometric algebra. A video presentation of these 
+ sides is presented at https://youtu.be/r6A-NpzdBuI?si=B9f04hMcMr-pHKGP.
 
 In researching the history of Clifford algebra, like other authors I found this
 subject is richly documented and does not need repeating. In one of the articles
