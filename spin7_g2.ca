@@ -4,14 +4,14 @@
 ########################################
 
 _spin7_g2 = """This module for calcCA defines the Triads7[30] 3-forms for Spin7, triads7
- functions to process allSign() elements and makeG2(i,j) to generate globals
+ functions to process allSign() elements and setupG2(makeG2(i)) to generate globals
  A, B,...,N for octonian representations. The variables are:
    Triads7gen, Triads7, PP1, PPP1, PP1p, P1o, PP1o, S1, SS1, TriadsG2, S1o, SS1o,
    f7Basis, Spin7O, Spin7R, Nac7Mirrors, Nac7Map, AutoTriads7, AutoTriadsO,
-   NameG2/2, MatrixG2/2, WikiG2/2, G2/2 (ie G2 & G22), Table2, <XyG2 stuff>
+   NameG2/2, MatrixG2/2, WikiG2/2, G2/2 (ie G2 & G22), TableG2, <XyG2 stuff>
  and functions:
    nac7subalg, nac7mirrors, nac7map, triadsOhalf, triads7all, triads7terms,
-   triads7remain, triads7class, triads7test, triads7parity, triads7autos,
+   triads7remain, triads7class, allCals, triads7test, triads7parity, triads7autos,
    setupG2, tableG2, makeG2, mapG2, constructG2, constructAll, generateXyG2."""
 
 _Triads7 = "30 tetrahedron faces selected to define sub-algebras of CA(7)"
@@ -117,6 +117,12 @@ Spin7R = Matrix( \
  ("-f7", "f4", "f5","-f2","-f3", "-1", "f1"),
  ("f6", "f5", "f4","-f3","-f2","-f1", "-1"))
 
+def sharp7(beta):
+  """sharp15(beta)
+     Return alpha=beta^2-1 so full rotation is alpha+beta."""
+  Lib._checkType(beta, CA, "sharp15")
+  return beta**2 +1
+
 def nac7subalg(tri, pos=None):
   """nac7subalg(tri, [pos])
      Return non-associative count for tri or tri.allSigns()[pos] sub-algebra."""
@@ -159,30 +165,30 @@ def nac7mirrors():
 
 def nac7map(idx):
   """nac7map(idx)
-     Map all Triads7[idx] remainders to sub-algebra in term order."""
-  global Triads15
-  global Nac15Name
+     Map all Triads7[idx] remainders to sub-algebra in remainder order."""
+  global Nac7Name
   if idx < 0 or idx >= len(Triads7):
     raise Exception("Invalid nac7Map Triads7 index")
   out = []
-  macMap = set(Nac7Name.keys())
+  nacMap = set(Nac7Name.keys())
   nac={} if idx in (10,19) else {abs(triads7remain(triads7all(idx,0))): triads7all(idx,0)}
-  for offs in range(1,9):
-    tmp = triads7remain(-triads7all(idx,offs))
+  for offs in range(1, 9):
+    tmp = triads7remain(-triads7all(idx, offs))
     if tmp and len(tmp.copyTerms()) == 1:
-      nac[abs(tmp)] = triads7all(idx,offs)
+      nac[abs(tmp)] = triads7all(idx, offs)
+  bas = CA.Basis(7, 0, 1)
   for pos in sorted(nac.keys()):
-    tmp = len(list(Lib.triadDump(Matrix.Triads(*(nac[pos]).spin(f7Basis)) \
-                           .assocTriads(f7Basis,True),f7Basis)))
+    tmp = nac[pos].rngCode()
     if tmp not in nacMap:
       nacMap.append(tmp)
-      Nac15Name[tmp] = ("", idx, sgn)
+      Nac7Name[tmp] = ("", idx, sgn)
       print("Not in Map", tmp, Nac15Name[tmp])
     out.append(tmp)
-  return out
+  return tuple(out)
 
-# Non-assoc cnt to subalgebra name & first example idx and allSign position
+_Nac7Name ="Non-assoc cnt to subalgebra name & first example idx and allSign position"
 Nac7Name = {4:("R",0,6), 8:("S",6,3), 10:("T",6,5), 12:("U",0,7), 14:("V",0,0), 16:("W",12,0), 28:("O",0,5)}
+_Nac7Map = "NonAssocCode for sorted remainders for Triads7[.]. See nac7map(.)."
 Nac7Map = ( \
   (4, 12, 12, 14, 14, 14, 14),  (4, 12, 12, 14, 14, 14, 14),  #0  R:8, U:16, V:32;       same 
   (4, 14, 14, 12, 12, 14, 14),  (4, 14, 14, 14, 14, 12, 12),  #2  R:8, U:16, V:32;       same 
@@ -234,7 +240,7 @@ Nac7Map = ( \
 #29:VVRUUOVVUR OUVVVVVUOV VOUVRUURVV VVOUVVUOVU RRUVOUVVUV VVVURVVVVR VVOU
 # Cardinality: R=96, S=96, T=256, U=464, V=704, W=64, O=240
 
-AutoTriads7 = "Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()"
+_AutoTriads7 = "Map Triads7[0] to others or triads7all(10,1) & triads7all(19,1) - see makeG2()"
 AutoTriads7 = (((), CA(1)),                     (((2,3), (4,5), (6,7)), e246),
   (((1,2), (4,5), (6,7)), e256),                  (((1,2), (5,7)), e345),
   (((2,3), (5,7)), e157),                 (((4,5), (4, 6), (4,7)), e123),
@@ -368,6 +374,24 @@ def _triads7combs(g2, comb=0, parity=False):
       print(term)
       g2Terms.append((sgn *CA.Eval(term),))
   return g2Terms
+
+def allCals(arrT=[], arrA=[1], dim=7):
+  """Generate 30 cals=[1, e12, e13, e14, e15, e16, e17, e23, e12 +e13, e12 +e14,
+     e12 +e15, e12 +e16, e12 +e17, e12 +e23, e13 +e14, e13 +e15, e13 +e16, e13 
+     +e17, e14 +e15, e14 +e26, e16 +e17, e16 +e24, e12 +e13 +e14, e12 +e13 +e15,
+     e12 +e13 +e16, e12 +e13 +e17, e12 +e14 +e16, e12 +e14 +e25, e12 +e15 +e17,
+     e12 +e15 +e24] for rotations CA.Basis(dim,0,2) from triads7all(0,63).
+     Updates arrT abd arrA. Repeat until full."""
+  if not arrT:
+    arrT = [triads7all(0,63)]
+  for x in enumerate(arrA[:]):
+    for y in CA.Basis(dim, 0, 2):
+      if x[0]==0 or y.copyTerms()[0] not in arrA[x[0]].copyTerms():
+        ss = (arrA[x[0]] +y) if x[0] else y
+        tt = arrT[0].swap(ss) 
+        if abs(tt) not in Abs(arrT):
+          arrT.append(tt)
+          arrA.append(ss)
 
 def triads7test(g2, row, rng0=0, rng1=0, loop=1, comb=0, mod=None, minus=False,
                 dump=False):
@@ -506,16 +530,16 @@ NameG22 = ("A+H", "B+I", "C+J", "D+K", "F+M", "G+N", "L-E")
 #  D   G-N  -M   A-H   0    J     I
 #  G   K-D  -L   B-I  -J    0    -H
 # -F+M E+L   K  -C+J  -I    H     0
-_MatrixG2 = "Matrix representation of G2 element A-N."
+_MatrixG2 = "Matrix representation of G2 element A->N."
 _MatrixG22 = "Matrix representation of G2 dual elements in NameG22."
 def _matrixG2(x1,x2,y1,y2):
   m = Matrix.Diag([0]*7); m[x1][x2]=1; m[x2][x1]=-1; m[y1][y2]=1; m[y2][y1]=-1
   return m
-MatrixG2 = (_matrixG2(1,2,4,3), _matrixG2(2,0,5,3), _matrixG2(0,1,3,6), # ABC
-            _matrixG2(4,0,1,5), _matrixG2(0,3,6,1), _matrixG2(0,6,1,3), # DEF
-            _matrixG2(5,0,4,1), _matrixG2(3,4,6,5), _matrixG2(3,5,4,6), # GHI
-            _matrixG2(4,5,6,3), _matrixG2(5,1,6,2), _matrixG2(2,5,6,1), # JKL
-            _matrixG2(6,0,2,4), _matrixG2(1,4,3,2))                    # MN
+MatrixG2 = (_matrixG2(2,1,3,4), _matrixG2(0,2,3,5), _matrixG2(0,1,6,3), # ABC
+            _matrixG2(0,4,1,5), _matrixG2(3,0,6,1), _matrixG2(6,0,1,3), # DEF
+            _matrixG2(0,5,4,1), _matrixG2(4,3,5,6), _matrixG2(5,3,6,4), # GHI
+            _matrixG2(3,6,5,4), _matrixG2(5,1,6,2), _matrixG2(6,1,2,5), # JKL
+            _matrixG2(0,6,2,4), _matrixG2(1,4,3,2))                    # MN
 MatrixG22 = (MatrixG2[0] +MatrixG2[7],  MatrixG2[1] +MatrixG2[8],  # A+H, B+I
              MatrixG2[2] +MatrixG2[9],  MatrixG2[3] +MatrixG2[10], # C+J, D+K
              MatrixG2[5] +MatrixG2[12], MatrixG2[6] +MatrixG2[13], # F+M, G+N
@@ -642,7 +666,7 @@ def tableG2(baseG2=MatrixG2, baseG22=MatrixG22,
   return Matrix(*out)
       
 def makeG2(idx=0, pos=None):
-  """makeG2([idx,pos]) -> (G2')
+  """makeG2([idx,pos=first Triads7[idx] rep.]) -> (G2')
      Return a list of G2 element reps for a calibration translated from G2."""
   if pos is None:
     pos = triads7class(next(triadsOhalf(idx)), True)[3]

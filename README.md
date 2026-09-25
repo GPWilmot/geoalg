@@ -23,14 +23,14 @@ the prompt. This has the advantage of enabling comparison between different
 algebras, especially for testing the defined tests in the first calculator. The
 calculators interpret basis numbers and change them into relevant classes. eg
 
-* 2 + i = Q(2, 2)
-* 1 + e1 + e12 = CA(2, 1, e12=1)
+* 2 + i = Q(2, 1)
+* 2 + e1 + e12 = CA(2, 1, e12=1)
 
 These basis classes offer libraries to perform many functions. Foremost is
 rotations and due to the axial formulation of quaternion rotations and the
-confusion between vectors and versors, these are easier to understand in CA and
-then convert back to Q. All calculators can be loaded on top of each other and
-the first five run together. Results need to be changed to text using the
+confusion between vectors and versors, these are easier to understand in CA
+and then convert back to Q. All calculators can be loaded on top of each other
+and the first five run together. Results need to be changed to text using the
 libraries to compare results. All other calculators take over because they mix
 CA and O in different ways (apart from calcS). Starting calcCA and entering
 "load(spin7_g2,demo_g2); help(demo_g2)" provides a demonstration of these
@@ -43,13 +43,13 @@ The common library has the following classes:
 * Matrix - Interface to numpy if it exists otherwise set to Tensor
 * Tensor - Simple list based 1 & 2-D matricies for testing and basis
   multiplication tables
-* Euler - Multi-dimensional Euler angles to rotation matries in any order,
-  optionally implicit
+* Euler - Multi-dimensional Euler angles to rotation matries in any
+  order and optionally implicit
 
-The Matrix class interfaces to numpy, if it exists, but without numpy it
-provides enough functionality to compare rotations defined by matrix
-exponentiation to Q and CA results. The Euler class provides n-D rotations in
-arbitrary order and implicit or explicit. These can generate n-D matrix
+The Matrix class interfaces to numpy, if it exists, but without numpy
+it provides enough functionality to compare rotations defined by matrix
+exponentiation to Q and CA results. The Euler class provides n-D rotations
+in arbitrary order and implicit or explicit. These can generate n-D matrix
 representations and can be converted back into CA algebra (or Q algebra, if 3-D)
 for explicit rotations in standard order. The matrix operations without numpy
 use the Tensor class which are simple but are designed to allow for unit tests.
@@ -73,9 +73,9 @@ like CA has both signatures, the octonions here have both signatures. O(2,1)
 defines the split-octonions with elements like o12u3 whereby u3*u3=1. Unity
 bases, u<hex>, have a similar multiplication table as octonions but positive
 diagonal elements for odd parity. O(1,2) and O(0,3) are also isomorphic to the
-split-octonions and other representations can be entered manually. Note that CA
-is a graded algebra with e123 being a 3-form but octonions are not graded and
-the hex indices are only used to invoke a plus sign in the Cayley-Dickson
+split-octonions and other representations can be entered manually. Note that
+CA is a graded algebra with e123 being a 3-form but octonions are not graded
+and the hex indices are only used to invoke a plus sign in the Cayley-Dickson
 multiplication rule. The use of the graded notation allows the Cayley-Dickson
 rule to be automated and exposes the underlying structure with quaternions such
 as o1, o2, o12 easily recognised.
@@ -98,16 +98,21 @@ will summarise the following papers:
 * The algebra of geometry - work in progress presented as a poster at AACA conference
  (2024) that expands pfaffian/simplex derivation of Clifford's geometric algebra
  presented in draft form in the book.
-* Automorphisms of Sedenions (preprint https://doi.org/10.48550/arXiv.2512.07210) -
+* Automorphisms of Sedenions (preprint https://doi.org/10.48550/arXiv.2512.07210V3) -
  Sharp subalgebras of Spin(2^n-1), n>0, extend the Fano plane to Fano hyper-volumes
  and map to Cayley Dickson algebras. The deviration of exceptional Lie algebra G_2
  defines the autmorphisms of sedenions, which does not match the usual maths.
- The working file is spin15_g2.ca.
+ The working file is spin15_g2.ca. The Fano volume is the same as PG(3,2). This paper
+ was presented at AGACSE 2026.
 * "Clifford algebra calibrations.pdf" - Slide presentation a walk from maths, through
  geometry, leading to geometric algebra and physics. The visualisation of Sharp rings
  as various levels of Fano-volume geometry, starting with the 1-D triangle projection
  (o-o-o) helps understand the power of geometric algebra. A video presentation of these 
- sides is presented at https://youtu.be/r6A-NpzdBuI?si=B9f04hMcMr-pHKGP.
+ sides is presented at https://youtu.be/r6A-NpzdBuI?si=B9f04hMcMr-pHKGP. This presents
+ arXiv:2512.07210V2 and is superseded by V3.
+* "CA Calibration Post-Quatnum Cryptography (https://doi.org/10.48550/arXiv.2608.00636) -
+ a symmetric cryptosystem without public keys based on the doublr lock scenario.
+ This is presented as a challenge to uncover how strong is this scheme.
 
 In researching the history of Clifford algebra, like other authors I found this
 subject is richly documented and does not need repeating. In one of the articles

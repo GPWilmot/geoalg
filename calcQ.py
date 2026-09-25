@@ -55,6 +55,7 @@ class Q():
      Package math methods only work on the scalar part eg sin(q.scalar()).
      """
   __BASE_CHARS = ('i', 'j', 'k')         # Quaternion basis chars
+  __calculator  = None                   # Call back to parse scripts
   dumpRepr = False                       # Repr defaults to str
 
   ##############################################################################
@@ -873,14 +874,23 @@ class Q():
      else:
        sys.stderr.write("PIP: Matlabplot not installed - no plot available\n")
      return (val, a*val*val +b*val +c)
+
+  @staticmethod
+  def ProcessScript(isAns, line):
+    """ProcessScript(isAns, line)
+       Parse and exec globals or return eval if isAns."""
+    return Q.__calculator.processScript(isAns, line)
+     
   ###################################################
   ## Calc class help and basis processing methods  ##
   ###################################################
   @staticmethod
-  def _getCalcDetails():
+  def _getCalcDetails(calc=None):
     """Return the calculator help, module heirachy and classes for Q."""
     calcHelp = """Quaternion Calculator - Process numbers and i, j, k.
           Euler angles, FrameMatrix and ECEF WGS-84 frames are supported."""
+    if calc:
+      Q.__calculator = calc
     ijk = "i,j,k=Q(0,1),Q(0,0,1),Q(0,0,0,1)"
     return (("Q", "R"), ("Q", "math"), ijk,
          "default.quat", calcHelp, "Can also use quaternions with basis i,j,k.")

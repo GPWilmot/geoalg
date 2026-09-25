@@ -8,16 +8,19 @@ _spin15_g2 = """Extend G2 construction to Spin(15). SedCal7 is the 15-D calibatn
   in sedonions, eg O27var and P27var. The 15-D representation is described in
   Oname. For other subalgs see Pname, Aname, Bname and Cname. If allTables()
   has been run use output of help(loadTables) then dumpTables().
+  Domains are: O, P, A, B, C with sign variations +0,1,2,3 (number of ticks).
 Module contains variables:
-   SedCal7, SedCal3, SedQ3, SedTri3, SedO, SedP, G2O0table, Sharp7, Sharp15, 
-   Ovar, Pvar, Avar, Bvar, Cvar, DoFixC, Oname, Pname, Aname, Bname, Cname,
-   OPABCnames, OPABCvars, AllNames, AllTicks
+   SedCal7, SedInv7, SedCal3, SedQ3, SedTri3, SedO, SedP, G2O0table, Sharp7,
+   Sharp15, Ovar, Pvar, Avar, Bvar, Cvar, Gvar, Nvar, DoFixC, Oname, Pname,
+   Aname, Bname, Cname, GName, Nname, OPABCnames, OPABCvars, AllNames, AllSigns,
+   AutIdx, AutBasis, AutNames 
  and functions:
-   sedenionG2, sharpRot15, checkSharp7, caSet, caIntersect1/2, transIt, Abs,
-   Low, Trans, Ticks, Fix, sedTriad, loadTables, dumpTables, allTables,
-   autoTable, autoClass
+   sharp15Matrix, sharp15Rot, sedenionG2, checkSharp7, caSet, caIntersect1/2,
+   transIt, parIt, Abs, Low, Trans, Pars, Ticks, Labels, Fix, sedTriad,
+   loadTables, dumpTables, allTables, autoTable,  autoClass, convertCal3,
+   findAut15, findRemainder3
  and if Calc(O):
-   e4o, e4os, e3o, sedTri."""
+   allCalQuats, e4o, e4os, e3o, e2o, sedTri."""
 
 # Calibrations derived from ot & pt in calcO.ultronions.oct.triadsCycles(4)
 # then triadsSA() and reverse map O.Basis(4) to get SedO and SedP.
@@ -31,9 +34,11 @@ Module contains variables:
 _SedO = "The octonion calibration terms from SedCal7"
 _SedP = "The seven P4 terms from SedCal7"
 _SedCal7 = "The sedenion octonion-like calibration with 8 oct. and 7 P4 parts."
+_SedInv7 = "Inverse of SedCal7."
 SedO = [e12389AB, e14589CD, e16789EF, e2468ACE, e2578ADF, e3478BCF, e3568BDE]
 SedP =  [e123CDEF, e145ABEF, e167ABCD, e2469BDF, e2579BCE, e3479ADE, e3569ACF]
 SedCal7 = e1234567 +sum(SedO +SedP)
+SedInv7 = (14*e123456789ABCDEF-SedCal7)/15
 
 # Define the intersections of SedO & SedP & check intersections relationship
 def caSet(x): return set(x.basisTerms()[0][0])
@@ -54,18 +59,47 @@ print("Commuting octonions: ", checkSharp7(1,2,3), checkSharp7(1,4,5),
         checkSharp7(1,6,7), checkSharp7(2,4,6), checkSharp7(2,5,7),
         checkSharp7(3,4,7), checkSharp7(3,5,6))
 
-def sharpRot15(quad):
-  """sharpRot15(quad)
-     Return (alpha,beta.delta) for invariant quad, ie beta=(1+8-form)/2
-     and quad-rotation: r=(1+eij)(1+ekl)(1+emn)(1+eop)==(alpha+beta+delta)/2
-     and r.inverse()=(alpha-beta+delta)/2 and the usual properties:
+def sharp15matrix(val, g2=False, spin=False):
+  """spharp15matrix(val,[g2,spin])
+     Return 180 or, if spin, 90 degree rotation pairs matrix
+     or the g2 component of the Ovar rotation."""
+  Lib._checkType(val, CA, "sharp15Matrix")
+  Lib._checkType(g2, bool, "sharp15Matrix")
+  Lib._checkType(spin, bool, "sharp15Matrix")
+  if len(val.dims()) != 3 or val.dims()[:2] != [0,0]:
+    raise Exception("Need 2-form val for sharp15Matrix")
+  out = Matrix.Diag((0,0,0,0,0,0,0) if g2 else (1,1,1,1,1,1,1))
+  val = val.basisTerms()
+  vals = val[0]; sgns = val[1]
+  if spin:
+    for idx,pair in enumerate(vals):
+      x,y = pair
+      out[x-1][x-1] = 0
+      out[y-1][y-1] = 0
+      out[x-1][y-1] = 1 if sgns[idx] > 0 else -1
+      out[y-1][x-1] = -1 if sgns[idx] > 0 else 1
+  else:
+    for x,y in vals:
+      out[x-1][x-1] = -1
+      out[y-1][y-1] = -1
+  return out
+
+def sharp15rot(beta):
+  """sharp15rot(beta)
+     Return (alpha,beta,gamma,delta) for invariant beta, ie alpha=(1+8-form)/4
+     and beta=(eij+ekl+emn+eop)/4 and rotation x'=r*x*r.inverse() where: 
+     r=(1+eij)(1+ekl)(1+emn)(1+eop)/2==(alpha+beta+gamma+delta)
+     and r.inverse()=(alpha-beta-gamma+delta)/2 and the properties:
      alpha**2==alpha, (beta/2)**2==alpha-1, alpha*beta==beta*alpha==0 and
-     SedCal7' = alpha*SedCal7 -beta*SedCal7*beta/4 == SedCal7 & for quad in Ovar
-     SedCal3' = alpha*SedCal3 -beta*SedCal3*beta/4 == SedCal3 otherwise add
-                + delta*SedCal3 +SedCal3*delta +delta*SedCal3*delta.
-     alpha=quad**4.pure(4)*2/3, beta=(quad**3+quad*16)/6, delta=quad**2/2+2."""
-  q = quad**2
-  return ((q**2).pure(8)*2/3+1)/2, (quad*q*8 +quad*32)/12, q+1
+     SedCal7' = 2alpha*SedCal7 -(beta+gamma)*SedCal7*(beta+gamma)/4 == SedCal7
+      & for beta in Ovar
+     SedCal3' = 2alpha*SedCal3 -(beta+gamma)*SedCal3*(beta+gamma)/4 == SedCal3
+      otherwise add    + delta*SedCal3 +SedCal3*delta +delta*SedCal3*delta.
+     alpha=beta**4.pure(4)*2/3, beta=(beta**3*4+beta*16)/6, delta=beta**2/2+2."""
+  q = beta**2
+  if q.scalar() != -1 or q.grades() != [1, 0, 0, 0, 6]:
+    raise Exception("Invalid beta for sharp15rot")
+  return ((q**2).pure(8)*2/3+1)/4, beta/2, (beta*q*4 +beta*10)/12, (q+1)/2
 
 def sedenionG2(sb=SedCal7, all=False, dump=False):
   """sedonionG2([sb=SedCal7, all, dump])
@@ -105,15 +139,22 @@ def sedenionG2(sb=SedCal7, all=False, dump=False):
 def transIt(x, y):
   """transIt(x, y)
      Return x.allSigns()[y] for x having 4 CA terms."""
-  comp = ((), (0,), (1,), (2,), (3,), (0,1), (0,2), (0,3))
+  comp = ((), (2,3), (1,3), (1,2), (0,), (1,), (2,), (3,))
   out = x.basisTerms()
+  if len(out[0]) < 4 and y > 0:
+    y = 5
   for z in comp[y if y < 8 else 7 -y]: out[1][z] *= -1
   return CA.Eval(out) if y < 8 else -CA.Eval(out)
+def parIt(x): "Return second term negated."; \
+    x = x.basisTerms(); x[1][1] *= -1; return CA.Eval(x)
 def Abs(x): "Return abs of list."; return list(map(abs,x))
 def Low(x): "Return lower case list."; return list(y.lower() for y in x)
 def Trans(x,y): "Return transIt of listx."; return list(transIt(z,y) for z in x)
-def Ticks(x,tick=1): "Return chars list with tick ticks."; \
-    return list(y +"''''"[:tick] for y in x)
+def Pars(x): "Return parIt of listx."; return list(parIt(y) for y in x)
+def Ticks(x,tick=0): "Return chars list with tick ticks."; \
+    return list(y +"'''''''"[:tick] for y in x)
+def Labels(x,tick=0): "Return chars list with tick as digit."; \
+    return list(y +chr(ord("0") +tick) for y in x)
 def Fix(arr, *pos):
   """Fix(arr, *pos)
      Return list arr[:] with pos[odd] replaced with transIt(.,pos[odd+1]).""" 
@@ -133,37 +174,30 @@ def sedTriad(oct):
       out += CA.Eval((base[mix[0]], base[mix[1]], base[mix[2]]))
   return out
 
-_SedTri3 = """Expanded SedCal7 terms: sum(SedTri3)=3*SedCal3, ?.nonAssocCode()
+_SedTri3 = """Expanded SedCal7 terms: sum(SedTri3)=3*SedCal7, ?.rngCode()
    matches 8x28 for O+SedO and 7x4 for SedP and P252 for SedCal3."""
-SedTri3 = (e123 +e145 -e167 +e246 +e257 +e347 -e356,
-           e123 +e189 -e1AB +e28A +e29B +e38B -e39A,
-           e145 +e189 -e1CD +e48C +e49D +e58D -e59C,
-           -e167 +e189 +e1EF +e68E -e69F +e78F +e79E,
-           e246 +e28A -e2CE +e48C +e4AE +e68E -e6AC,
-           e257 +e28A -e2DF +e58D +e5AF +e78F -e7AD,
-           e347 +e38B -e3CF +e48C +e4BF +e78F -e7BC,
-           -e356 +e38B +e3DE +e58D -e5BE +e68E +e6BD,
-           e123 -e1CD +e1EF -e2CE -e2DF -e3CF +e3DE,
-           e145 -e1AB +e1EF +e4AE +e4BF +e5AF -e5BE,
-           -e167 -e1AB -e1CD -e6AC +e6BD -e7AD -e7BC,
-           e246 +e29B -e2DF +e49D +e4BF -e69F +e6BD,
-           e257 +e29B -e2CE -e59C -e5BE +e79E -e7BC,
-           e347 -e39A +e3DE +e49D +e4AE +e79E -e7AD,
-           -e356 -e39A -e3CF -e59C +e5AF -e69F -e6AC)
+SedTri3 = (e123 +e145 -e167 +e246 +e257 +e347 -e356,  # O Face
+           e123 +e189 -e1AB +e28A +e29B +e38B -e39A,  # O Face
+           e145 +e189 -e1CD +e48C +e49D +e58D -e59C,  # O Face
+           -e167 +e189 +e1EF +e68E -e69F +e78F +e79E, # O Plane
+           e246 +e28A -e2CE +e48C +e4AE +e68E -e6AC,  # O Cone
+           e257 +e28A -e2DF +e58D +e5AF +e78F -e7AD,  # O Plane
+           e347 +e38B -e3CF +e48C +e4BF +e78F -e7BC,  # O Plane
+           -e356 +e38B +e3DE +e58D -e5BE +e68E +e6BD, # O Face
+           e123 -e1CD +e1EF -e2CE -e2DF -e3CF +e3DE,  # P Plane
+           e145 -e1AB +e1EF +e4AE +e4BF +e5AF -e5BE,  # P Plane
+           -e167 -e1AB -e1CD -e6AC +e6BD -e7AD -e7BC, # P Cone
+           e246 +e29B -e2DF +e49D +e4BF -e69F +e6BD,  # P Folly
+           e257 +e29B -e2CE -e59C -e5BE +e79E -e7BC,  # P Cone
+           e347 -e39A +e3DE +e49D +e4AE +e79E -e7AD,  # P Cone
+           -e356 -e39A -e3CF -e59C +e5AF -e69F -e6AC) # P Plane
 
-_SedCal3 = "(sedTri(e1234567) +sum(sedTri(x) for x in SedO +SedP))/3"
+_SedCal3 = """( sedTri(e1234567)+sum(sedTri(x) for x in SedO +SedP))/3. This is
+      the representation of sedenions; b4=O.Basis(4), c15=CA.Basis(15,0,1) ie:
+      Matrix.Triads(*SedCal3.spin(c15),c15)==Matrix.Table(b4).morph(b4,c15)."""
 SedCal3 = e123 +e145 -e167 +e189 -e1AB -e1CD +e1EF +e246 +e257 +e28A +e29B \
     -e2CE -e2DF +e347 -e356 +e38B -e39A -e3CF +e3DE +e48C +e49D +e4AE +e4BF \
     +e58D -e59C +e5AF -e5BE +e68E -e69F -e6AC +e6BD +e78F +e79E -e7AD -e7BC
-
-def sedIt(x, y=SedCal3):
-  a,b,c = alphaBeta15(x)
-  return a *y -b *y *b/4
-
-def rotIt(x):
-  out = 1
-  for y in (x*2).copyTerms(): out *= (1+CA.Eval(y))
-  return out /4
 
 if Lib.isLoaded("spin7_g2.ca"):
   c7 = triads7all(0,63) # Swap last 2 signs of omp for triads7all(0,4)
@@ -179,18 +213,18 @@ if Lib.isLoaded("spin7_g2.ca"):
     print("G2 all 7-D automorphisms:", all(e2os(x)[:2]==(1,(1,-1)) for x in g2))
 
 # G2 for some 7-D reps and 15-D SedO part of SedCal7 in sedenionG2()
-_Oname = """SedO G2 independ. automorphism names. Use G2O0table.dump(Oname) or
+_Oname = """SedO G2 in/depend. automorphism names. Use G2O0table.dump(Oname) or
   Tensor.Table(O0var, lie=1).morph(O0vars, Onames).dump(Oname) #7-D,
   Tensor.Table(O7var, lie=1).morph(O7vars, Onames).dump(Oname) #7-D,
   Tensor.Table(P7var, lie=1).morph(P7vars, Onames).dump(Oname) #7-D,
-  Tensor.Table(Ovar, lie=1).morph(Ovars, Onames).dump(Oname)  #15-D,
-  autoTable(Ovar).dump(Oname) # same=G2,
-  autoTable(Ovar, 10).dump(Ticks(Oname))  # same but not G2!
-  autoTable(Ovar, 9).dump(Ticks(Oname,2)) # 8==9 is
-  mixed results. So G2^G2 = G2, G2'^G2' = G2, G2''^G2'' = G2'''^G2''' -> G2+G2''
-  autoTable(Ovar, x, Ovar, y).dump() for x,y in 0,10,9,8 is
-  G2^G2' -> G2', G2^G2'' = G2'^G2''' -> G2+G2'', G2'^G2'' -> G2'+G2'''
-  G2''^G2''' -> G2'+G2'''."""
+  Tensor.Table(Ovar, lie=1).morph(Ovars, Onames).dump(Oname) or #15-D,
+  autoTable(Ovar).dump(Oname) or autoTable(Ovar,dump=1)  #same: O0^O0=G2,
+  autoTable(Ovar, 1).dump(Ticks(Oname))   # O1^O1=G2!
+  autoTable(Ovar, 2).dump(Ticks(Oname,2)) # O2^O2=
+  mixed results. So O0^O0 = O0, O1^O1 = O0, O2^O2 = O3^O3 -> O02 = G2+G2'
+  autoTable(Ovar, x, Ovar, y, dump=1) for x,y in 0,1,2,3 is
+  O0^O1->O0, O0^O2 = O02, O0^O3->O03, O1^O2->O03, O1^O3->O02, O2^O3->O03.
+  For triads7all(0,22) BI=B-I, DK=D-K, GN=G-N, EL=E-L, rest are +."""
 Oname = list(chr(65+x) for x in range(14))
 OOname = ['AH', 'BI', 'CJ', 'DK', 'FM', 'GN', 'EL']
 O2name = list("2" +x for x in Oname +OOname)
@@ -231,7 +265,7 @@ P7vars = P7var +PP7var +P27var
 print("G2 P7 rep in SedCal7:", G2O0table == \
   Tensor.Table(P7var, lie=1).morph(P7vars, Onames))
 
-# O2var is 21 G2 rep. for triads7all(0,63), O2var5 is for (0,4).
+# O2var is G2 rep. for triads7all(0,22), O2var5 is for (0,4).
 O2var5 = [-e23 +e45 -eAB +eCD, -e13 +e46 -e9B +eCE,  e12 -e47 +e9A -eCF,
          e15 +e26 +e9D +eAE, -e14 -e27 -e9C -eAF, -e17 +e24 -e9F +eAC,
          e16 -e25 +e9E -eAD, -e45 +e67 -eCD +eEF, -e46 -e57 -eCE -eDF,
@@ -239,13 +273,13 @@ O2var5 = [-e23 +e45 -eAB +eCD, -e13 +e46 -e9B +eCE,  e12 -e47 +e9A -eCF,
          e17 +e35 +e9F +eBD,  e25 -e34 +eAD -eBC, -e23 +e67 -eAB +eEF,
         -e13 -e57 -e9B -eDF,  e12 -e56 +e9A -eDE,  e15 -e37 +e9D -eBF,
          e24 +e35 +eAC +eBD,  e16 -e34 +e9E -eBC,  e14 +e36 +e9C +eBE]
-O2var = [e23 -e45 +eAB -eCD, -e13 -e46 -e9B -eCE,  e12 -e47 +e9A -eCF,
-        -e15 +e26 -e9D +eAE,  e14 +e27 +e9C +eAF, -e17 +e24 -e9F +eAC,
-        -e16 -e25 -e9E -eAD,  e45 +e67 +eCD +eEF,  e46 -e57 +eCE -eDF,
-         e47 +e56 +eCF +eDE, -e26 +e37 -eAE +eBF,  e27 +e36 +eAF +eBE,
-         e17 +e35 +e9F +eBD,  e25 -e34 +eAD -eBC,  e23 +e67 +eAB +eEF,
-        -e13 -e57 -e9B -eDF,  e12 +e56 +e9A +eDE, -e15 +e37 -e9D +eBF,
-         e24 +e35 +eAC +eBD, -e16 -e34 -e9E -eBC,  e14 -e36 +e9C -eBE]
+O2var = [e23 -e45 +eAB -eCD, -e13 -e46 -e9B -eCE,  e12 -e47 +e9A -eCF, #3
+        -e15 +e26 -e9D +eAE,  e14 +e27 +e9C +eAF, -e17 +e24 -e9F +eAC, #6
+        -e16 -e25 -e9E -eAD,  e45 +e67 +eCD +eEF,  e46 -e57 +eCE -eDF, #9
+         e47 +e56 +eCF +eDE, -e26 +e37 -eAE +eBF,  e27 +e36 +eAF +eBE, #12
+         e17 +e35 +e9F +eBD,  e25 -e34 +eAD -eBC,  e23 +e67 +eAB +eEF, #15
+        -e13 -e57 -e9B -eDF,  e12 +e56 +e9A +eDE, -e15 +e37 -e9D +eBF, #18
+         e24 +e35 +eAC +eBD, -e16 -e34 -e9E -eBC, -e14 +e36 -e9C +eBE]
 
 # G2 7-D and 15-D match
 _Ovar = "Automorphisms for Oname. Sign changes so O^O closed. See Ovars."
@@ -254,31 +288,32 @@ Ovars = Ovar +OOvar +O2var;  _Ovar = _Oname
 print("G2 15-D from SedCal7 == 7-D:", G2O0table == \
   Tensor.Table(list(Ovar), lie=1).morph(Ovars, Onames))
 
-_Pname = """SedP G2 independ. automorphism names=lower case Onames. Use:
+_Pname = """SedP all independ. automorphism names=lower case Onames. Use:
   Tensor.Table(Pvar,lie=-1).morph(abs(Tensor(Ovars+Pvars)),Onames+Pnames) or
   autoTable(Pvar).dump(Pname)             # mixed G2-like
-  autoTable(Pvar,10).dump(Ticks(Pname))   # same
-  autoTable(Pvar,9).dump(Ticks(Pname,2))  # 9=8
+  autoTable(Pvar,1).dump(Ticks(Pname))    # same
+  autoTable(Pvar,2).dump(Ticks(Pname,2))  # 9=8
   P^P = P'^P' -> G2+P', P''^P'' = P'''^P''' -> G2+P''', 
   P^P' -> G2+G2'+P+P', P^P'' = P'^P''' -> G2''+G2'''+P+P'+P''+P''', 
   P^P''' = P'^P'' -> G2''+G2'''+P+P'+P''+P''', P''^P''' -> G2'+P''."""
 _Pvar = "Automorphisms for Pname. Sign changes so P^P closed. See Pvars."
-Pname = Low(Oname);  PPname = Low(OOname);  P2name = Low(O2name)
+Pname = Low(Oname);  PPname = ['o', 'p', 'q', 'r', 's', 't', 'u'];  
+P2name = list("2" +x for x in Pname +PPname)
 Pnames = Pname +PPname +P2name;   OPnames = Onames +Pnames
 OPnames = OPnames +Ticks(OPnames) +Ticks(OPnames,2) +Ticks(OPnames,3) \
      +Ticks(OPnames,4) +Ticks(OPnames,5) +Ticks(OPnames,6) +Ticks(OPnames,7)
-P2var = [e12 -e47 -e8B +eDE, e14 +e27 -e8D -eBE, e17 -e24 -e8E +eBD,
-         e12 +e56 -e8B -eCF, -e15 +e26 -e8C +eBF, e16 +e25 +e8F +eBC,
-         e13 +e46 +e8A +eDF, e14 -e36 -e8D +eAF, e16 +e34 +e8F +eAD,
-         e13 +e57 +e8A +eCE, -e15 +e37 -e8C +eAE, e17 +e35 -e8E -eAC,
-         e23 -e45 -e89 +eEF, e24 +e35 -e8E -e9F, e25 -e34 -e8F +e9E,
-         e23 +e67 -e89 -eCD, -e26 +e37 -e8C +e9D, e27 +e36 +e8D +e9C,
-         e45 +e67 -e89 -eAB, e46 -e57 -e8A +e9B, e47 +e56 -e8B -e9A]
 
+P2var = [e12 +e47 -e8B -eDE, e14 -e27 +e8D -eBE, e17 +e24 +e8E +eBD,
+         e12 -e56 -e8B +eCF, -e15 -e26 +e8C +eBF, e16 -e25 -e8F +eBC,
+         e13 -e46 +e8A -eDF, e14 +e36 +e8D +eAF, e16 -e34 -e8F +eAD,
+         e13 -e57 +e8A -eCE, -e15 -e37 +e8C +eAE, e17 -e35 +e8E -eAC,
+         e23 +e45 -e89 -eEF, e24 -e35 +e8E -e9F, e25 +e34 -e8F -e9E,
+         e23 -e67 -e89 +eCD, -e26 -e37 -e8C -e9D, e27 -e36 +e8D -e9C,
+         e45 -e67 -e89 +eAB, e46 +e57 -e8A -e9B, e47 -e56 -e8B +e9A]
 Pvar = list(Tensor(P2var[:14])/2);  PPvar = list(Tensor(P2var[14:])/2)
 Pvars = Pvar +PPvar +P2var;  OPvars = Ovars +Pvars
-OPvars = OPvars +Trans(OPvars,10) +Trans(OPvars,9) +Trans(OPvars,8) \
-        +Trans(OPvars,1) +Trans(OPvars,2) +Trans(OPvars,3) +Trans(OPvars,4)
+OPvars = OPvars +Trans(OPvars,1) +Trans(OPvars,2) +Trans(OPvars,3) \
+        +Trans(OPvars,4) +Trans(OPvars,5) +Trans(OPvars,6) +Trans(OPvars,7)
 print("Full P4 SedCal7 is not G2:", G2O0table != \
   Tensor.Table(Pvar, lie=1).morph(abs(Tensor(Ovars +Pvars)), Onames +Pnames))
 
@@ -288,21 +323,22 @@ _Aname = """All 7 (G2 & Mixed) primary SedCal7[0]=e89ABCDEF automorphisms. Use:
     autoTable(Avars).dump(Anames)
     for all E15[0] automorphism Lie products."""; _Avar = _Aname
 _Avar = "Automorphisms for Aname. Sign changes so A012^A012 closed. See Avars."
-Aname = list("A%d" %x for x in range(1,8))
+Aname = list("a%d" %x for x in range(1,8))
 Anames = Aname +Ticks(Aname) +Ticks(Aname,2) +Ticks(Aname,3) \
      +Ticks(Aname,4) +Ticks(Aname,5) +Ticks(Aname,6) +Ticks(Aname,7)
-A2var = [e89 +eAB +eCD +eEF, e8A -e9B +eCE -eDF, e8B +e9A +eCF +eDE,
-        e8C -e9D -eAE +eBF, e8D +e9C -eAF -eBE, e8E +e9F +eAC +eBD,
-        e8F -e9E +eAD -eBC]
+
+A2var = [e89 -eAB -eCD +eEF, e8A +e9B -eCE -eDF, e8B -e9A -eCF +eDE,
+         e8C +e9D +eAE +eBF, e8D -e9C -eAF +eBE, e8E +e9F -eAC -eBD,
+         e8F -e9E +eAD -eBC]
 Avar = list(Tensor(A2var)/2)
-Avars = Avar +Trans(Avar,10) +Trans(Avar,9) +Trans(Avar,8) \
-        +Trans(Avar,1) +Trans(Avar,2) +Trans(Avar,3) +Trans(Avar,4)
+Avars = Avar +Trans(Avar,1) +Trans(Avar,2) +Trans(Avar,3) \
+        +Trans(Avar,4) +Trans(Avar,5) +Trans(Avar,6) +Trans(Avar,7)
 
 _Bname = """Autommorphism names for Mixed SedO. Use:
     autoTable(Bvar).dump(Bname), B^B = G2+G2'+G2''+G2'''. But
     trans=13/14/15 all fail by involving inconsistent linear combinations."""
 _Bvar = "Automorphisms for Bname. Sign changes so B^B closed. See Bvars."
-Bname = list("B%d" %x for x in range(1,29))
+Bname = list("b%d" %x for x in range(1,29))
 Bnames = Bname +Ticks(Bname) +Ticks(Bname,2) +Ticks(Bname,3) \
      +Ticks(Bname,4) +Ticks(Bname,5) +Ticks(Bname,6) +Ticks(Bname,7)
 Bnames = Bnames +list("2%s" %x for x in Bnames)
@@ -317,15 +353,15 @@ B2var = [-e19 +e2A +e4C -e7F, -e1A +e29 +e4F -e7C,
        e2F +e3E -e6B -e7A, e4C -e5D +e6E -e7F, e4D -e5C +e6F -e7E,
        e4E -e5F +e6C -e7D, e4F +e5E -e6D -e7C]
 Bvar = list(Tensor(B2var)/2)
-Bvars = Bvar +Trans(Bvar,10) +Trans(Bvar,9) +Trans(Bvar,8) \
-        +Trans(Bvar,1) +Trans(Bvar,2) +Trans(Bvar,3) +Trans(Bvar,4)
+Bvars = Bvar +Trans(Bvar,1) +Trans(Bvar,2) +Trans(Bvar,3) \
+        +Trans(Bvar,4) +Trans(Bvar,5) +Trans(Bvar,6) +Trans(Bvar,7)
 Bvars = Bvars +list(x *2 for x in Bvars)
 
 _Cname = """Autommorphism names for Mixed SedP. Use:
     autoTable(Cvar).dump(Cname). C^C = G2'+G2'''+P+P'+P''+P'''.
     But trans=10/9/8 all fail by involving inconsistent linear combinations."""
 _Cvar = "Automorphisms for Cname. No sign changes. See Cvars."
-Cname = list("C%d" %x for x in range(1,29))
+Cname = list("c%d" %x for x in range(1,29))
 C2name = list("2" +x for x in Cname)
 Cname  = Cname +C2name
 Cnames = Cname +Ticks(Cname) +Ticks(Cname,2) +Ticks(Cname,3) \
@@ -340,21 +376,113 @@ C2var = [e18 +e2B +e4D +e7E, e1B +e28 +e4E +e7D,
        e28 +e39 +e6C +e7D, e29 +e38 +e6D +e7C, e2C +e3D +e68 +e79,
        e2D +e3C +e69 +e78, e48 +e59 +e6A +e7B, e49 +e58 +e6B +e7A,
        e4A +e5B +e68 +e79, e4B +e5A +e69 +e78]
-Cvar = list(Tensor(C2var)/2)
-_DoFixC = "Set this to 1 before loading to change parity of CVars."
-if "DoFixC" in globals() and DoFixC > 0: # Change parity to 1 (needed for S)
+_DoFixC = "Set this to 4 before loading to change parity of CVars for e4os()."
+if "DoFixC" in globals():
+  Lib._checkType(DoFixC, int, "DoFixC", (0, 7))
   C2var = Trans(C2var, DoFixC)
+Cvar = list(Tensor(C2var)/2)
 Cvars = Cvar +C2var
-Cvars = Cvars +Trans(Cvars,10) +Trans(Cvars,9) +Trans(Cvars,8) \
-        +Trans(Cvars,1) +Trans(Cvars,2) +Trans(Cvars,3) +Trans(Cvars,4)
+Cvars = Cvars +Trans(Cvars,1) +Trans(Cvars,2) +Trans(Cvars,3) \
+        +Trans(Cvars,4) +Trans(Cvars,5) +Trans(Cvars,6) +Trans(Cvars,7)
 _OPABCnames = "OPABCnames = Pnames +Anames +Bnames +Cnames"
 _OPABCvars = "OPABCvars = OPvars +Avars +Bvars +Cvars"
 OPABCnames = OPnames +Anames +Bnames +Cnames
 OPABCvars = OPvars +Avars +Bvars +Cvars
 
+_Gname = "Two term 7-D G2 automorphisms are called G1..G21 in 15-D."
+_Gvar = "Two term automorphisms for Gname. 7-D G2 + its opposite parity."
+Gname = list("G%d" %x for x in range(1,22)) +list("G%d'" %x for x in range(1,22))
+Gnames = Gname +list("2%s" %x for x in Gname)
+G2var = [e23 -e45, -e13 -e46, e12 -e47, -e15 +e26, e14 +e27, -e17 +e24, -e16 -e25,
+         e45 +e67, e46 -e57, e47 +e56, -e26 +e37, e27 +e36, e17 +e35, e25 -e34,
+         e23 +e67, -e13 -e57, e12 +e56, -e15 +e37, e24 +e35, -e16 -e34, -e14 +e36]
+Gvar = list(0.5 *Tensor(G2var)) +list(0.5 *parIt(x) for x in G2var)
+Gvars = Gvar +list(2 *Tensor(Gvar))
+
+_Nname = "Two term [A,OP] automorphisms are called N1..N26 +N27..N44. See Nvar & autoTable(6)."
+_Nvar = """Two term automorphisms from [A,OP]. Has 44 terms with the last 14 dependent:
+  N27=-N8+N17-N21, N28=-N1+N14+N20, N29=-N3-N22+N24, N30=-N2+N4-N5, N31=N6+N7+N11, 
+  N32=N31-N11, N33=-N9+N10, N34=N5+N30, N35=N7+N11, N36=-N3-N22, N37=N9-N13, N38=-N12+N16,
+  N39=N1-N14, N40=N8+N27, N41=N12-N26, N42=N8+N21, N43=N16-N27, N44=N20+N14.
+  The opposite parity elements are automorphisms too and are appended."""
+N2var = [e8B +eDE, -e9E +eAD, -e8A +e9B, e8F +eAD, e9E -eBC, eAB -eEF, -eCD +eEF,
+         e8E -eAC, -e9D +eBF, eAE +eBF, e89 +eCD, e8D +e9C, -e8C +eBF, e8B +eCF,
+         -e8E +eAC, e9C +eAF, e9F +eBD, e8A +eDF, e8C +eAE, e9A -eCF, -e8E +e9F,
+         e8A -eCE, eAD -eBC, e9B +eDF, e8D -eAF, e9C +eBE, eAC +eBD, e9A -eDE,
+         eCE +eDF, e8F +eBC, e89 +eAB, eAB -eCD, e9D +eAE, e8F +e9E, e89 +eEF,
+         -e9B +eCE, e8C -e9D, -e8D +eAF, -eCF +eDE, e8E +eBD, e8D -eBE, e9F -eAC,
+         eAF -eBE, e8B +e9A]
+Nvar = list(0.5 *Tensor(N2var)) +list(0.5 *parIt(x) for x in N2var)
+Nname = list("N%d" %x for x in range(1,45)) +list("N%d'" %x for x in range(1,45))
+Nvars = Nvar +list(2 *Tensor(Nvar))
+Nnames = Nname +list("2%s" %x for x in Nname)
+
+OPABCnames += Gnames
+OPABCvars += Gvars
+OPABCnames += Nnames
+OPABCvars += Nvars
+QRSTUVvars = []
+QRSTUVnames = []
+
+_AutIdx = "Indices into Ovar, Pvar and Avar for 91 calibration AutBasis."
+AutIdx = (((), (0,1,2,3,7,10,12), (0,1,2,3,4,5,6),
+           (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)),
+         ((0,1,2,3,4,5,6,9,12,14,15,16,17,18,19,20), (0,1,2,4,5,6,7,8,10,11,12,13),
+           (0,1,2,3,4,5,6,9,12,13,14,15,16,17), (0,1,4,5,6,11,12)),
+         ((0,1,2,3), (4,), (5,), (6,)))
+_AutBasis = "Independent auto. to swap to all 91 calibrations."
+_AutNames = "Names for SedBasis, Indep. auto. to swap to all 91 calibrations."
+AutO = list(transIt(O2var[x],y)/2 for y in range(4) for x in AutIdx[0][y])
+AutP = list(transIt(P2var[x],y)/2 for y in range(4) for x in AutIdx[1][y])
+AutA = list(transIt(A2var[x],y)/2 for y in range(4) for x in AutIdx[2][y])
+NameO = list(Ticks([Onames[x]],y)[0] for y in range(1,4) for x in AutIdx[0][y])
+NameP = list(Ticks([Pnames[x]],y)[0] for y in range(4) for x in AutIdx[1][y])
+NameA = list(Ticks([Aname[x]],y)[0] for y in range(4) for x in AutIdx[2][y])
+AutBasis = AutO +AutP +AutA;  AutNames = NameO +NameP +NameA
+
+def findAut15(cal, root=SedCal3):
+  """Generate 32-cycle calibrations and search each in AutO+P+A. Return both."""
+  cyc = [cal]
+  for x in CA.Basis(15,0,1): # Generate 32-cycle
+    cyc.append(x*cal*x)
+  for x in reversed(range(16)):
+    cyc.append(-cyc[x])
+  out = []   # Generate list basis of all cals and search for all 32-cycle
+  allAuts = [root] +list(SedCal3.swap(x*2) for x in AutBasis)
+  for idx,tmp in enumerate(cyc):
+    if tmp in allAuts:
+      out.extend(((["1"] +AutNames)[allAuts.index(tmp)], idx))
+  return out, cyc
+
 if Lib.isCalc("O"):
+  def allCalQuats(calCA, basisO):
+    "Check assoc.cal is all quaternion rings, allCalQuats(SedCal3,O.Basis(4))."
+    out = []
+    arr = calCA.basisTerms()
+    for idx,tri in enumerate(arr[0]):
+      res = arr[1][idx]
+      for el in tri:
+        res *= basisO[el -1]
+      out.append(res)
+    return out
+  _ = all(x==-1 for x in allCalQuats(SedCal3,O.Basis(4)))
+  print("All SedCal3 quaternion:", _)
+  if Lib.isLoaded("spin7_g2.ca"):
+    _ = all(x==-1 for x in allCalQuats(triads7all(0,22),O.Basis(3)))
+    print("All triads7all(0,22) quaternion:", _)
+
+  def sedTri(oct, pullback=False):
+    "Return 7-form SedCal7 terms as SedCal3 terms."
+    oct = oct.basisTerms()
+    arr = [[0,1,2], [0,3,4], [0,5,6], [1,3,5], [1,4,6], [2,3,6], [2,4,5]]
+    tris = list(CA.Eval(list(oct[0][0][x] for x in ex)) for ex in arr)
+    sgns = list(-e3o(x)[3] for x in tris)
+    if pullback:
+      tris = (CA.Eval(list(y+1 for y in x)) for x in arr)
+    return sum(x[1] *sgns[x[0]] for x in enumerate(tris))
+
   om15 = (1,o1,o2,o12,o3,o13,o23,o123,o4,o14,o24,o124,o34,o134,o234,o1234)
-  def e4o(x): "Map Cl(15) to octonion automorphs"; x = x.basisTerms(); \
+  def e4o(x): "Map Cl(15) to 4-form automorphs"; x = x.basisTerms(); \
          return (om15[x[0][0][0]] *om15[x[0][0][1]] *x[1][0], \
                  om15[x[0][1][0]] *om15[x[0][1][1]]*x[1][1], \
                  om15[x[0][2][0]] *om15[x[0][2][1]]*x[1][2], \
@@ -364,79 +492,92 @@ if Lib.isCalc("O"):
   def e3o(x):  x = x.basisTerms(); \
          y = [om15[x[0][0][0]],om15[x[0][0][1]],om15[x[0][0][2]],0]; \
          y[3] = (y[0] *y[1] *y[2]).scalar() *x[1][0]; return y
-  def sedTri(oct, pullback=False):
-    oct = oct.basisTerms()
-    arr = [[0,1,2], [0,3,4], [0,5,6], [1,3,5], [1,4,6], [2,3,6], [2,4,5]]
-    tris = list(CA.Eval(list(oct[0][0][x] for x in ex)) for ex in arr)
-    sgns = list(-e3o(x)[3] for x in tris)
-    if pullback:
-      tris = (CA.Eval(list(y+1 for y in x)) for x in arr)
-    return sum(x[1] *sgns[x[0]] for x in enumerate(tris))
-  print("Check all Phi(1+2+3) (all(e4os(x)[0]==1 & sum(e4os(x)[1])==0):")
-  # 0: ++++, 8: +--+, 9: +-+-, 10: ++--
+  def e2o(x): "Map Cl(15) to 2-form automorphs"; x = x.basisTerms(); \
+         return (om15[x[0][0][0]] *om15[x[0][0][1]] *x[1][0], \
+                 om15[x[0][1][0]] *om15[x[0][1][1]]*x[1][1])
+  print("Check all Phi(0+1+2+3) (all(e4os(x)[0]==1 & sum(e4os(x)[1]) in (0,4)):")
   PhiPart = (("O", Ovar), ("P", Pvar), ("A", Avar), ("B", Bvar), ("C", Cvar))
-  PhiSign = ((0,(1,-1,-1,1)) ,(10,(1,-1,1,-1)), (9,(1,1,-1,-1)), (8,(1,1,1,1)))
-  print("  +1-1-1+1, +1-1+1-1, +1+1-1-1, Non-zero")
-  for z in PhiPart: print(z[0]," ","      ".join(list(str(all(e4os(x)[1]==y[1]\
-               for x in Trans(z[1],y[0]))) for y in PhiSign)))
+  print("Sign: \t0, \t1, \t2, \t3")
+  for z in PhiPart: print(z[0],"\t"+"\t".join(list(str(all(sum(e4os(x)[1]) in (0,4)\
+               for x in Trans(z[1], sgn))) for sgn in range(4))))
 
-_AllNames = "List of names O, P, A, B, C for load/dump/allTables"
-_AllTicks = "List of tick indices 0,1,2,3 for load/dump/allTables"
-AllNames = ("O", "P", "A", "B", "C")
-AllTicks = (0,1,11,2,12,22,3,13,23,33)
+_AllNames = "List of names G, O, P, A, B, C, N for load/dump/allTables"
+_AllSigns = "List of sign label pairs 0,1,2,3 for load/dump/allTables"
+AllNames = ("G", "O", "P", "A", "B", "C", "N")
+AllSigns = (0, 11, 22, 33, 1, 2, 3, 12, 13, 23)
+def dumpLabels(sgn): return Labels(AllNames[0 if sgn < 2 else 1 \
+             :7 if sgn < 2 else 6], sgn)
 def loadTables(name="All"):
   """loadTables([name="All"])
      Use loadd(",".join(loadTables())) to load all tables."""
-  return list("%s%d%d" %(name, x//10, x%10) for x in AllTicks)
+  return list("%s%d%d" %(name, x//10, x%10) for x in AllSigns)
 def dumpTables(name="All"):
   """dumpTables(["name=All"])
      List allTables results using dump()."""
-  for x in AllTicks: eval("%s%d%d" %(name,x//10,x%10)) \
-     .dump(Ticks(AllNames,x//10),Ticks(AllNames,x%10))
+  for x in AllSigns: eval("%s%d%d" %(name, x//10, x%10)) \
+              .dump(dumpLabels(x %10), dumpLabels(x //10))
 
 def allTables(name="All"):
   """allTables([name="All"])
      Build and save AllXY.ca for Trans(AllNames,X/Y)**2 for X<=Y in 0..3."""
-  all = (Ovar,Pvar,Avar,Bvar,Cvar)
-  ticksMap = (0,10,9,8)
-  for idx in AllTicks:
+  all = (Gvar[:14], Ovar, Pvar, Avar, Bvar, Cvar, Nvar[:26])
+  for idx in AllSigns:
     row = idx //10
     col = idx %10
     matName = "%s%d%d" %(name, row, col)
-    out = list(list([] for _ in all))
-    for x0,x1 in enumerate(all):
-      for y0,y1 in enumerate(all):
-        #if True:
-        #  print(idx, row, col, x0, ticksMap[col], y0, ticksMap[row])
+    rowRng = (0 if row < 2 else 1, 7 if row < 2 else 6)
+    colRng = (0 if col < 2 else 1, 7 if col < 2 else 6)
+    out = list(list([] for _ in all[rowRng[0]:rowRng[1]]))
+    for x0,x1 in enumerate(all[rowRng[0]:rowRng[1]]):
+      x2 = x0 +rowRng[0]
+      for y0,y1 in enumerate(all[colRng[0]:colRng[1]]):
+        y2 = y0 +colRng[0]
         if row == col:
-          out[x0].append(autoTable(x1, ticksMap[col], y1, ticksMap[row],
-                         cls=True) if x0<=y0 else ".")
+          out[x0].append(autoTable(x2, row, y2, col, dump=2) if x0<=y0 else ".")
         else:
-          out[x0].append(autoTable(x1, ticksMap[col], y1, ticksMap[row],
-                         cls=True))
+          out[x0].append(autoTable(x2, row, y2, col, dump=2))
+    rowRng = (0 if row < 2 else 1, 7 if row < 2 else 6)
     out = Matrix(out)
     exec("global %s;%s = out" %(matName, matName))
     print("Save data %s.ca" %matName)
     filename = Calculator.fixFilename("%s.ca" %matName, True)
     Lib.save(filename, "%s" %matName, out)
 
-def autoTable(var1, trans1=0, var2=None, trans2=None, lie=0, cls=False):
-  """autoTable(var1, [trans1, var2=var1, trans2=trans1, lie=[1/2],cls])
-     Lie product of vars=O/P/A/B/Cvar[s], trans=sign variations,lie is auto set.
-     Return table or set of OPABCvars types (XX=2 terms, XXXX not found) if cls.
-     Shortcut for: Tensor.Table(Trans(var1,trans1), Trans(var2,trans2),lie=lie)
-         .[count 2 term 2-forms or 4 terms not in OIPABCvars], lie=2 for Avars
-     EG: for x in (0,10,9,8): print(list(autoTable(Bvar,x,Cvar,y,cls=True)
-         for y in (0,10,9,8)))"""
+def autoTable(var1, tran1=0, var2=None, tran2=None, lie=0, dump=0):
+  """autoTable(var1, [tran1, var2=var1, tran2=tran1, lie=[1/2],dump])
+     Lie product of vars=G2/O/P/A/B/C/Nvar[s] or index to these, lie is auto
+     set, trans=sign variation (1..3 and parity change 4..7) and dump=0-2.
+     Runs: Tensor.Table(Trans(var2, tran2), Trans(var1, tran1), lie=lie)).
+     Return morph'd table if dump=0, else summary of autoClass() types. If 
+     dump then the formatted table if printed (with labels if vars are ints).
+     The tables contain (XXX for all unknows) but the autoClass() distinguishes
+     Z=unknown 2-form, Y=unknown 4-form else X. Sets lie=1 or 2 for Avars."""
   if var2 is None:
     var2 = var1
-  if trans2 is None:
-    trans2 = trans1
-  Lib._checkList(var1, (CA, list, Matrix), "autoTable")
-  Lib._checkList(var2, (CA, list, Matrix), "autoTable")
-  Lib._checkType(trans1, int, "autoTable", (0,15))
-  Lib._checkType(trans2, int, "autoTable", (0,15))
-  Lib._checkType(cls, bool, "autoTable")
+  if tran2 is None:
+    tran2 = tran1
+  vars = (Gvar[:14], Ovar, Pvar, Avar, Bvar, Cvar, Nvar[:26])
+  names = (Gname[:14], Oname, Pname, Aname, Bname, Cname[:28], Nname[:26])
+  labels1 = labels2 = None
+  Lib._checkType(tran1, int, "autoTable", (0, 1 if var1 in (0,6) else 7))
+  Lib._checkType(tran2, int, "autoTable", (0, 1 if var2 in (0,6) else 7))
+  if isinstance(var1, int) and var1 >= 0 and var1 < 7:
+    labels1 = Ticks(names[var1], tran1)
+    var1 = vars[var1]
+  if isinstance(var2, int) and var2 >= 0 and var2 < 7:
+    labels2 = Ticks(names[var2], tran2)
+    var2 = vars[var2]
+  Lib._checkList(var1, (CA, list, Tensor, Matrix), "autoTable")
+  Lib._checkList(var2, (CA, list, Tensor, Matrix), "autoTable")
+  Lib._checkType(dump, int, "autoTable", (0,2))
+  if var1[:14] == Gvar[:14] and tran1:
+    var1 = Gvar[21:21 +len(var1)]
+  if var2[:14] == Gvar[:14] and tran1:
+    var2 = Gvar[21:21 +len(var2)]
+  if var1[:26] == Nvar[:26] and tran1:
+    var1 = Nvar[44:44 +len(var1)]
+  if var2[:26] == Nvar[:26] and tran1:
+    var2 = Nvar[44:44 +len(var2)]
   useName1 = useName2 = None
   if lie == 0:
     l1 = min(len(Avar), len(var1))
@@ -445,68 +586,109 @@ def autoTable(var1, trans1=0, var2=None, trans2=None, lie=0, cls=False):
               Abs(var2[:l2]) == Abs(Avar[:l2])
     lie = 2 if isAvars else 1
   Lib._checkType(lie, int, "autoTable", (1,2))
-  mat = Tensor.Table(Trans(var1, trans1), Trans(var2, trans2), lie=lie)
-  if cls:
-    order = ("0", "X", "O", "P", "A", "B", "C")  
-    types = mat.reduce(lambda x,y: autoClass(y, x), set())
+  mat = Tensor.Table(Trans(var2, tran2), Trans(var1, tran1), lie=lie)
+  if dump > 0:
+    order = ("0", "G", "O", "P", "A", "B", "C", "N")
+    cnts = {"X": 0, "Y": 0, "Z": 0}
+    types = mat.reduce(lambda x,y: autoClass(y, x), (set(), []))
     accum = list([] for _ in order)
-    for el in types:
-      accum[order.index(el[0])].append(el if el[0] in ("0","X") else el[1:])
+    for el in types[0]:
+      accum[order.index(el[0])].append(el if len(el) == 1 else el[1:])
     out = []
-    for x in accum[1]:
-      if x == "X":
-        cnt = mat.reduce(lambda x,y: x +(1 if y and y.grades()[2]!=4 else 0))
-        out.append("X"+str(cnt))
-      elif x == "XX":
-        cnt = mat.reduce(lambda x,y: x +(1 if y and \
-              not (y in OPABCvars or -y in OPABCvars) else 0))
-        out.append("XX" +str(cnt))
-    for idx,el in enumerate(accum[2:]):
+    if len(types[1]) > 0:
+      for ch in types[1]:
+        cnts[ch] += 1
+      for ch,val in cnts.items():
+        if val > 0:
+          out.append(ch +str(val))
+    for idx,el in enumerate(accum[1:]):
       if el:
-       out.append(order[idx +2] +"".join(sorted(el)))
+        out.append(order[idx +1] +"".join(sorted(el)))
+    if not out and accum[0]:
+      out = "0"
+    if dump == 1:
+      mat.morph(OPABCvars, OPABCnames).dump(labels2, labels1)
     return "+".join(out)
-  return mat.morph(OPABCvars, OPABCnames)
+  return mat.morph(OPABCvars +QRSTUVvars, OPABCnames +QRSTUVnames)
 
-def autoClass(value, setx=None):
+def autoClass(value, _excess=None):
   """autoClass(value)
-     Return the O,P,A,B,C type +number or 0 for != 4 terms or X not found."""
-  out = "XX"
+     Return the O,P,A,B,C,GP,0 type or X if != 4 terms or XX not found."""
+  out = "Z"
   if value == 0:
     out = "0"
-  elif not isinstance(value, CA) or value.grades()[2:3] != [4]:
-    out = "X"
   else:
     name = ""
     offs = 0
     sgn = -1 if -value in OPABCvars else 1
     if value in OPABCvars or sgn < 0:
       name = OPABCnames[OPABCvars.index(value *sgn)]
-    else:
-      for cnt in range(0):
+    elif not isinstance(value, CA) or value.grades()[2:3] == [2]:
+      out = "Y"
+    elif value.grades()[2:3] == [4]:
+      out = "X"
+      for cnt in range(4,8):
         tran = transIt(value, cnt)
-        sgn = -1 if -tran in OPABCvar else 1
-        if tran in OPABCvar or sgn < 0:
-          name = OPABCname[OPABCvar.index(tran *sgn)]
-          offs = 4
+        sgn = -1 if -tran in OPABCvars else 1
+        if tran in OPABCvars or sgn < 0:
+          name = OPABCname[OPABCvars.index(tran *sgn)]
+          offs = cnt
     if name:
       if name[0] == "-":
         name = name[1:]
       if name[0] == "2":
         name = name[1:]
-      if ord(name[0]) >= 97:
+      if len(name) > 1 and name[1] != "'" and ord(name[1]) < 65:
+        name0 = name[0].upper()
+      elif ord(name[0]) >= 97:
         name0 = "P"
-      elif len(name) > 1 and name[1] != "'" and ord(name[1]) < 65:
-        name0 = name[0]
       else:
         name0 = "O"
       cnt = 0
       while name[-(1+cnt)] == "'":
         cnt += 1
       out = name0 +str(cnt +offs)
-  if setx is None:
+  if _excess is None:
     return out
-  setx.add(out)
-  return setx
+  if out in ("X", "Y", "Z"):
+    _excess[1].append(out)
+  else:
+    _excess[0].add(out)
+  return _excess
+
+def convertCal3(cal3):
+  """convertCal3(cal3)
+     Return the 7-form parts of 3*cal3 in 15-D as a dict."""
+  baseCal = cal3.basisTerms()
+  base = (SedCal3**3).basisTerms()
+  tmps = dict(list((tuple(x), []) for x in base[0] if len(x)==7))
+  for tri in enumerate(baseCal[0]):
+    idxs = tri[1]
+    for key,val in tmps.items():
+      if idxs[0] in key and idxs[1] in key and idxs[2] in key:
+        val.append(([idxs], [baseCal[1][tri[0]]], [[]]))
+  out = {}
+  for x in tmps:
+    if len(tmps[x])==7:
+      out[CA.Eval(x)] = sum(CA.Eval(z) for z in tmps[x])
+  return out
+
+def findRemainder3(cal3):
+  """findRemainder3(cal3)
+     Return the remainder of 2p(((3p+-cal3)/4)**2 +1) [+-cal3], p=7-form."""
+  p = (cal3**3).pure(7)
+  p = p /p.norm()
+  rem = ((3*p +cal3)/4)**2 +1
+  if rem:
+    p = abs(p)
+    rem = 2*p*(((3*p -cal3)/4)**2 +1)
+    if abs(rem.copyTerms()[0][1]) != 1:
+      rem = 2*p*(((3*p +cal3)/4)**2 +1) +cal3
+    else:
+      rem -= cal3
+    return rem
+  return 0
+  
 
 print("Avar^Avar cycles(7):", len(autoTable(Avar).cycles(Aname)))
 # Table Avar has 7 cycles & A+A'+A''+A''' has 56 cycles.

@@ -16,9 +16,9 @@ _spin15 = """Extend Spin(7) construction to all Cl(15) sedenion representations
    slow so the multitask process to build all files is defined below. The files
    can be loaded with triads15load(path="data") after the files are loaded.
  Module contains variables:
-   f15Basis, Triads15_0, Triads15, Backup15, tris0, Triads15parts, Nac15map_0,
-   Nac15names, Nac15, Nac15mirrors, P15, PP15, F15, FF15, FFF15, FFFF15,
-   SO15, SB15, SOBmap
+   U0inU1_ID, U0inU1_code, f15Basis, Triads15_0, Triads15, Backup15, tris0,
+   Triads15parts, Nac15Map_0, Nac15Names, Nac15, Nac15Mirrors,
+   P15, PP15, F15, FF15, FFF15, FFFF15, SO15, SB15, SOBmap
  and functions:
    tri2str, str2tri, triads15load, loadCa, saveCa,, taskTriads15build,
    triads15build, triads15parts, nac15subalg, nac15genSA, nac15map,
@@ -32,13 +32,23 @@ _spin15 = """Extend Spin(7) construction to all Cl(15) sedenion representations
    files of size 2M primaries. Triads15parts contains the size of each iteration
    of triads15build() which is run by triads15parts(). Then use nac15parts() to
    find sedonions and the 100 subsedenion-like algebras. Nac15 stores these
-   and Nac15names continas the Triads15 and allSigns()[] indices for these.
+   and Nac15Names continas the Triads15 and allSigns()[] indices for these.
    On the Adelaide Uni. Pheonix HPC iceman system with 72 nodes triads15parts()
    takes 2.8 days and nac15parts() takes 1.6 days. The 2M file size is actually
    a nice chunk size to generate new primaries and read especially since Windows
    can't load more in a timely fashion. Also packing is used because 100k triads
    is >20MB and python exec blows up RAM more than size of structure (ie >13E6)!
    Hence the use of tri2str to storei primaries."""
+
+_U0inU1_ID = """This is all 15 U0s in U1 in normalised form.
+    U0inU1_ID = list(rng for rng in Lib.rngPull(O.Basis(4)))"""
+U0inU1_ID = ((o1,o2,o3), (o1,o2,o4), (o1,o2,o34), (o1,o3,o4), (o1,o3,o24), (o1,o23,o4),
+             (o1,o23,o24), (o2,o3,o4), (o2,o3,o14), (o2,o13,o4), (o2,o13,o14),
+             (o12,o3,o4),  (o12,o3,o14), (o12,o13,o4), (o12,o13,o14))
+
+_U0inU1_ID = """U0inU1_code = list(Lib.rngCode(rng) for rng in Lib.rngPull(O.Basis(4)))
+     with O=28 and Cawagas quasi-octonion=4."""
+ U0inU1_codes = (28, 28, 4, 28, 4, 28, 4, 28, 4, 28, 4, 28, 4, 28, 4)
 
 _f15Basis = "String basis names for comparison purposes."
 f15Basis = Tensor(("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9",
@@ -194,7 +204,7 @@ def triads15load(codes=[0], path=None, lastVars=False):
   parts = codes if codes != [0] else range(1, lastPart)
   for part in parts:
     if part not in range(lastPart):
-      raise Exception("Invalid codes for triads15load)")
+      raise Exception("Invalid codes for triads15load")
   Lib.checkMem(len(Triads15), 1)
   for idx in parts:
     if Triads15parts[idx][1]:
@@ -262,6 +272,46 @@ def saveCa(basename, varname, var, path="", dump=False):
                var[idx:idx +step], path, ".ca")
       cnt += 1
   return cnt
+
+def ringPull(cal, table=None, bas=None):
+  """ringPull(cal) - cal is unsigned associative calibration eg nac(.).
+     Return the list of subNArings of length siz for cal as a table."""
+  Lib._checkType(cal, CA, "ringPull")
+  bas = bas if bas else CA.Basis(15, 0, 1)
+  table = table if table else Matrix.Triads(*cal.spin(bas))
+  tabIdx = table._morphIn(bas)
+  bIdx = list(x+1 for x in range(16))
+  accum = set()
+  for tri in Lib.triadDump(Lib.allCycles(bas, table)[1], bas):
+    tri = Tensor(tri)._morphIn(bas)
+    first = abs(tabIdx.get(tri[0] -1, tri[1] -1))
+    rng = list(tri) +[first, abs(tabIdx.get(tri[0] -1, tri[2] -1)), 
+           abs(tabIdx.get(tri[1] -1, tri[2] -1)), abs(tabIdx.get(first -1, tri[2] -1))]
+    if len(set(rng)) == 7:
+      accum.add(tuple(sorted(rng)))
+  out = []
+  for rng in accum:
+    out.append(tuple(bas[x-1] for x in rng))
+  return out
+
+def subringCode(cal, subrng=None, table=None, bas=None):
+  """subruingCode(cal, [subrng]) - cal is unsigned associative calibration
+     eg nac(.). Return number of nonAssoc (type B & X) triads for subrng
+     eg output of ringPull(cal)."""
+  bas = bas if bas else CA.Basis(15,0,1)
+  table = table if table else Matrix.Triads(*cal.spin(bas))
+  return  len(list(Lib.triadDump(Lib.assocCycles(bas, table,
+                     subBasis=subrng, nonAssoc=True), bas)))
+
+def makeCal(arr, basis, table):
+  tri = ((0,1,2), (0,3,4), (0,5,6), (1,3,5), (1,4,6), (2,3,6), (2,4,5))
+  cal = list(arr[x[0]] *arr[x[1]] *arr[x[2]] for x in tri)
+  for x in enumerate(tri):
+    idxs = list(basis.index(arr[y]) for y in x[1])
+    bc = table.get(idxs[0], idxs[1])
+    if bc < 0:
+      cal[x[0]] *= -1
+  return sum(cal)
 
 # Windows needs to copy this function into calcCA.py due to a scoping bug.
 def taskTriads15build(triads, allTriads, values=list(range(105)), path=None,
@@ -459,14 +509,14 @@ def triads15parts(code, cpus=2, redo=[], path=""):
 
 _Nac15 = "The unique primaries for 101 sedonion-like algs. See Nac15Names."
 _Nac15Names = """Dictionary in Nac15 order of non-assoc. cnt to (algebra name,
-   first example part, part's idx, allSigns position) (282:I6=Sedenions). 
+   first example part, part's idx, allSigns position) (252:G9=Sedenions). 
    Check with nac15map()."""
-_Nac15map_0 = "list(nac15subalg(x) for x in Triads15_0.allSigns(36))#."
-Nac15map_0 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224,
+_Nac15Map_0 = "list(nac15subalg(x) for x in Triads15_0.allSigns(36))#."
+Nac15Map_0 = (210, 210, 210, 210, 210, 210, 210, 210, 224, 200, 224, 200, 224,
    200, 208, 208, 208, 208, 208, 208, 252, 228, 204, 180, 236, 236, 188, 188,
    220, 196, 220, 196, 204, 204, 204, 204)
 
-Nac15names = {
+Nac15Names = {
  128: ('A1',3,6793710,4), 130: ('A2',2,1106227,4), 132: ('A3',3,7643461,4),
  134: ('A4',3,6980279,22),136: ('A5',2,476144,17), 138: ('A6',2,973626,3),
  140: ('A7',1,89116,16),  142: ('A8',1,70147,3),   144: ('A9',0,67,26),
@@ -502,6 +552,10 @@ Nac15names = {
  320: ('K7',1,224,31),    322: ('K8',1,35370,14),  324: ('K9',2,193266,30),
  326: ('L1',3,3600142,7), 328: ('L2',3,8667056,7)}
 
+def nac(idx): 
+  """Return Nac15[idx] as Nac15Names.key algebra."""
+  return list(str2tri(Nac15[idx]).allSigns(Nac15Names[list(Nac15Names.keys())[idx]][3]))[-1]
+
 def nac15subalg(tri, pos=None):
   """nac15subalg(tri, [pos])
      Return non-assoc. cnt for tri or str2tri(tri).allSigns()[pos] sub-alg."""
@@ -510,8 +564,7 @@ def nac15subalg(tri, pos=None):
   if pos is not None:
     Lib._checkType(pos, int, "nac15subalg", (0,0))
     tri = list(tri.allSigns(pos))[pos]
-  return len(list(Lib.triadDump(Tensor.Triads(*tri.spin(f15Basis)) \
-                     .assocTriads(f15Basis,True),f15Basis)))
+  return tri.rngCode()
 
 def nac15genSA(tri, pos=True):
   """nas15genSA(tri, [pos=True ie half of 3E10])
@@ -625,10 +678,10 @@ Nac15 = [ \
 
 def nac15map(code=0):
   """nac15map([code=0=all])
-     Return invalid Nac15names checking Nac15 after triads15load(code)."""
+     Return invalid Nac15Names checking Nac15 after triads15load(code)."""
   idx = 0
   out = {}
-  for sa,nac in Nac15names.items():
+  for sa,nac in Nac15Names.items():
     tri = ""
     if code in (0, nac[1]):
       if nac[1] >= len(Triads15parts) or \
@@ -654,7 +707,7 @@ def taskNac15build(triads, nac15keys, offs=0, siz=0,
   errname = "error" +outname +".txt"
   out = []
   cnt = 0
-  bas = list("f%s" %chr(x+49 if x<9 else x+56) for x in range(15))
+  bas = CA.Basis(15, 0, 1)
   try:
     for idx,triad in enumerate(triads[offs:offs +siz]):
       for sgn,tri in enumerate(CA.str2tri(triad).allSigns(36)):
@@ -693,7 +746,7 @@ def taskNac15build(triads, nac15keys, offs=0, siz=0,
 def nac15build(triads, cpus=1, path="", name="nactmp"):
   """nac15build(triads,[cpus=1,path,name="nactmp"])
      Output new Nac15 signed sub-sedenion algs from 36 signed triads."""
-  nac15keys = set(Nac15names.keys())
+  nac15keys = set(Nac15Names.keys())
   out = []
   Lib.checkMem()
   status = oldStatus = None
@@ -757,7 +810,7 @@ def nac15parts(code, cpus=2, redo=[], path="."):
      For code>2 can do file indices listed in redo. If redo contains -1 then at
      the end accumulate all outnac files and write spin15-nac<code> file.
      Code==1 does both parts 0 and 1."""
-  global Nac15names
+  global Nac15Names
   global Nac15
   if isinstance(redo, int):
     redo = [redo]
@@ -810,7 +863,7 @@ def nac15parts(code, cpus=2, redo=[], path="."):
             newKeys.add(nac[0])
             out.append(nac)
             offs = idx *2000000
-            Nac15names[nac[0]] = ("", newPart, offs +nac[1], nac[2])
+            Nac15Names[nac[0]] = ("", newPart, offs +nac[1], nac[2])
             Nac15.append(nac[3])
       Lib.save(outname %part, outname %part, out, path, ".ca")
   if -1 in redo or not redo:
@@ -818,9 +871,9 @@ def nac15parts(code, cpus=2, redo=[], path="."):
     Lib.save(outname %"triads.ca", "nac15", Nac15, path, ".ca")
   return len(Nac15)
 
-# TBD: Triads7 reflections have the same structure for each primary
-# This is easy to just check the remainder. CA(15) doesn't have the equivalent.
-Nac15mirrors = []
+_Nac15Mirrors = """Triads7 reflections have the same structure for each primary
+    but CA(15) doesn't have the equivalent. Easy to just check the remainder TBD."""
+Nac15Mirrors = []
 
 def nac15mirrors(idx):
   """nac15mirrors(idx)
@@ -845,7 +898,7 @@ def nac15mirrors(idx):
       #buf.append(idx32768)
       #buf.append(32768 -idx32768)
     cmp.append(buf)#sorted(buf)[:36])
-  #if cmp != Nas15mirrors:
+  #if cmp != Nac15Mirrors:
   #  print("NOT EQUAL", idx)
   #  return cmp
   #return []
@@ -857,8 +910,7 @@ def triadsShalf(idx):
   if idx < 0 or idx >= len(Triads15):
     raise Exception("Invalid triadsShalf Triads15 index")
   for phi in CA.str2tri(Triads15[idx]).allSigns(True):
-    if len(list(Lib.triadDump(Tensor.Triads(*phi.spin(f15Basis)) \
-                          .assocTriads(f15Basis,True), f15Basis,1))) == 252:
+    if phi.rngCode() == 252:
       yield phi
 
 def triads15all(idx, pos=0):
